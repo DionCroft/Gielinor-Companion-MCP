@@ -29,6 +29,44 @@ const MIGRATIONS: ReadonlyArray<{ version: number; sql: string }> = [
       );
     `,
   },
+  {
+    version: 2,
+    sql: `
+      CREATE TABLE IF NOT EXISTS quests (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        quest_json TEXT NOT NULL,
+        content_hash TEXT NOT NULL,
+        source_revision TEXT,
+        source_updated_at TEXT,
+        last_checked_at TEXT NOT NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_quests_name
+        ON quests(name COLLATE NOCASE);
+
+      CREATE TABLE IF NOT EXISTS quest_aliases (
+        alias_key TEXT PRIMARY KEY,
+        alias TEXT NOT NULL,
+        quest_id TEXT NOT NULL REFERENCES quests(id) ON DELETE CASCADE
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_quest_aliases_quest_id
+        ON quest_aliases(quest_id);
+
+      CREATE TABLE IF NOT EXISTS quest_sync_status (
+        singleton_id INTEGER PRIMARY KEY CHECK (singleton_id = 1),
+        state TEXT NOT NULL CHECK (state IN ('ready', 'failed')),
+        provider TEXT,
+        source_revision TEXT,
+        last_attempt_at TEXT NOT NULL,
+        last_successful_sync_at TEXT,
+        quest_count INTEGER NOT NULL DEFAULT 0 CHECK (quest_count >= 0),
+        last_error_code TEXT,
+        last_error_message TEXT
+      );
+    `,
+  },
 ];
 
 function migrate(database: DatabaseConnection): void {
@@ -63,4 +101,17 @@ export function openDatabase(filename: string): DatabaseConnection {
 
 export function getDatabaseSchemaVersion(database: DatabaseConnection): number {
   return database.pragma("user_version", { simple: true }) as number;
+}
+
+export async function backupDatabase(
+  sourceFilename: string,
+  destinationFilename: string,
+): Promise<void> {
+  mkdirSync(dirname(resolve(destinationFilename)), { recursive: true });
+  const database = new Database(sourceFilename);
+  try {
+    await database.backup(destinationFilename);
+  } finally {
+    database.close();
+  }
 }

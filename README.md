@@ -7,15 +7,16 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 Gielinor Companion MCP is a safe, model-independent foundation for deterministic
-RuneScape 3 planning. Version 0.1 provides public Hiscores, local player profiles,
-XP calculations, current Jagex Grand Exchange guide prices, and a standards-based
-stdio MCP server. It never controls the game client.
+RuneScape 3 planning. Version 0.2 provides public Hiscores, local player profiles,
+XP calculations, current Jagex Grand Exchange guide prices, revision-aware quest
+data, prerequisite routes, manual quest progress, and a standards-based stdio MCP
+server. It never controls the game client.
 
 ## Release status
 
-**Current version: 0.1.0 — Foundation.** This is an early working release. Quest
-planning begins in 0.2; the desktop interface, local Ollama/LM Studio chat runtime,
-and hosted MCP are roadmap work and are not represented as complete.
+**Current version: 0.2.0 — Quest Companion.** This is an early working release.
+The levelling planner, desktop interface, local Ollama/LM Studio chat runtime, and
+hosted MCP are roadmap work and are not represented as complete.
 
 There are no interface screenshots yet because 0.1 is a headless MCP release.
 
@@ -29,23 +30,26 @@ There are no interface screenshots yet because 0.1 is a headless MCP release.
 - Jagex ItemDB current guide-price lookup by item ID.
 - Persistent cache-first, stale-while-revalidate provider data.
 - Timeouts, bounded retries, response validation, provenance, and timestamps.
-- Eleven local MCP tools over stdio.
+- RuneScape Wiki quest catalogue with revisions, content hashes, source links,
+  aliases, and transactional rollback.
+- Prerequisite graph traversal, cycle detection, alternatives, available quests,
+  missing requirements, route planning, and aggregated shopping lists.
+- Manual completed/in-progress/not-started status in local profiles.
+- Twenty-four local MCP tools over stdio.
 - Portable, strict, schema-versioned profile import/export.
 - Fixture-based unit and integration tests; live provider tests are opt-in.
 
 ## Architecture
 
 ```text
-Jagex public APIs
-        |
-        v
-provider adapters ---- persistent provider cache
-        |
-        v
-domain ports + core services ---- SQLite profile repository
-        |
-        v
-MCP tool service ---- stdio transport ---- MCP client
+Jagex public APIs ---- provider cache
+RuneScape Wiki  ----- revision-aware quest sync
+                              |
+                              v
+domain ports + core services ---- SQLite profiles/quests
+                              |
+                              v
+                MCP tool service ---- stdio MCP client
 ```
 
 Business rules are in `packages/core`. Provider parsing, SQLite, and MCP transport
@@ -69,6 +73,15 @@ corepack pnpm start:mcp
 
 The last command starts an MCP stdio process and waits for a client. It does not
 provide a terminal chat prompt.
+
+Populate or refresh the local quest catalogue without an MCP client:
+
+```sh
+corepack pnpm refresh:quests
+```
+
+Before the first migration from schema 1 to schema 2, this command creates a
+one-time sibling database backup and verifies that profile rows remain unchanged.
 
 By default, profiles are stored in
 `~/.gielinor-companion/gielinor.db`. Override this and other settings with the
@@ -98,18 +111,18 @@ does not contain LM Studio-specific behavior.
 
 ### Ollama
 
-The shared Ollama agent runtime is planned for 0.6. Version 0.1 does not claim
+The shared Ollama agent runtime is planned for 0.6. Version 0.2 does not claim
 direct Ollama tool-loop support. An MCP-capable third-party Ollama host may launch
 the same stdio command, but is outside this release's tested surface.
 
 ### Standalone desktop
 
 The Tauri desktop application and non-AI dashboard are planned for 0.5. They are
-not included in the headless 0.1 release.
+not included in the headless 0.2 release.
 
 ### ChatGPT-compatible remote MCP
 
-Hosted Streamable HTTP transport is planned for 0.7. Version 0.1 exposes local
+Hosted Streamable HTTP transport is planned for 0.7. Version 0.2 exposes local
 stdio only and cannot be connected as a remote ChatGPT MCP app.
 
 ## MCP tools
@@ -125,6 +138,19 @@ stdio only and cannot be connected as a remote ChatGPT MCP app.
 - `calculate_xp_remaining`
 - `get_skill_progress`
 - `get_item_price`
+- `search_quests`
+- `get_quest`
+- `get_quest_requirements`
+- `get_quest_rewards`
+- `get_quest_source`
+- `set_quest_status`
+- `set_multiple_quest_statuses`
+- `list_available_quests`
+- `list_missing_quest_requirements`
+- `create_quest_route`
+- `create_quest_shopping_list`
+- `refresh_quest_data`
+- `get_quest_data_status`
 
 Every result is JSON and includes generation/source metadata. Full contracts,
 examples, and error cases are in [the MCP tool reference](docs/mcp-tools/README.md).
@@ -136,19 +162,22 @@ corepack pnpm build
 corepack pnpm typecheck
 corepack pnpm lint
 corepack pnpm test
+corepack pnpm test:unit
+corepack pnpm test:integration
+corepack pnpm test:mcp
+corepack pnpm test:providers
+corepack pnpm test:database
+corepack pnpm test:e2e
 ```
 
-Optional live smoke tests make real public API requests:
+Optional live smoke tests make real public API requests and remain outside
+deterministic CI:
 
 ```sh
-RUN_LIVE_API_TESTS=1 corepack pnpm test:live
-```
-
-On PowerShell:
-
-```powershell
-$env:RUN_LIVE_API_TESTS = "1"
 corepack pnpm test:live
+corepack pnpm test:live:hiscores
+corepack pnpm test:live:itemdb
+corepack pnpm test:live:wiki
 ```
 
 Normal CI never requires live services. See [CONTRIBUTING.md](CONTRIBUTING.md).
@@ -159,11 +188,14 @@ Normal CI never requires live services. See [CONTRIBUTING.md](CONTRIBUTING.md).
 - **Current item guide price:** Jagex Grand Exchange ItemDB. Default fresh period:
   5 minutes.
 - **XP thresholds:** deterministic RuneScape XP formula, generated locally.
+- **Quest facts and prerequisites:** RuneScape Wiki Bucket and MediaWiki APIs,
+  refreshed on demand with source revisions and content hashes.
 
 Responses distinguish fresh, stale, and newly fetched data. A stale validated
 record may be served temporarily while refresh happens; malformed responses never
 replace it. Prices are guide values, can be delayed, and are not guaranteed trade
-prices. See [data-source assumptions and risks](docs/data-sources/version-0.1.md).
+prices. See the [Version 0.1](docs/data-sources/version-0.1.md) and
+[Version 0.2](docs/data-sources/version-0.2.md) data-source notes.
 
 ## Privacy and safety
 

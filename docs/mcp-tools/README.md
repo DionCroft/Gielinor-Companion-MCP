@@ -1,4 +1,4 @@
-# MCP tool reference — Version 0.1
+# MCP tool reference — Version 0.2
 
 All tools use strict JSON object inputs. Successful responses use:
 
@@ -15,8 +15,9 @@ All tools use strict JSON object inputs. Successful responses use:
 Errors set MCP `isError: true` and return
 `{"error":{"code":"STABLE_CODE","message":"Safe message"}}`. Common errors are
 `NOT_FOUND`, `PROVIDER_NOT_FOUND`, `PROVIDER_TIMEOUT`, `PROVIDER_UNAVAILABLE`,
-`MALFORMED_PROVIDER_RESPONSE`, and `INTERNAL_ERROR`. Schema violations are
-reported by the MCP SDK before a handler runs.
+`MALFORMED_PROVIDER_RESPONSE`, `EMPTY_PROVIDER_RESPONSE`,
+`QUEST_PREREQUISITE_CYCLE`, `MISSING_QUEST_DATA`, and `INTERNAL_ERROR`. Schema
+violations are reported by the MCP SDK before a handler runs.
 
 ## `create_player_profile`
 
@@ -328,3 +329,120 @@ Response data:
   "cacheStoredAt": "2026-07-23T17:59:00.000Z"
 }
 ```
+
+## Quest-tool data and privacy
+
+Quest reads use the last fully validated local RuneScape Wiki snapshot. They do
+not make a network request. `refresh_quest_data` is the only quest tool that
+contacts the Wiki. Status tools write only the selected local profile; no
+RuneScape account or client is read or modified.
+
+## `search_quests`
+
+Purpose: search canonical names and aliases. Input: `query` and optional `limit`
+(1–100, default 20). Output: complete matching quest records. Example:
+`{"query":"plague","limit":5}`. Source/cache: local revisioned Wiki snapshot.
+Errors: empty input or invalid stored data. Privacy: no profile data is read.
+
+## `get_quest`
+
+Purpose: resolve one quest by ID, name, or alias. Input:
+`{"quest":"Plague's End"}`. Output: the complete quest record, including
+requirements, rewards, provenance, revision, and content hash. Source/cache:
+local revisioned Wiki snapshot. Errors: `NOT_FOUND` or invalid stored data.
+Privacy: no profile data is read.
+
+## `get_quest_requirements`
+
+Purpose: return only planning requirements. Input:
+`{"quest":"plagues-end"}`. Output includes `prerequisiteGroups`,
+`skillRequirements`, `questPointRequirement`, `otherRequirements`,
+`itemRequirements`, and `recommendedItems`. Source/cache: local revisioned Wiki
+snapshot. Errors: `NOT_FOUND`. Privacy: no profile data is read.
+
+## `get_quest_rewards`
+
+Purpose: return quest points and structured rewards. Input:
+`{"quest":"Plague's End"}`. Output:
+`{"questId":"plagues-end","questPointReward":2,"rewards":[...]}`. Source/cache:
+local revisioned Wiki snapshot. Errors: `NOT_FOUND`. Reward text is factual
+source data, not a guarantee of account eligibility. Privacy: no profile data.
+
+## `get_quest_source`
+
+Purpose: explain provenance. Input: `{"quest":"plagues-end"}`. Output includes
+source/guide URLs, source revision, source update/check timestamps, and SHA-256
+content hash. Source/cache: local sync metadata. Errors: `NOT_FOUND`. Privacy: no
+profile data is read.
+
+## `set_quest_status`
+
+Purpose: set one manual local status. Input:
+`{"profileId":"<uuid>","quest":"Plague's End","status":"completed"}` where status
+is `not-started`, `in-progress`, or `completed`. Output: the updated profile.
+Source/cache: local SQLite profile and quest alias catalogue. Errors:
+`NOT_FOUND`, invalid status, or database failure. Privacy: changes local
+companion data only; it does not claim the in-game quest is complete.
+
+## `set_multiple_quest_statuses`
+
+Purpose: apply 1–500 status changes with one profile save. Input:
+`{"profileId":"<uuid>","updates":[{"quest":"Plague's End","status":"completed"}]}`.
+Output: the updated profile with disjoint, sorted completed/in-progress IDs.
+Source/cache: local SQLite. Errors: unknown quest/profile, empty/invalid batch, or
+database failure. The batch is resolved before saving. Privacy: local only.
+
+## `list_available_quests`
+
+Purpose: list not-started quests whose known prerequisite, skill, and tracked
+quest-point requirements are met. Input: `{"profileId":"<uuid>"}`. Output:
+quest/status records with manual checks, recommendation score, and explainable
+reasons. Source/cache: local profile plus local Wiki snapshot. Errors: unknown
+profile or invalid stored data. Manual requirements remain visible and are not
+silently asserted. Privacy: reads one local profile.
+
+## `list_missing_quest_requirements`
+
+Purpose: show blockers across a target route. Input:
+`{"profileId":"<uuid>","quest":"Plague's End"}`. Output: missing prerequisite
+statuses, maximum missing skill levels with requiring quests, and manual checks.
+Source/cache: local profile plus local Wiki snapshot. Errors: `NOT_FOUND`,
+`MISSING_QUEST_DATA`, or `QUEST_PREREQUISITE_CYCLE`. Privacy: reads one local
+profile; no bank/inventory data is inferred.
+
+## `create_quest_route`
+
+Purpose: topologically order uncompleted prerequisites before the target. Input:
+`{"profileId":"<uuid>","quest":"Plague's End"}`. Output:
+`{"targetQuestId":"plagues-end","steps":[...],"alternatives":[...]}`. `any`
+groups select the lowest-cost unsatisfied branch while reporting every option.
+Source/cache: deterministic core graph over local data. Errors:
+`MISSING_QUEST_DATA`, `QUEST_PREREQUISITE_CYCLE`, or `NOT_FOUND`. Privacy: reads
+manual statuses from one local profile.
+
+## `create_quest_shopping_list`
+
+Purpose: aggregate required top-level items for every remaining route quest.
+Input: `{"profileId":"<uuid>","quest":"Plague's End"}`. Output: route quest IDs
+and case-insensitively deduplicated item quantities, alternatives, and requiring
+quest IDs. Source/cache: deterministic route plus local Wiki snapshot. Errors are
+the route errors above. Quantities are planning guidance; bank contents,
+consumption, and tradeability are not inferred. Privacy: reads one local profile.
+
+## `refresh_quest_data`
+
+Purpose: retrieve a new complete Wiki snapshot and apply it transactionally.
+Input: `{}`. Output counts `total`, `inserted`, `updated`, `unchanged`, and
+`removed`, plus provider revision and check time. Source: RuneScape Wiki Bucket
+and MediaWiki APIs; no background schedule in Version 0.2. Errors distinguish
+timeouts, network/HTTP failures, malformed/empty responses, suspicious
+truncation, alias ambiguity, and database failure. The previous valid catalogue
+is retained on failure. Privacy: sends only the configured User-Agent.
+
+## `get_quest_data_status`
+
+Purpose: inspect refresh health without contacting the network. Input: `{}`.
+Output state (`never-synced`, `ready`, or `failed`), retained quest count,
+provider/revision, last attempt/success times, and safe last error where present.
+Source/cache: local SQLite sync status. Errors: database failure. Privacy: no
+profile data is read and internal paths/stacks are not returned.

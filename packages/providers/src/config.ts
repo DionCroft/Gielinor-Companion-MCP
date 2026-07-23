@@ -10,6 +10,8 @@ export type ProviderConfig = {
   retries: number;
   hiscoresUrl: string;
   geUrl: string;
+  wikiApiUrl: string;
+  wikiPageUrl: string;
   hiscoresCache: CachePolicy;
   geCache: CachePolicy;
 };
@@ -22,7 +24,7 @@ export function loadProviderConfig(environment: NodeJS.ProcessEnv = process.env)
   return {
     userAgent:
       environment.GIELINOR_USER_AGENT ??
-      "Gielinor-Companion-MCP/0.1.0 (https://github.com/DionCroft/Gielinor-Companion-MCP)",
+      "Gielinor-Companion-MCP/0.2.0 (https://github.com/DionCroft/Gielinor-Companion-MCP)",
     timeoutMs: envInteger(environment, "GIELINOR_HTTP_TIMEOUT_MS", 10_000),
     retries: z.coerce
       .number()
@@ -35,6 +37,8 @@ export function loadProviderConfig(environment: NodeJS.ProcessEnv = process.env)
     geUrl:
       environment.GIELINOR_GE_URL ??
       "https://secure.runescape.com/m=itemdb_rs/api/catalogue/detail.json",
+    wikiApiUrl: environment.GIELINOR_WIKI_API_URL ?? "https://runescape.wiki/api.php",
+    wikiPageUrl: environment.GIELINOR_WIKI_PAGE_URL ?? "https://runescape.wiki/w/",
     hiscoresCache: {
       freshForMs: envInteger(environment, "GIELINOR_HISCORES_TTL_MS", 15 * 60_000),
       staleForMs: envInteger(environment, "GIELINOR_HISCORES_STALE_MS", 60 * 60_000),

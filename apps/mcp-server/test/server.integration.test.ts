@@ -1,4 +1,4 @@
-import type { PriceProvider, ProfileService } from "@gielinor/core";
+import type { PriceProvider, ProfileService, QuestService } from "@gielinor/core";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { afterEach, describe, expect, it } from "vitest";
@@ -16,7 +16,10 @@ afterEach(async () => {
 
 describe("MCP server protocol integration", () => {
   it("lists tools and returns structured XP results over an MCP transport", async () => {
-    const service = new CompanionToolService({} as ProfileService, {} as PriceProvider);
+    const quests = {
+      getDataStatus: async () => ({ state: "ready", questCount: 2 }),
+    } as unknown as QuestService;
+    const service = new CompanionToolService({} as ProfileService, {} as PriceProvider, quests);
     const server = createCompanionServer(service);
     const client = new Client({ name: "integration-test", version: "1.0.0" });
     const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
@@ -27,6 +30,23 @@ describe("MCP server protocol integration", () => {
 
     const listed = await client.listTools();
     expect(listed.tools.map((tool) => tool.name)).toContain("calculate_xp_remaining");
+    expect(listed.tools.map((tool) => tool.name)).toEqual(
+      expect.arrayContaining([
+        "search_quests",
+        "get_quest",
+        "get_quest_requirements",
+        "get_quest_rewards",
+        "get_quest_source",
+        "set_quest_status",
+        "set_multiple_quest_statuses",
+        "list_available_quests",
+        "list_missing_quest_requirements",
+        "create_quest_route",
+        "create_quest_shopping_list",
+        "refresh_quest_data",
+        "get_quest_data_status",
+      ]),
+    );
 
     const result = await client.callTool({
       name: "calculate_xp_remaining",
@@ -40,6 +60,16 @@ describe("MCP server protocol integration", () => {
         experienceRemaining: 12_034_431,
       },
       meta: { source: "deterministic RuneScape XP table" },
+    });
+
+    const status = await client.callTool({
+      name: "get_quest_data_status",
+      arguments: {},
+    });
+    expect(status.isError).not.toBe(true);
+    expect(status.structuredContent).toMatchObject({
+      data: { state: "ready", questCount: 2 },
+      meta: { source: "local SQLite quest sync status" },
     });
   });
 });

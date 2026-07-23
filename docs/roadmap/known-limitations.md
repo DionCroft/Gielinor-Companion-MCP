@@ -1,6 +1,5 @@
-# Version 0.1 known limitations
+# Version 0.2 known limitations
 
-- Quest search, requirements, routes, status, and shopping lists start in 0.2.
 - Training methods and multi-stage budget/time plans start in 0.3.
 - Item search, buy limits, price history, averages, volatility, and valuation
   start in 0.4.
@@ -13,5 +12,9 @@
 - No desktop/no-AI dashboard or agent runtime is shipped.
 - No npm release or signed desktop artifact is published by this source snapshot.
 - Mode-specific Hiscores endpoint overrides are not independently configurable.
-- Cache refresh diagnostics are currently surfaced through tool errors rather
-  than a dedicated source-status tool.
+- Wiki item/reward fields are human-maintained markup. Quantities and explicit
+  alternatives are normalized, but consumption and tradeability are not inferred.
+- `Misc:` quest requirements remain visible manual checks. Lore-only `Full:` and
+  `Follows:` graphs are not treated as start requirements.
+- Quest status is manually tracked because Jagex Hiscores does not expose a
+  trustworthy complete quest-state feed.

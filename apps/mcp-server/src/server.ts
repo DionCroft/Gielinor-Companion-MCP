@@ -9,7 +9,12 @@ import {
   GetPlayerStatsToolInputSchema,
   GetSkillProgressToolInputSchema,
   ImportPlayerProfileToolInputSchema,
+  ProfileQuestInputSchema,
   ProfileIdInputSchema,
+  QuestIdentifierInputSchema,
+  SearchQuestsToolInputSchema,
+  SetMultipleQuestStatusesToolInputSchema,
+  SetQuestStatusToolInputSchema,
   UpdatePlayerPreferencesToolInputSchema,
 } from "./schemas.js";
 import { publicToolError, type CompanionToolService, type ToolEnvelope } from "./tool-service.js";
@@ -35,7 +40,7 @@ async function run(operation: () => Promise<ToolEnvelope<unknown>>): Promise<Cal
 
 export function createCompanionServer(tools: CompanionToolService): McpServer {
   const server = new McpServer(
-    { name: "gielinor-companion-mcp", version: "0.1.0" },
+    { name: "gielinor-companion-mcp", version: "0.2.0" },
     {
       instructions:
         "Use these deterministic, read-only RuneScape 3 data and planning tools. " +
@@ -162,6 +167,146 @@ export function createCompanionServer(tools: CompanionToolService): McpServer {
       annotations: { readOnlyHint: true },
     },
     ({ itemId, forceRefresh }) => run(() => tools.getItemPrice(itemId, forceRefresh ?? false)),
+  );
+
+  server.registerTool(
+    "search_quests",
+    {
+      description: "Search the validated local quest catalogue by canonical name or alias.",
+      inputSchema: SearchQuestsToolInputSchema.shape,
+      annotations: { readOnlyHint: true },
+    },
+    ({ query, limit }) => run(() => tools.searchQuests(query, limit)),
+  );
+
+  server.registerTool(
+    "get_quest",
+    {
+      description:
+        "Get one structured quest record from the last valid RuneScape Wiki synchronization.",
+      inputSchema: QuestIdentifierInputSchema.shape,
+      annotations: { readOnlyHint: true },
+    },
+    ({ quest }) => run(() => tools.getQuest(quest)),
+  );
+
+  server.registerTool(
+    "get_quest_requirements",
+    {
+      description:
+        "Get prerequisite quests, skills, items, recommendations, and manually checked requirements.",
+      inputSchema: QuestIdentifierInputSchema.shape,
+      annotations: { readOnlyHint: true },
+    },
+    ({ quest }) => run(() => tools.getQuestRequirements(quest)),
+  );
+
+  server.registerTool(
+    "get_quest_rewards",
+    {
+      description: "Get structured quest points, experience, unlocks, and other rewards.",
+      inputSchema: QuestIdentifierInputSchema.shape,
+      annotations: { readOnlyHint: true },
+    },
+    ({ quest }) => run(() => tools.getQuestRewards(quest)),
+  );
+
+  server.registerTool(
+    "get_quest_source",
+    {
+      description:
+        "Get quest source URL, source revision, timestamps, and content hash for provenance.",
+      inputSchema: QuestIdentifierInputSchema.shape,
+      annotations: { readOnlyHint: true },
+    },
+    ({ quest }) => run(() => tools.getQuestSource(quest)),
+  );
+
+  server.registerTool(
+    "set_quest_status",
+    {
+      description:
+        "Set completed, in-progress, or not-started status in a local companion profile only.",
+      inputSchema: SetQuestStatusToolInputSchema.shape,
+      annotations: { destructiveHint: false, idempotentHint: true },
+    },
+    ({ profileId, quest, status }) => run(() => tools.setQuestStatus(profileId, quest, status)),
+  );
+
+  server.registerTool(
+    "set_multiple_quest_statuses",
+    {
+      description: "Apply multiple validated quest-status changes to one local profile atomically.",
+      inputSchema: SetMultipleQuestStatusesToolInputSchema.shape,
+      annotations: { destructiveHint: false, idempotentHint: true },
+    },
+    ({ profileId, updates }) => run(() => tools.setMultipleQuestStatuses(profileId, updates)),
+  );
+
+  server.registerTool(
+    "list_available_quests",
+    {
+      description:
+        "List quests whose known quest and skill requirements the selected local profile meets, ranked with explainable recommendations.",
+      inputSchema: ProfileIdInputSchema.shape,
+      annotations: { readOnlyHint: true },
+    },
+    ({ profileId }) => run(() => tools.listAvailableQuests(profileId)),
+  );
+
+  server.registerTool(
+    "list_missing_quest_requirements",
+    {
+      description:
+        "List missing prerequisite statuses, skills, and manually checked requirements for a target quest route.",
+      inputSchema: ProfileQuestInputSchema.shape,
+      annotations: { readOnlyHint: true },
+    },
+    ({ profileId, quest }) => run(() => tools.listMissingQuestRequirements(profileId, quest)),
+  );
+
+  server.registerTool(
+    "create_quest_route",
+    {
+      description:
+        "Create a deterministic prerequisite-first route to a target quest, with cycle detection and alternative branches.",
+      inputSchema: ProfileQuestInputSchema.shape,
+      annotations: { readOnlyHint: true },
+    },
+    ({ profileId, quest }) => run(() => tools.createQuestRoute(profileId, quest)),
+  );
+
+  server.registerTool(
+    "create_quest_shopping_list",
+    {
+      description:
+        "Aggregate required items across the uncompleted quests in a target quest route.",
+      inputSchema: ProfileQuestInputSchema.shape,
+      annotations: { readOnlyHint: true },
+    },
+    ({ profileId, quest }) => run(() => tools.createQuestShoppingList(profileId, quest)),
+  );
+
+  server.registerTool(
+    "refresh_quest_data",
+    {
+      description:
+        "Fetch and validate a revision-aware RuneScape Wiki quest snapshot, then apply it transactionally. The previous valid snapshot survives failures.",
+      inputSchema: EmptyInputSchema.shape,
+      annotations: { destructiveHint: false, idempotentHint: true },
+    },
+    () => run(() => tools.refreshQuestData()),
+  );
+
+  server.registerTool(
+    "get_quest_data_status",
+    {
+      description:
+        "Read quest catalogue count, source revision, last successful sync, and the last safe refresh error.",
+      inputSchema: EmptyInputSchema.shape,
+      annotations: { readOnlyHint: true },
+    },
+    () => run(() => tools.getQuestDataStatus()),
   );
 
   return server;

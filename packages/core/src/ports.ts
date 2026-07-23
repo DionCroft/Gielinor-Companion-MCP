@@ -5,6 +5,10 @@ import type {
   PlayerStatsResult,
   PriceHistoryRange,
   PricePoint,
+  Quest,
+  QuestDataSnapshot,
+  QuestDataStatus,
+  QuestSyncResult,
 } from "@gielinor/shared-types";
 
 export interface ProviderRequestOptions {
@@ -33,4 +37,17 @@ export interface PlayerProfileRepository {
   getById(id: string): Promise<PlayerProfile | null>;
   list(): Promise<PlayerProfile[]>;
   save(profile: PlayerProfile): Promise<PlayerProfile>;
+}
+
+export interface QuestDataProvider {
+  fetchSnapshot(): Promise<QuestDataSnapshot>;
+}
+
+export interface QuestRepository {
+  getByIdOrAlias(identifier: string): Promise<Quest | null>;
+  list(): Promise<Quest[]>;
+  search(query: string, limit: number): Promise<Quest[]>;
+  replaceSnapshot(snapshot: QuestDataSnapshot): Promise<QuestSyncResult>;
+  getDataStatus(): Promise<QuestDataStatus>;
+  recordSyncFailure(code: string, message: string, attemptedAt: string): Promise<void>;
 }
