@@ -7,20 +7,16 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 Gielinor Companion MCP is a safe, model-independent foundation for deterministic
-RuneScape 3 planning. Version 0.4 provides public Hiscores, local player profiles,
-authoritative standard and Invention XP calculations, revision-aware quest and
-training data, multi-stage levelling plans, searchable Grand Exchange data and
-historical price analytics, and a standards-based stdio MCP server. It never
-controls the game client.
+RuneScape 3 planning. Version 0.5 adds an accessible Tauri/React desktop
+application to the existing public Hiscores, local profiles, quest routes,
+levelling plans, Grand Exchange analytics, and standards-based stdio MCP server.
+It works without AI and never controls the game client.
 
 ## Release status
 
-**Current version: 0.4.0 — Grand Exchange Intelligence.** This is an early
-working release.
-The desktop interface, local Ollama/LM Studio chat runtime, and hosted MCP are
-roadmap work and are not represented as complete.
-
-There are no interface screenshots yet because 0.4 remains a headless MCP release.
+**Current version: 0.5.0 — Standalone Desktop and No-AI Dashboard.** This is an
+early working release. The deterministic desktop application is complete; local
+Ollama/LM Studio chat and hosted MCP remain roadmap work.
 
 ## Features
 
@@ -51,8 +47,15 @@ There are no interface screenshots yet because 0.4 remains a headless MCP releas
   explicit missing-data behavior.
 - Quest-XP reward comparison and weekly goal schedules.
 - Forty-eight local MCP tools over stdio.
+- Tauri 2 and React desktop application with first-run setup, multiple profiles,
+  skills, quest routes/checklists, levelling plans, GE charts, shopping lists,
+  goals, source status, settings, update status, and legal/safety information.
+- Bundled least-privilege MCP sidecar, strict CSP, keyboard navigation,
+  responsive layouts, system/light/dark themes, offline retained-data status,
+  and a complete no-AI mode.
 - Portable, strict, schema-versioned profile import/export.
-- Fixture-based unit and integration tests; live provider tests are opt-in.
+- Fixture-based unit, component, native-command, integration, and Playwright
+  journey tests; live provider tests are opt-in.
 
 ## Architecture
 
@@ -65,6 +68,9 @@ domain ports + core services ---- SQLite profiles/quests/training/prices
                               |
                               v
                 MCP tool service ---- stdio MCP client
+                         |
+                         v
+              Tauri command bridge ---- React desktop
 ```
 
 Business rules are in `packages/core`. Provider parsing, SQLite, and MCP transport
@@ -76,6 +82,8 @@ depend on those ports; the core never depends on a UI or model vendor. See
 - Node.js 20 or later
 - Corepack (included with supported Node distributions)
 - A C++ build toolchain only if a prebuilt `better-sqlite3` binary is unavailable
+- Rust 1.85 or later and platform Tauri prerequisites only for desktop source
+  builds
 
 ## Quick start
 
@@ -138,18 +146,27 @@ does not contain LM Studio-specific behavior.
 
 ### Ollama
 
-The shared Ollama agent runtime is planned for 0.6. Version 0.4 does not claim
+The shared Ollama agent runtime is planned for 0.6. Version 0.5 does not claim
 direct Ollama tool-loop support. An MCP-capable third-party Ollama host may launch
 the same stdio command, but is outside this release's tested surface.
 
 ### Standalone desktop
 
-The Tauri desktop application and non-AI dashboard are planned for 0.5. They are
-not included in the headless 0.4 release.
+Version 0.5 includes the standalone no-AI desktop application. Build and run it
+from source:
+
+```sh
+corepack pnpm build
+corepack pnpm desktop:dev
+```
+
+Create native installers with `corepack pnpm desktop:build`. The build bundles a
+target-specific Node sidecar and production MCP runtime; generated binaries are
+not committed. See the [desktop installation guide](docs/installation/desktop.md).
 
 ### ChatGPT-compatible remote MCP
 
-Hosted Streamable HTTP transport is planned for 0.7. Version 0.4 exposes local
+Hosted Streamable HTTP transport is planned for 0.7. Version 0.5 exposes local
 stdio only and cannot be connected as a remote ChatGPT MCP app.
 
 ## MCP tools
@@ -219,6 +236,9 @@ corepack pnpm test:mcp
 corepack pnpm test:providers
 corepack pnpm test:database
 corepack pnpm test:e2e
+corepack pnpm test:desktop
+corepack pnpm test:desktop:e2e
+corepack pnpm test:desktop:rust
 ```
 
 Optional live smoke tests make real public API requests and remain outside
@@ -261,6 +281,8 @@ prices. See the [Version 0.1](docs/data-sources/version-0.1.md) and
 [Version 0.2](docs/data-sources/version-0.2.md), and
 [Version 0.3](docs/data-sources/version-0.3.md), and
 [Version 0.4](docs/data-sources/version-0.4.md) data-source notes.
+The desktop application does not introduce a new game-data provider; see the
+[Version 0.5 desktop source behavior](docs/data-sources/version-0.5.md).
 
 ## Privacy and safety
 

@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Gielinor Companion compass mark">
+  <defs>
+    <linearGradient id="g" x1="80" y1="64" x2="430" y2="452" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#66E6B6"/>
+      <stop offset="1" stop-color="#D5A94D"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="#09110F"/>
+  <circle cx="256" cy="256" r="168" fill="#101E1A" stroke="#29483D" stroke-width="14"/>
+  <path d="M256 82l37 137 137 37-137 37-37 137-37-137-137-37 137-37 37-137z" fill="url(#g)"/>
+  <circle cx="256" cy="256" r="42" fill="#09110F" stroke="#F0D78B" stroke-width="11"/>
+  <path d="M256 119v38M393 256h-38M256 393v-38M119 256h38" stroke="#E9F5ED" stroke-width="12" stroke-linecap="round"/>
+</svg>

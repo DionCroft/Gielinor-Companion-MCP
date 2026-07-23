@@ -39,5 +39,65 @@ jobs:
       - name: Unit and integration tests
         run: pnpm test
 
-      - name: Build all Version 0.1 workspaces
+      - name: Build all current workspaces
         run: pnpm build
+
+  desktop-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.5
+          run_install: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Chromium
+        run: pnpm --filter @gielinor/desktop exec playwright install --with-deps chromium
+
+      - name: Exercise desktop user journeys
+        run: pnpm test:desktop:e2e
+
+  desktop-native:
+    runs-on: windows-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.5
+          run_install: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build TypeScript runtime
+        run: pnpm build
+
+      - name: Prepare production sidecar
+        run: pnpm --filter @gielinor/desktop prepare:runtime
+
+      - name: Test native command boundary
+        run: pnpm test:desktop:rust
+
+      - name: Build Windows application
+        run: pnpm --filter @gielinor/desktop exec tauri build --no-bundle

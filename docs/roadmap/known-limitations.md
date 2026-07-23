@@ -1,4 +1,4 @@
-# Version 0.4 known limitations
+# Version 0.5 known limitations
 
 - Public RS3 sources provide guide prices and daily history, not an instant
   order book. Instant buy/high and sell/low prices are reported as unavailable.
@@ -14,8 +14,14 @@
 - Profiles have no delete tool in 0.1; this avoids an unnecessary destructive MCP
   operation before profile-management UI work.
 - Only local stdio transport is shipped. There is no hosted endpoint.
-- No desktop/no-AI dashboard or agent runtime is shipped.
-- No npm release or signed desktop artifact is published by this source snapshot.
+- The desktop source and unsigned installer build are verified, but this
+  development release does not publish signed/notarized binaries.
+- Goals and ad-hoc shopping lists use installation-local UI storage/state;
+  portable profile export covers schema-versioned profile goals and quest state,
+  not those ad-hoc dashboard entries.
+- Offline mode disables explicit refresh controls and clearly uses retained
+  data. It is not an operating-system network firewall.
+- Ollama/LM Studio tool-loop execution is not shipped until Version 0.6.
 - Mode-specific Hiscores endpoint overrides are not independently configurable.
 - Wiki item/reward fields are human-maintained markup. Quantities and explicit
   alternatives are normalized, but consumption and tradeability are not inferred.

@@ -21,12 +21,12 @@ Structured training methods, time/XP/GP calculations, multi-stage fastest,
 cheapest, balanced, and low-intensity plans, quest comparisons, budgets, and
 weekly schedules.
 
-## 0.4 — Grand Exchange intelligence (current)
+## 0.4 — Grand Exchange intelligence (complete)
 
 Item search, historical data, moving averages, percentage changes, volatility,
 volume where available, list/equipment valuation, charts, and freshness display.
 
-## 0.5 — Standalone desktop and no-AI dashboard
+## 0.5 — Standalone desktop and no-AI dashboard (current)
 
 Accessible React/Tauri UI for profiles, skills, quests, levelling, GE, shopping
 lists, goals, settings, source health, and portable profile files.

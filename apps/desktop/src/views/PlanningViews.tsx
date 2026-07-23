@@ -1,0 +1,977 @@
+import { useMemo, useState, type FormEvent } from "react";
+
+import {
+  EmptyState,
+  InlineAlert,
+  LoadingBlock,
+  MetricCard,
+  PageHeader,
+  StatusPill,
+} from "../components/Common.js";
+import { Icon } from "../components/Icon.js";
+import { formatDate, formatGp, formatNumber, titleCase } from "../lib/format.js";
+import {
+  ItemSearchFormSchema,
+  LevellingPlanFormSchema,
+  QuestSearchFormSchema,
+  firstError,
+} from "../lib/validation.js";
+import type {
+  CompanionBridge,
+  DesktopProfile,
+  LocalGoal,
+  PriceItem,
+  PriceSummary,
+  QuestRoute,
+  QuestSummary,
+  ShoppingList,
+  TrainingPlan,
+  Valuation,
+} from "../types.js";
+
+export function QuestPlannerView({
+  bridge,
+  profile,
+}: {
+  bridge: CompanionBridge;
+  profile: DesktopProfile;
+}) {
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState<QuestSummary[]>([]);
+  const [selected, setSelected] = useState<QuestSummary>();
+  const [route, setRoute] = useState<QuestRoute>();
+  const [shopping, setShopping] = useState<ShoppingList>();
+  const [tab, setTab] = useState<"route" | "checklist" | "shopping">("route");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string>();
+
+  async function search(event: FormEvent) {
+    event.preventDefault();
+    const parsed = QuestSearchFormSchema.safeParse({ query });
+    if (!parsed.success) {
+      setError(firstError(parsed.error));
+      return;
+    }
+    setBusy(true);
+    setError(undefined);
+    try {
+      const response = await bridge.callTool<QuestSummary[]>("search_quests", {
+        query: parsed.data.query,
+        limit: 20,
+      });
+      setResults(response.data);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Quest search failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function buildRoute(quest: QuestSummary) {
+    setSelected(quest);
+    setBusy(true);
+    setError(undefined);
+    try {
+      const [routeResult, shoppingResult] = await Promise.all([
+        bridge.callTool<QuestRoute>("create_quest_route", {
+          profileId: profile.id,
+          quest: quest.id,
+        }),
+        bridge.callTool<ShoppingList>("create_quest_shopping_list", {
+          profileId: profile.id,
+          quest: quest.id,
+        }),
+      ]);
+      setRoute(routeResult.data);
+      setShopping(shoppingResult.data);
+      setTab("route");
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Quest route could not be built");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function markStatus(step: QuestRoute["steps"][number], status: string) {
+    try {
+      await bridge.callTool("set_quest_status", {
+        profileId: profile.id,
+        quest: step.questId,
+        status,
+      });
+      setRoute((current) =>
+        current === undefined
+          ? undefined
+          : {
+              ...current,
+              steps: current.steps.map((candidate) =>
+                candidate.questId === step.questId
+                  ? { ...candidate, status: status as typeof candidate.status }
+                  : candidate,
+              ),
+            },
+      );
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Quest status was not saved");
+    }
+  }
+
+  return (
+    <div className="page-stack">
+      <PageHeader
+        eyebrow="Prerequisite intelligence"
+        title="Quest planner"
+        description="Choose a target, see every dependency, and keep progress as a local checklist."
+      />
+      {error === undefined ? null : <InlineAlert tone="error">{error}</InlineAlert>}
+      <div className="quest-workspace">
+        <aside className="quest-search-panel surface-card">
+          <form className="search-field" onSubmit={search}>
+            <Icon name="search" />
+            <input
+              value={query}
+              onChange={(event) => setQuery(event.currentTarget.value)}
+              placeholder="Search quests…"
+              aria-label="Search quests"
+            />
+            <button type="submit" className="icon-button" aria-label="Run quest search">
+              <Icon name="chevron" />
+            </button>
+          </form>
+          <div className="result-list" aria-live="polite">
+            {busy && results.length === 0 ? <LoadingBlock label="Searching quests" /> : null}
+            {results.map((quest) => (
+              <button
+                type="button"
+                key={quest.id}
+                className={selected?.id === quest.id ? "result-item selected" : "result-item"}
+                onClick={() => void buildRoute(quest)}
+              >
+                <span>
+                  <strong>{quest.name}</strong>
+                  <small>
+                    {quest.difficulty ?? "Quest"} · {quest.questPointReward ?? 0} QP
+                  </small>
+                </span>
+                <Icon name="chevron" />
+              </button>
+            ))}
+            {!busy && query.length > 0 && results.length === 0 ? (
+              <p className="muted-copy centred">No matching quests yet.</p>
+            ) : null}
+          </div>
+        </aside>
+        <section className="surface-card quest-detail-panel">
+          {route === undefined || selected === undefined ? (
+            <EmptyState
+              title="Choose a target quest"
+              description="Search on the left to build a prerequisite-first route, checklist and shopping list."
+            />
+          ) : (
+            <>
+              <div className="quest-title-row">
+                <div>
+                  <p className="eyebrow">Target quest</p>
+                  <h2>{selected.name}</h2>
+                </div>
+                <StatusPill state="neutral">{selected.difficulty ?? "Quest"}</StatusPill>
+              </div>
+              <div className="tab-list" role="tablist" aria-label="Quest planning views">
+                {[
+                  ["route", "Dependency route"],
+                  ["checklist", "Checklist"],
+                  ["shopping", `Shopping (${shopping?.items.length ?? 0})`],
+                ].map(([id, label]) => (
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={tab === id}
+                    className={tab === id ? "active" : ""}
+                    onClick={() => setTab(id as typeof tab)}
+                    key={id}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              {tab === "route" ? (
+                <div className="route-timeline">
+                  {route.steps.map((step, index) => (
+                    <article className="route-step" key={step.questId}>
+                      <span className="route-index">{String(index + 1).padStart(2, "0")}</span>
+                      <i className="route-line" />
+                      <div>
+                        <small>
+                          {step.depth === 0 ? "Target" : `Dependency depth ${step.depth}`}
+                        </small>
+                        <strong>{step.name}</strong>
+                        <StatusPill state={step.status === "completed" ? "success" : "neutral"}>
+                          {titleCase(step.status)}
+                        </StatusPill>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              ) : null}
+              {tab === "checklist" ? (
+                <div className="checklist">
+                  {route.steps.map((step) => (
+                    <label key={step.questId}>
+                      <input
+                        type="checkbox"
+                        checked={step.status === "completed"}
+                        onChange={(event) =>
+                          void markStatus(
+                            step,
+                            event.currentTarget.checked ? "completed" : "not-started",
+                          )
+                        }
+                      />
+                      <span>
+                        <strong>{step.name}</strong>
+                        <small>Saved to {profile.displayName}'s local profile</small>
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              ) : null}
+              {tab === "shopping" ? (
+                <div className="shopping-table">
+                  {shopping?.items.map((item) => (
+                    <div className="shopping-row" key={`${item.itemId ?? item.name}`}>
+                      <span className="item-orb">{item.name.slice(0, 1)}</span>
+                      <div>
+                        <strong>{item.name}</strong>
+                        <small>Required by {item.requiredByQuestIds.length} route quest(s)</small>
+                      </div>
+                      <b>× {formatNumber(item.quantity)}</b>
+                    </div>
+                  ))}
+                  {shopping?.items.length === 0 ? (
+                    <EmptyState
+                      title="No structured items"
+                      description="The source does not list any aggregate item requirements for this route."
+                    />
+                  ) : null}
+                </div>
+              ) : null}
+            </>
+          )}
+        </section>
+      </div>
+    </div>
+  );
+}
+
+export function LevellingView({
+  bridge,
+  profile,
+}: {
+  bridge: CompanionBridge;
+  profile: DesktopProfile;
+}) {
+  const [skillId, setSkillId] = useState(profile.skills[0]?.skillId ?? "mining");
+  const [targetLevel, setTargetLevel] = useState(99);
+  const [strategy, setStrategy] = useState<"fastest" | "cheapest" | "balanced" | "afk">(
+    profile.preferredPlayStyle ?? "balanced",
+  );
+  const [budgetGp, setBudgetGp] = useState("");
+  const [hoursPerDay, setHoursPerDay] = useState(
+    profile.availableHoursPerDay === undefined ? "" : String(profile.availableHoursPerDay),
+  );
+  const [plan, setPlan] = useState<TrainingPlan>();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string>();
+
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    const parsed = LevellingPlanFormSchema.safeParse({
+      skillId,
+      targetLevel,
+      strategy,
+      budgetGp,
+      hoursPerDay,
+    });
+    if (!parsed.success) {
+      setError(firstError(parsed.error));
+      return;
+    }
+    setBusy(true);
+    setError(undefined);
+    try {
+      const result = await bridge.callTool<TrainingPlan>("create_levelling_plan", {
+        profileId: profile.id,
+        skillId: parsed.data.skillId,
+        targetLevel: parsed.data.targetLevel,
+        strategy: parsed.data.strategy,
+        ...(parsed.data.budgetGp === "" ? {} : { budgetGp: parsed.data.budgetGp }),
+        ...(parsed.data.hoursPerDay === "" ? {} : { hoursPerDay: parsed.data.hoursPerDay }),
+        allowVirtualLevels: parsed.data.targetLevel > 120,
+      });
+      setPlan(result.data);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Levelling plan could not be created");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="page-stack">
+      <PageHeader
+        eyebrow="Deterministic planning"
+        title="Levelling planner"
+        description="Compare honest rate ranges and turn a target into explainable stages."
+      />
+      {error === undefined ? null : <InlineAlert tone="error">{error}</InlineAlert>}
+      <div className="planner-layout">
+        <form className="surface-card planner-form" onSubmit={submit}>
+          <p className="eyebrow">Plan inputs</p>
+          <h2>Define your target</h2>
+          <label>
+            Skill
+            <select
+              value={skillId}
+              onChange={(event) => setSkillId(event.currentTarget.value as typeof skillId)}
+            >
+              {(profile.skills.length === 0
+                ? ["mining", "herblore", "necromancy"]
+                : profile.skills.map((skill) => skill.skillId)
+              ).map((skill) => (
+                <option value={skill} key={skill}>
+                  {titleCase(skill)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Target level
+            <input
+              type="number"
+              min={2}
+              max={150}
+              value={targetLevel}
+              onChange={(event) => setTargetLevel(event.currentTarget.valueAsNumber)}
+            />
+          </label>
+          <fieldset>
+            <legend>Priority</legend>
+            <div className="strategy-grid">
+              {[
+                ["fastest", "Fastest", "Maximise XP/hour"],
+                ["cheapest", "Cheapest", "Minimise known cost"],
+                ["balanced", "Balanced", "Rate, cost and focus"],
+                ["afk", "Low intensity", "Prefer AFK methods"],
+              ].map(([value, label, detail]) => (
+                <label key={value}>
+                  <input
+                    type="radio"
+                    name="strategy"
+                    value={value}
+                    checked={strategy === value}
+                    onChange={() => setStrategy(value as typeof strategy)}
+                  />
+                  <span>
+                    <strong>{label}</strong>
+                    <small>{detail}</small>
+                  </span>
+                </label>
+              ))}
+            </div>
+          </fieldset>
+          <div className="form-columns">
+            <label>
+              Maximum budget
+              <input
+                inputMode="numeric"
+                value={budgetGp}
+                onChange={(event) => setBudgetGp(event.currentTarget.value)}
+                placeholder="Optional GP"
+              />
+            </label>
+            <label>
+              Hours per day
+              <input
+                type="number"
+                min={0.1}
+                max={24}
+                step={0.1}
+                value={hoursPerDay}
+                onChange={(event) => setHoursPerDay(event.currentTarget.value)}
+                placeholder="Optional"
+              />
+            </label>
+          </div>
+          <button className="primary-button wide" type="submit" disabled={busy}>
+            {busy ? <span className="spinner small" /> : <Icon name="levelling" />}
+            {busy ? "Calculating route…" : "Create levelling plan"}
+          </button>
+        </form>
+        <section className="planner-result">
+          {plan === undefined ? (
+            <EmptyState
+              title="Your plan will appear here"
+              description="Set a skill, target and priority. Every stage includes the source assumptions and uncertainty."
+            />
+          ) : (
+            <>
+              <div className="plan-summary surface-card">
+                <div>
+                  <p className="eyebrow">{titleCase(plan.strategy)} route</p>
+                  <h2>
+                    {titleCase(plan.skillId)} {plan.currentLevel} → {plan.targetLevel}
+                  </h2>
+                </div>
+                <StatusPill state={plan.feasible ? "success" : "warning"}>
+                  {plan.feasible ? "Feasible" : "Constraints exceeded"}
+                </StatusPill>
+                <div className="plan-metrics">
+                  <div>
+                    <span>XP remaining</span>
+                    <strong>{formatNumber(plan.experienceRequired)}</strong>
+                  </div>
+                  <div>
+                    <span>Estimated time</span>
+                    <strong>
+                      {plan.totalHoursRange === undefined
+                        ? "Unknown"
+                        : `${plan.totalHoursRange.minimum.toFixed(1)}–${plan.totalHoursRange.maximum.toFixed(1)} h`}
+                    </strong>
+                  </div>
+                  <div>
+                    <span>Estimated cost</span>
+                    <strong>
+                      {plan.totalGpRange === undefined
+                        ? "Unknown"
+                        : `${formatGp(plan.totalGpRange.minimum)}–${formatGp(plan.totalGpRange.maximum)}`}
+                    </strong>
+                  </div>
+                </div>
+              </div>
+              <div className="stage-list">
+                {plan.stages.map((stage, index) => (
+                  <article className="surface-card plan-stage" key={`${stage.method.id}-${index}`}>
+                    <span className="stage-number">{index + 1}</span>
+                    <div className="stage-levels">
+                      <small>Levels</small>
+                      <strong>
+                        {stage.startLevel}–{stage.endLevel}
+                      </strong>
+                    </div>
+                    <div className="stage-main">
+                      <h3>{stage.method.name}</h3>
+                      <p>{formatNumber(stage.experience)} XP in this stage</p>
+                      <div className="tag-row">
+                        <StatusPill state="neutral">
+                          {stage.method.afkRating ?? "Unknown"} AFK
+                        </StatusPill>
+                        <span>
+                          {stage.hoursRange.minimum.toFixed(1)}–
+                          {stage.hoursRange.maximum.toFixed(1)} h
+                        </span>
+                      </div>
+                    </div>
+                    <strong className="stage-cost">
+                      {stage.gpRange === undefined
+                        ? "Cost unknown"
+                        : formatGp(stage.gpRange.maximum)}
+                    </strong>
+                  </article>
+                ))}
+              </div>
+              {plan.warnings.map((warning) => (
+                <InlineAlert tone="warning" key={warning}>
+                  {warning}
+                </InlineAlert>
+              ))}
+            </>
+          )}
+        </section>
+      </div>
+    </div>
+  );
+}
+
+function PriceChart({ summary }: { summary: PriceSummary }) {
+  const dimensions = { width: 720, height: 260, padding: 28 };
+  const points = summary.chart;
+  if (points.length === 0) {
+    return (
+      <EmptyState
+        title="No retained chart points"
+        description="The current guide price remains available, but this source returned no history."
+      />
+    );
+  }
+  const prices = points.map((point) => point.price);
+  const minimum = Math.min(...prices);
+  const maximum = Math.max(...prices);
+  const spread = Math.max(1, maximum - minimum);
+  const path = points
+    .map((point, index) => {
+      const x =
+        dimensions.padding +
+        (index / Math.max(1, points.length - 1)) * (dimensions.width - dimensions.padding * 2);
+      const y =
+        dimensions.height -
+        dimensions.padding -
+        ((point.price - minimum) / spread) * (dimensions.height - dimensions.padding * 2);
+      return `${index === 0 ? "M" : "L"} ${x.toFixed(1)} ${y.toFixed(1)}`;
+    })
+    .join(" ");
+
+  return (
+    <div className="price-chart">
+      <svg
+        role="img"
+        aria-label={`${summary.name} guide-price history from ${formatNumber(minimum)} to ${formatNumber(maximum)} GP`}
+        viewBox={`0 0 ${dimensions.width} ${dimensions.height}`}
+      >
+        <defs>
+          <linearGradient id="chart-fill" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor="#62deb0" stopOpacity=".3" />
+            <stop offset="1" stopColor="#62deb0" stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        {[0.25, 0.5, 0.75].map((position) => (
+          <line
+            key={position}
+            x1={dimensions.padding}
+            x2={dimensions.width - dimensions.padding}
+            y1={dimensions.height * position}
+            y2={dimensions.height * position}
+            className="chart-gridline"
+          />
+        ))}
+        <path
+          d={`${path} L ${dimensions.width - dimensions.padding} ${dimensions.height - dimensions.padding} L ${dimensions.padding} ${dimensions.height - dimensions.padding} Z`}
+          fill="url(#chart-fill)"
+        />
+        <path d={path} className="chart-line" />
+        {points.map((point, index) => {
+          const x =
+            dimensions.padding +
+            (index / Math.max(1, points.length - 1)) * (dimensions.width - dimensions.padding * 2);
+          const y =
+            dimensions.height -
+            dimensions.padding -
+            ((point.price - minimum) / spread) * (dimensions.height - dimensions.padding * 2);
+          return <circle key={point.timestamp} cx={x} cy={y} r="3.4" className="chart-point" />;
+        })}
+      </svg>
+      <div className="chart-axis">
+        <span>{formatDate(points[0]?.timestamp)}</span>
+        <span>{formatDate(points.at(-1)?.timestamp)}</span>
+      </div>
+    </div>
+  );
+}
+
+export function ExchangeView({ bridge }: { bridge: CompanionBridge }) {
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState<PriceItem[]>([]);
+  const [summary, setSummary] = useState<PriceSummary>();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string>();
+
+  async function search(event: FormEvent) {
+    event.preventDefault();
+    const parsed = ItemSearchFormSchema.safeParse({ query });
+    if (!parsed.success) {
+      setError(firstError(parsed.error));
+      return;
+    }
+    setBusy(true);
+    setError(undefined);
+    try {
+      const response = await bridge.callTool<PriceItem[]>("search_items", {
+        query: parsed.data.query,
+        limit: 20,
+      });
+      setResults(response.data);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Item search failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function select(item: PriceItem) {
+    setBusy(true);
+    setError(undefined);
+    try {
+      const response = await bridge.callTool<PriceSummary>("get_item_price_summary", {
+        item: item.itemId,
+        range: "30d",
+      });
+      setSummary(response.data);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Price history failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="page-stack">
+      <PageHeader
+        eyebrow="Guide-price intelligence"
+        title="Grand Exchange"
+        description="Search current guide prices and inspect descriptive history—never guaranteed trades."
+        actions={<StatusPill state="fresh">Catalogue ready</StatusPill>}
+      />
+      <form className="exchange-search" onSubmit={search}>
+        <Icon name="search" size={22} />
+        <input
+          value={query}
+          onChange={(event) => setQuery(event.currentTarget.value)}
+          placeholder="Search 7,000+ tradeable items…"
+          aria-label="Search Grand Exchange items"
+        />
+        <button className="primary-button" type="submit" disabled={busy}>
+          Search
+        </button>
+      </form>
+      {error === undefined ? null : <InlineAlert tone="error">{error}</InlineAlert>}
+      {results.length > 0 ? (
+        <section className="item-result-strip" aria-label="Item search results">
+          {results.map((item) => (
+            <button type="button" key={item.itemId} onClick={() => void select(item)}>
+              <span className="item-orb">{item.name.slice(0, 1)}</span>
+              <span>
+                <strong>{item.name}</strong>
+                <small>#{item.itemId}</small>
+              </span>
+              <b>{formatGp(item.currentPrice)}</b>
+            </button>
+          ))}
+        </section>
+      ) : null}
+      {busy && summary === undefined ? <LoadingBlock label="Loading validated price data" /> : null}
+      {summary === undefined ? (
+        <EmptyState
+          title="Search for an item"
+          description="See current guide value, recent change, moving averages, volatility and source freshness."
+        />
+      ) : (
+        <>
+          <section className="surface-card exchange-hero">
+            <div className="item-heading">
+              <span className="item-orb large">{summary.name.slice(0, 1)}</span>
+              <div>
+                <p className="eyebrow">Item #{summary.itemId}</p>
+                <h2>{summary.name}</h2>
+              </div>
+            </div>
+            <div className="current-price">
+              <span>Current guide price</span>
+              <strong>{formatGp(summary.currentPrice)}</strong>
+              <StatusPill state={(summary.percentageChange ?? 0) >= 0 ? "success" : "warning"}>
+                {(summary.percentageChange ?? 0) >= 0 ? "+" : ""}
+                {summary.percentageChange?.toFixed(2) ?? "?"}% / {summary.range}
+              </StatusPill>
+            </div>
+          </section>
+          <section className="metrics-grid exchange-metrics">
+            <MetricCard
+              label="30-point average"
+              value={formatGp(summary.movingAverages.days30)}
+              detail="Arithmetic mean"
+              accent="mint"
+            />
+            <MetricCard
+              label="Range high"
+              value={formatGp(summary.historicalHigh)}
+              detail={`${summary.range} guide high`}
+              accent="gold"
+            />
+            <MetricCard
+              label="Range low"
+              value={formatGp(summary.historicalLow)}
+              detail={`${summary.range} guide low`}
+              accent="blue"
+            />
+            <MetricCard
+              label="Daily volatility"
+              value={
+                summary.volatilityPercent === undefined
+                  ? "Unknown"
+                  : `${summary.volatilityPercent.toFixed(2)}%`
+              }
+              detail="Standard deviation of returns"
+              accent="rose"
+            />
+          </section>
+          <section className="surface-card">
+            <div className="section-heading">
+              <div>
+                <p className="eyebrow">Chart-ready history</p>
+                <h2>{summary.range} guide-price movement</h2>
+              </div>
+              <StatusPill state={summary.historyFreshness.state === "fresh" ? "fresh" : "stale"}>
+                {titleCase(summary.historyFreshness.state)}
+              </StatusPill>
+            </div>
+            <PriceChart summary={summary} />
+          </section>
+          <InlineAlert tone="info">
+            RS3 public sources do not provide an instant order book. Buy/high and sell/low prices
+            stay explicitly unavailable; this chart is not a profit forecast.
+          </InlineAlert>
+        </>
+      )}
+    </div>
+  );
+}
+
+export function ShoppingListsView({ bridge }: { bridge: CompanionBridge }) {
+  const [name, setName] = useState("Coal");
+  const [quantity, setQuantity] = useState(1_000);
+  const [lines, setLines] = useState<Array<{ item: string; quantity: number }>>([]);
+  const [valuation, setValuation] = useState<Valuation>();
+  const [error, setError] = useState<string>();
+
+  function addLine(event: FormEvent) {
+    event.preventDefault();
+    if (name.trim().length === 0 || !Number.isSafeInteger(quantity) || quantity <= 0) {
+      setError("Enter an item name and a positive whole-number quantity.");
+      return;
+    }
+    setLines((current) => [...current, { item: name.trim(), quantity }]);
+    setName("");
+    setQuantity(1);
+    setError(undefined);
+  }
+
+  async function valueList() {
+    setError(undefined);
+    try {
+      const result = await bridge.callTool<Valuation>("value_item_list", { items: lines });
+      setValuation(result.data);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "The list could not be valued");
+    }
+  }
+
+  return (
+    <div className="page-stack">
+      <PageHeader
+        eyebrow="Local lists"
+        title="Shopping lists"
+        description="Build a list, aggregate duplicate items and value it with explicit missing-price lines."
+      />
+      {error === undefined ? null : <InlineAlert tone="error">{error}</InlineAlert>}
+      <div className="content-grid two-thirds">
+        <section className="surface-card">
+          <div className="section-heading">
+            <div>
+              <p className="eyebrow">Current list</p>
+              <h2>Materials to gather</h2>
+            </div>
+            <StatusPill state="neutral">{lines.length} lines</StatusPill>
+          </div>
+          <form className="inline-add-form" onSubmit={addLine}>
+            <label>
+              <span className="sr-only">Item name</span>
+              <input
+                value={name}
+                onChange={(event) => setName(event.currentTarget.value)}
+                placeholder="Item name"
+              />
+            </label>
+            <label>
+              <span className="sr-only">Quantity</span>
+              <input
+                type="number"
+                min={1}
+                value={quantity}
+                onChange={(event) => setQuantity(event.currentTarget.valueAsNumber)}
+              />
+            </label>
+            <button className="secondary-button" type="submit">
+              <Icon name="plus" />
+              Add
+            </button>
+          </form>
+          {lines.length === 0 ? (
+            <EmptyState
+              title="Your list is empty"
+              description="Add materials by name; exact catalogue aliases are resolved when you value it."
+            />
+          ) : (
+            <div className="shopping-table">
+              {lines.map((line, index) => (
+                <div className="shopping-row" key={`${line.item}-${index}`}>
+                  <span className="item-orb">{line.item.slice(0, 1)}</span>
+                  <div>
+                    <strong>{line.item}</strong>
+                    <small>Pending catalogue resolution</small>
+                  </div>
+                  <b>× {formatNumber(line.quantity)}</b>
+                  <button
+                    className="icon-button"
+                    type="button"
+                    aria-label={`Remove ${line.item}`}
+                    onClick={() => setLines((current) => current.filter((_, row) => row !== index))}
+                  >
+                    <Icon name="trash" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+          <button
+            className="primary-button wide"
+            type="button"
+            disabled={lines.length === 0}
+            onClick={() => void valueList()}
+          >
+            <Icon name="exchange" />
+            Value current list
+          </button>
+        </section>
+        <aside className="surface-card sticky-card">
+          <p className="eyebrow">Guide-price valuation</p>
+          <h2>{valuation === undefined ? "Not calculated" : formatGp(valuation.totalValue)}</h2>
+          {valuation === undefined ? (
+            <p className="muted-copy">
+              Valuation is read-only and never places a Grand Exchange offer.
+            </p>
+          ) : (
+            <>
+              <StatusPill state={valuation.complete ? "success" : "warning"}>
+                {valuation.complete ? "Complete" : "Some prices missing"}
+              </StatusPill>
+              <div className="valuation-lines">
+                {valuation.items.map((line) => (
+                  <div key={`${line.itemId ?? line.name}`}>
+                    <span>{line.name}</span>
+                    <strong>{formatGp(line.totalPrice)}</strong>
+                  </div>
+                ))}
+              </div>
+              <small>Guide values only. Actual transactions may differ.</small>
+            </>
+          )}
+        </aside>
+      </div>
+    </div>
+  );
+}
+
+export function GoalsView({
+  goals,
+  onAdd,
+  onToggle,
+  onRemove,
+}: {
+  goals: LocalGoal[];
+  onAdd: (goal: LocalGoal) => void;
+  onToggle: (goalId: string) => void;
+  onRemove: (goalId: string) => void;
+}) {
+  const [title, setTitle] = useState("");
+  const [target, setTarget] = useState("");
+  const remaining = useMemo(() => goals.filter((goal) => !goal.completed).length, [goals]);
+
+  function submit(event: FormEvent) {
+    event.preventDefault();
+    if (title.trim().length < 2 || target.trim().length < 1) {
+      return;
+    }
+    onAdd({
+      id: crypto.randomUUID(),
+      title: title.trim(),
+      target: target.trim(),
+      completed: false,
+      createdAt: new Date().toISOString(),
+    });
+    setTitle("");
+    setTarget("");
+  }
+
+  return (
+    <div className="page-stack">
+      <PageHeader
+        eyebrow="Personal planning"
+        title="Goals"
+        description="Small, local commitments that remain useful with no AI and no network."
+        actions={<StatusPill state="neutral">{remaining} active</StatusPill>}
+      />
+      <div className="content-grid two-thirds">
+        <section className="surface-card">
+          <div className="section-heading">
+            <div>
+              <p className="eyebrow">Goal board</p>
+              <h2>Your next milestones</h2>
+            </div>
+          </div>
+          {goals.length === 0 ? (
+            <EmptyState
+              title="No goals yet"
+              description="Add a level, quest, item or custom milestone."
+            />
+          ) : (
+            <div className="goal-list">
+              {goals.map((goal) => (
+                <article
+                  className={goal.completed ? "goal-row completed" : "goal-row"}
+                  key={goal.id}
+                >
+                  <button
+                    className="goal-check"
+                    type="button"
+                    aria-label={goal.completed ? `Reopen ${goal.title}` : `Complete ${goal.title}`}
+                    onClick={() => onToggle(goal.id)}
+                  >
+                    {goal.completed ? <Icon name="check" /> : null}
+                  </button>
+                  <div>
+                    <strong>{goal.title}</strong>
+                    <span>{goal.target}</span>
+                  </div>
+                  <time dateTime={goal.createdAt}>{formatDate(goal.createdAt)}</time>
+                  <button
+                    className="icon-button"
+                    type="button"
+                    aria-label={`Remove ${goal.title}`}
+                    onClick={() => onRemove(goal.id)}
+                  >
+                    <Icon name="trash" />
+                  </button>
+                </article>
+              ))}
+            </div>
+          )}
+        </section>
+        <aside className="surface-card sticky-card">
+          <p className="eyebrow">Add a goal</p>
+          <h2>What comes next?</h2>
+          <form className="stacked-form" onSubmit={submit}>
+            <label>
+              Goal
+              <input
+                value={title}
+                onChange={(event) => setTitle(event.currentTarget.value)}
+                placeholder="Reach 99 Herblore"
+              />
+            </label>
+            <label>
+              Target or note
+              <input
+                value={target}
+                onChange={(event) => setTarget(event.currentTarget.value)}
+                placeholder="13,034,431 XP"
+              />
+            </label>
+            <button className="primary-button wide" type="submit">
+              <Icon name="plus" />
+              Add local goal
+            </button>
+          </form>
+          <small>Goals are stored in this app's local webview storage.</small>
+        </aside>
+      </div>
+    </div>
+  );
+}
