@@ -1,13 +1,14 @@
-# Version 0.2 architecture
+# Version 0.3 architecture
 
 ## Boundaries
 
 `@gielinor/shared-types` owns domain Zod schemas and stable vocabulary.
-`@gielinor/core` owns deterministic XP and quest-graph rules, application
-services, and ports. `@gielinor/providers` implements public API adapters,
-resilient caching, and the RuneScape Wiki quest adapter. `@gielinor/database`
-implements SQLite profile, cache, quest-catalogue, alias, and sync-status ports.
-`@gielinor/mcp-server` composes dependencies and exposes stdio tools.
+`@gielinor/core` owns deterministic XP, quest-graph, and levelling-planner rules,
+application services, and ports. `@gielinor/providers` implements public API
+adapters, resilient caching, and RuneScape Wiki quest/training adapters.
+`@gielinor/database` implements SQLite profile, cache, quest, training, alias,
+and sync-status ports. `@gielinor/mcp-server` composes dependencies and exposes
+stdio tools.
 
 Dependencies point inward:
 
@@ -61,11 +62,43 @@ the target and rejects cycles. `any` groups retain all alternatives and select
 the lowest-cost currently unsatisfied branch. Shopping lists aggregate
 case-insensitive duplicate items across remaining route quests.
 
+## Training synchronization
+
+The training adapter maps the current members' training guides to all 29 skill
+IDs. It combines exact revision wikitext with rendered HTML for the same oldid:
+wikitext supplies stable summary/section structure, while rendered HTML resolves
+dynamic template expressions. Batches of five bound rendered-page concurrency.
+
+Rows become source-revisioned `TrainingMethod` objects only after level, range,
+rate, provenance, and plausibility validation. Missing rates are representable
+and block estimates rather than receiving guessed values. The complete snapshot
+must cover all skills. Duplicate IDs, empty data, and suspicious truncation fail
+before one transactional replacement.
+
+## Levelling planning
+
+`LevellingPlannerService` reads a profile and the last valid training snapshot.
+It uses exact XP thresholds to divide a target into level intervals, selects an
+accessible method for each interval, and merges adjacent selections into stages.
+Strategies are deterministic:
+
+- fastest uses the conservative published XP/hour minimum;
+- cheapest uses known GP/XP or derives it from published GP/hour, falling back
+  with a warning only when no cost data exists;
+- AFK prioritizes source-derived AFK rating and then rate;
+- balanced weighs conservative rate, attention, and known cost.
+
+Each stage calculates best/worst hours and cost/profit where supported. The final
+plan applies GP budget, hours/day, target-date, true-cap/virtual, quest,
+membership, skill, and Ironman constraints. It retains uncertainty notes and
+never infers inventory or equipment ownership.
+
 ## Local data
 
 SQLite migration 1 creates `player_profiles` and `provider_cache`. Migration 2
-adds `quests`, `quest_aliases`, and `quest_sync_status`; it does not alter or
-rewrite Version 0.1 profiles. Profiles and quests are stored as schema-validated
+adds `quests`, `quest_aliases`, and `quest_sync_status`. Migration 3 adds
+`training_methods` and `training_sync_status`. Migrations are additive and do not
+rewrite earlier profile or quest JSON. Domain objects are stored as validated
 JSON plus searchable metadata. The cache stores validated adapter results with
 fresh and stale deadlines. WAL mode and a busy timeout are enabled for
 file-backed databases.
@@ -81,6 +114,6 @@ writes protocol messages to stdout and diagnostics to stderr.
 
 ## Future extension
 
-Training ports will be added in Version 0.3. Hosted transport, agent runtimes,
-and UIs must compose the same services; they must not reimplement calculations
-or quest graph traversal.
+Price history arrives in Version 0.4. Hosted transport, agent runtimes, and UIs
+must compose the same services; they must not reimplement calculations, quest
+graph traversal, or levelling selection.

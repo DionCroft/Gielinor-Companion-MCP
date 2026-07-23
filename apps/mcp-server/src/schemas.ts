@@ -5,6 +5,7 @@ import {
   ProfileExportSchema,
   QuestStatusSchema,
   SkillIdSchema,
+  TrainingStrategySchema,
 } from "@gielinor/shared-types";
 import { z } from "zod";
 
@@ -64,7 +65,8 @@ export const ImportPlayerProfileToolInputSchema = z
 export const CalculateXpRemainingToolInputSchema = z
   .object({
     currentExperience: z.number().int().min(0).max(5_800_000_000),
-    targetLevel: z.number().int().min(1).max(126),
+    targetLevel: z.number().int().min(1).max(150),
+    skillId: SkillIdSchema.optional(),
   })
   .strict();
 
@@ -72,7 +74,7 @@ export const GetSkillProgressToolInputSchema = z
   .object({
     profileId: z.string().uuid(),
     skillId: SkillIdSchema,
-    targetLevel: z.number().int().min(1).max(126),
+    targetLevel: z.number().int().min(1).max(150),
   })
   .strict();
 
@@ -121,5 +123,58 @@ export const SetMultipleQuestStatusesToolInputSchema = z
       )
       .min(1)
       .max(500),
+  })
+  .strict();
+
+export const ListTrainingMethodsToolInputSchema = z
+  .object({
+    skillId: SkillIdSchema.optional(),
+    level: z.number().int().min(1).max(150).optional(),
+    members: z.boolean().optional(),
+    ironman: z.boolean().optional(),
+  })
+  .strict();
+
+export const GetTrainingMethodToolInputSchema = z
+  .object({
+    methodId: z.string().trim().min(1).max(300),
+  })
+  .strict();
+
+export const CompareTrainingMethodsToolInputSchema = z
+  .object({
+    profileId: z.string().uuid(),
+    skillId: SkillIdSchema,
+    targetLevel: z.number().int().min(1).max(150),
+    methodIds: z.array(z.string().min(1).max(300)).min(1).max(100).optional(),
+    members: z.boolean().optional(),
+    allowVirtualLevels: z.boolean().optional(),
+  })
+  .strict();
+
+export const CreateLevellingPlanToolInputSchema = z
+  .object({
+    profileId: z.string().uuid(),
+    skillId: SkillIdSchema,
+    targetLevel: z.number().int().min(1).max(150),
+    strategy: TrainingStrategySchema.optional(),
+    methodId: z.string().trim().min(1).max(300).optional(),
+    budgetGp: z.number().int().nonnegative().optional(),
+    hoursPerDay: z.number().positive().max(24).optional(),
+    targetDate: z.string().datetime({ offset: true }).optional(),
+    members: z.boolean().optional(),
+    allowVirtualLevels: z.boolean().optional(),
+  })
+  .strict();
+
+export const CreateWeeklyGoalPlanToolInputSchema = CreateLevellingPlanToolInputSchema.extend({
+  weeks: z.number().int().min(1).max(520).optional(),
+}).strict();
+
+export const CompareQuestXpRewardsToolInputSchema = z
+  .object({
+    skillId: SkillIdSchema,
+    profileId: z.string().uuid().optional(),
+    limit: z.number().int().min(1).max(100).optional(),
   })
   .strict();

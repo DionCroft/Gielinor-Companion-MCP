@@ -289,20 +289,202 @@ export type Requirement = z.infer<typeof RequirementSchema>;
 export const TrainingMethodSchema = z
   .object({
     id: z.string().min(1),
+    name: z.string().min(1),
     skillId: SkillIdSchema,
     minimumLevel: z.number().int().min(1).max(120),
-    maximumLevel: z.number().int().min(1).max(126).optional(),
+    maximumLevel: z.number().int().min(1).max(150).optional(),
     xpPerHour: z.number().positive().optional(),
+    xpPerHourRange: z
+      .object({
+        minimum: z.number().positive(),
+        maximum: z.number().positive(),
+      })
+      .strict()
+      .optional(),
     gpPerHour: z.number().optional(),
+    gpPerHourRange: z
+      .object({
+        minimum: z.number(),
+        maximum: z.number(),
+      })
+      .strict()
+      .optional(),
     gpPerXp: z.number().optional(),
-    intensity: z.enum(["low", "medium", "high"]).optional(),
-    members: z.boolean().optional(),
-    requirements: z.array(RequirementSchema),
-    sourceUrl: z.string().url().optional(),
-    sourceUpdatedAt: isoDateTime.optional(),
+    intensity: z.enum(["low", "medium", "high"]),
+    afkRating: z.enum(["not-afk", "low", "moderate", "high"]),
+    members: z.boolean(),
+    ironmanCompatibility: z.enum(["supported", "unsupported", "unknown"]),
+    requirements: z.array(RequirementSchema).default([]),
+    questRequirements: z.array(z.string().min(1)).default([]),
+    itemRequirements: z.array(z.string().min(1)).default([]),
+    equipment: z.array(z.string().min(1)).default([]),
+    notes: z.array(z.string().min(1)).default([]),
+    confidence: z.enum(["low", "medium", "high"]),
+    uncertaintyNotes: z.array(z.string().min(1)).default([]),
+    sourceName: z.string().min(1),
+    sourceUrl: z.string().url(),
+    sourceRevision: z.string().min(1),
+    sourceUpdatedAt: isoDateTime,
+    lastCheckedAt: isoDateTime,
+    contentHash: z.string().regex(/^[a-f0-9]{64}$/),
+  })
+  .strict()
+  .superRefine((method, context) => {
+    if (method.maximumLevel !== undefined && method.maximumLevel < method.minimumLevel) {
+      context.addIssue({
+        code: "custom",
+        path: ["maximumLevel"],
+        message: "Maximum level cannot be below minimum level",
+      });
+    }
+    if (
+      method.xpPerHourRange !== undefined &&
+      method.xpPerHourRange.maximum < method.xpPerHourRange.minimum
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["xpPerHourRange", "maximum"],
+        message: "Maximum XP rate cannot be below minimum XP rate",
+      });
+    }
+    if (
+      method.gpPerHourRange !== undefined &&
+      method.gpPerHourRange.maximum < method.gpPerHourRange.minimum
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["gpPerHourRange", "maximum"],
+        message: "Maximum GP rate cannot be below minimum GP rate",
+      });
+    }
+  });
+export type TrainingMethod = z.infer<typeof TrainingMethodSchema>;
+
+export const TrainingDataSnapshotSchema = z
+  .object({
+    provider: z.string().min(1),
+    sourceUrl: z.string().url(),
+    sourceRevision: z.string().min(1),
+    retrievedAt: isoDateTime,
+    methods: z.array(TrainingMethodSchema).min(1),
   })
   .strict();
-export type TrainingMethod = z.infer<typeof TrainingMethodSchema>;
+export type TrainingDataSnapshot = z.infer<typeof TrainingDataSnapshotSchema>;
+
+export const TrainingSyncResultSchema = z
+  .object({
+    provider: z.string().min(1),
+    sourceRevision: z.string().min(1),
+    checkedAt: isoDateTime,
+    total: nonNegativeInteger,
+    inserted: nonNegativeInteger,
+    updated: nonNegativeInteger,
+    unchanged: nonNegativeInteger,
+    removed: nonNegativeInteger,
+  })
+  .strict();
+export type TrainingSyncResult = z.infer<typeof TrainingSyncResultSchema>;
+
+export const TrainingDataStatusSchema = z
+  .object({
+    state: z.enum(["never-synced", "ready", "failed"]),
+    provider: z.string().min(1).optional(),
+    sourceRevision: z.string().min(1).optional(),
+    lastAttemptAt: isoDateTime.optional(),
+    lastSuccessfulSyncAt: isoDateTime.optional(),
+    methodCount: nonNegativeInteger,
+    coveredSkills: z.array(SkillIdSchema),
+    lastErrorCode: z.string().min(1).optional(),
+    lastErrorMessage: z.string().min(1).optional(),
+  })
+  .strict();
+export type TrainingDataStatus = z.infer<typeof TrainingDataStatusSchema>;
+
+export const TrainingStrategySchema = z.enum(["fastest", "cheapest", "balanced", "afk"]);
+export type TrainingStrategy = z.infer<typeof TrainingStrategySchema>;
+
+export const LevellingPlanStageSchema = z
+  .object({
+    order: z.number().int().positive(),
+    method: TrainingMethodSchema,
+    startLevel: z.number().int().min(1).max(150),
+    endLevel: z.number().int().min(1).max(150),
+    startExperience: nonNegativeInteger,
+    endExperience: nonNegativeInteger,
+    experienceRequired: nonNegativeInteger,
+    hoursRange: z
+      .object({
+        minimum: z.number().nonnegative(),
+        maximum: z.number().nonnegative(),
+      })
+      .strict(),
+    gpRange: z
+      .object({
+        minimum: z.number(),
+        maximum: z.number(),
+      })
+      .strict()
+      .optional(),
+    warnings: z.array(z.string()),
+  })
+  .strict();
+export type LevellingPlanStage = z.infer<typeof LevellingPlanStageSchema>;
+
+export const LevellingPlanSchema = z
+  .object({
+    skillId: SkillIdSchema,
+    strategy: TrainingStrategySchema,
+    currentLevel: z.number().int().min(1).max(150),
+    currentExperience: nonNegativeInteger,
+    targetLevel: z.number().int().min(1).max(150),
+    targetExperience: nonNegativeInteger,
+    trueSkillCap: z.number().int().min(99).max(120),
+    virtualTarget: z.boolean(),
+    experienceRequired: nonNegativeInteger,
+    stages: z.array(LevellingPlanStageSchema),
+    totalHoursRange: z
+      .object({
+        minimum: z.number().nonnegative(),
+        maximum: z.number().nonnegative(),
+      })
+      .strict(),
+    totalGpRange: z
+      .object({
+        minimum: z.number(),
+        maximum: z.number(),
+      })
+      .strict()
+      .optional(),
+    completionDateRange: z
+      .object({
+        earliest: isoDateTime,
+        latest: isoDateTime,
+      })
+      .strict()
+      .optional(),
+    feasible: z.boolean(),
+    warnings: z.array(z.string()),
+    assumptions: z.array(z.string()),
+    generatedAt: isoDateTime,
+  })
+  .strict();
+export type LevellingPlan = z.infer<typeof LevellingPlanSchema>;
+
+export const WeeklyGoalPlanSchema = z
+  .object({
+    plan: LevellingPlanSchema,
+    weeks: z.number().int().positive(),
+    weeklyExperienceTarget: nonNegativeInteger,
+    weeklyHoursRange: z
+      .object({
+        minimum: z.number().nonnegative(),
+        maximum: z.number().nonnegative(),
+      })
+      .strict(),
+    achievableWithinPeriod: z.boolean(),
+  })
+  .strict();
+export type WeeklyGoalPlan = z.infer<typeof WeeklyGoalPlanSchema>;
 
 export const GrandExchangeItemSchema = z
   .object({

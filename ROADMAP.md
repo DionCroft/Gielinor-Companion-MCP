@@ -9,13 +9,13 @@ Strict monorepo, shared schemas, SQLite profiles/cache, public Hiscores, XP
 calculations, Jagex ItemDB lookup, local stdio MCP, client examples, CI, and
 project policies.
 
-## 0.2 — Quest companion (current)
+## 0.2 — Quest companion (complete)
 
 Wiki-backed revision-aware quest sync, transactional validation, prerequisite
 graph and cycle detection, manual progress, available quests, missing
 requirements, routes, shopping lists, and quest MCP tools.
 
-## 0.3 — Levelling planner
+## 0.3 — Levelling planner (current)
 
 Structured training methods, time/XP/GP calculations, multi-stage fastest,
 cheapest, balanced, and low-intensity plans, quest comparisons, budgets, and

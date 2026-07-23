@@ -7,18 +7,18 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 Gielinor Companion MCP is a safe, model-independent foundation for deterministic
-RuneScape 3 planning. Version 0.2 provides public Hiscores, local player profiles,
-XP calculations, current Jagex Grand Exchange guide prices, revision-aware quest
-data, prerequisite routes, manual quest progress, and a standards-based stdio MCP
-server. It never controls the game client.
+RuneScape 3 planning. Version 0.3 provides public Hiscores, local player profiles,
+authoritative standard and Invention XP calculations, revision-aware quest and
+training data, multi-stage levelling plans, current Jagex Grand Exchange guide
+prices, and a standards-based stdio MCP server. It never controls the game client.
 
 ## Release status
 
-**Current version: 0.2.0 — Quest Companion.** This is an early working release.
-The levelling planner, desktop interface, local Ollama/LM Studio chat runtime, and
-hosted MCP are roadmap work and are not represented as complete.
+**Current version: 0.3.0 — Levelling Planner.** This is an early working release.
+The desktop interface, local Ollama/LM Studio chat runtime, and hosted MCP are
+roadmap work and are not represented as complete.
 
-There are no interface screenshots yet because 0.1 is a headless MCP release.
+There are no interface screenshots yet because 0.3 remains a headless MCP release.
 
 ## Features
 
@@ -26,7 +26,8 @@ There are no interface screenshots yet because 0.1 is a headless MCP release.
   methods, goals, requirements, and GE items.
 - Multiple local player profiles in SQLite; no Jagex login or credentials.
 - Public normal, Ironman, and Hardcore Ironman Hiscores adapters.
-- Deterministic levels 1–126, including level 99 and 120 targets.
+- Exact standard levels 1–126 and Invention levels 1–150, true skill caps,
+  virtual targets, and current level 99/110/120 boundaries.
 - Jagex ItemDB current guide-price lookup by item ID.
 - Persistent cache-first, stale-while-revalidate provider data.
 - Timeouts, bounded retries, response validation, provenance, and timestamps.
@@ -35,7 +36,13 @@ There are no interface screenshots yet because 0.1 is a headless MCP release.
 - Prerequisite graph traversal, cycle detection, alternatives, available quests,
   missing requirements, route planning, and aggregated shopping lists.
 - Manual completed/in-progress/not-started status in local profiles.
-- Twenty-four local MCP tools over stdio.
+- RuneScape Wiki training guides parsed from revisioned wikitext and rendered
+  tables, covering all 29 skills with rate uncertainty and source provenance.
+- Fastest, cheapest, balanced, and AFK multi-stage plans with time ranges,
+  available GP, daily play time, target dates, quest gates, Ironman checks, and
+  explicit missing-data behavior.
+- Quest-XP reward comparison and weekly goal schedules.
+- Thirty-four local MCP tools over stdio.
 - Portable, strict, schema-versioned profile import/export.
 - Fixture-based unit and integration tests; live provider tests are opt-in.
 
@@ -43,10 +50,10 @@ There are no interface screenshots yet because 0.1 is a headless MCP release.
 
 ```text
 Jagex public APIs ---- provider cache
-RuneScape Wiki  ----- revision-aware quest sync
+RuneScape Wiki  ----- revision-aware quest/training sync
                               |
                               v
-domain ports + core services ---- SQLite profiles/quests
+domain ports + core services ---- SQLite profiles/quests/training
                               |
                               v
                 MCP tool service ---- stdio MCP client
@@ -80,8 +87,14 @@ Populate or refresh the local quest catalogue without an MCP client:
 corepack pnpm refresh:quests
 ```
 
-Before the first migration from schema 1 to schema 2, this command creates a
-one-time sibling database backup and verifies that profile rows remain unchanged.
+Populate or refresh training methods:
+
+```sh
+corepack pnpm refresh:training
+```
+
+Each versioned refresh command creates its one-time sibling database backup when
+needed and verifies that profile rows remain unchanged.
 
 By default, profiles are stored in
 `~/.gielinor-companion/gielinor.db`. Override this and other settings with the
@@ -111,18 +124,18 @@ does not contain LM Studio-specific behavior.
 
 ### Ollama
 
-The shared Ollama agent runtime is planned for 0.6. Version 0.2 does not claim
+The shared Ollama agent runtime is planned for 0.6. Version 0.3 does not claim
 direct Ollama tool-loop support. An MCP-capable third-party Ollama host may launch
 the same stdio command, but is outside this release's tested surface.
 
 ### Standalone desktop
 
 The Tauri desktop application and non-AI dashboard are planned for 0.5. They are
-not included in the headless 0.2 release.
+not included in the headless 0.3 release.
 
 ### ChatGPT-compatible remote MCP
 
-Hosted Streamable HTTP transport is planned for 0.7. Version 0.2 exposes local
+Hosted Streamable HTTP transport is planned for 0.7. Version 0.3 exposes local
 stdio only and cannot be connected as a remote ChatGPT MCP app.
 
 ## MCP tools
@@ -151,6 +164,16 @@ stdio only and cannot be connected as a remote ChatGPT MCP app.
 - `create_quest_shopping_list`
 - `refresh_quest_data`
 - `get_quest_data_status`
+- `list_training_methods`
+- `get_training_method`
+- `compare_training_methods`
+- `create_levelling_plan`
+- `create_weekly_goal_plan`
+- `estimate_time_to_level`
+- `estimate_cost_to_level`
+- `compare_quest_xp_rewards`
+- `refresh_training_data`
+- `get_training_data_status`
 
 Every result is JSON and includes generation/source metadata. Full contracts,
 examples, and error cases are in [the MCP tool reference](docs/mcp-tools/README.md).
@@ -178,6 +201,7 @@ corepack pnpm test:live
 corepack pnpm test:live:hiscores
 corepack pnpm test:live:itemdb
 corepack pnpm test:live:wiki
+corepack pnpm test:live:training
 ```
 
 Normal CI never requires live services. See [CONTRIBUTING.md](CONTRIBUTING.md).
@@ -187,15 +211,21 @@ Normal CI never requires live services. See [CONTRIBUTING.md](CONTRIBUTING.md).
 - **Player stats:** Jagex public Hiscores. Default fresh period: 15 minutes.
 - **Current item guide price:** Jagex Grand Exchange ItemDB. Default fresh period:
   5 minutes.
-- **XP thresholds:** deterministic RuneScape XP formula, generated locally.
+- **XP thresholds and skill caps:** authoritative RuneScape Wiki
+  `Experience/Table` revision 37100263. Standard thresholds are generated from
+  the game formula; the distinct Invention curve is stored exactly.
 - **Quest facts and prerequisites:** RuneScape Wiki Bucket and MediaWiki APIs,
   refreshed on demand with source revisions and content hashes.
+- **Training methods and rates:** current RuneScape Wiki members' training
+  guides, refreshed on demand from exact revisions. Published ranges are
+  retained; unavailable hourly or GP data remains explicitly unknown.
 
 Responses distinguish fresh, stale, and newly fetched data. A stale validated
 record may be served temporarily while refresh happens; malformed responses never
 replace it. Prices are guide values, can be delayed, and are not guaranteed trade
 prices. See the [Version 0.1](docs/data-sources/version-0.1.md) and
-[Version 0.2](docs/data-sources/version-0.2.md) data-source notes.
+[Version 0.2](docs/data-sources/version-0.2.md), and
+[Version 0.3](docs/data-sources/version-0.3.md) data-source notes.
 
 ## Privacy and safety
 

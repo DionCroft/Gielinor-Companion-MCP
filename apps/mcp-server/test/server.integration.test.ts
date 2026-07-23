@@ -1,4 +1,9 @@
-import type { PriceProvider, ProfileService, QuestService } from "@gielinor/core";
+import type {
+  LevellingPlannerService,
+  PriceProvider,
+  ProfileService,
+  QuestService,
+} from "@gielinor/core";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { afterEach, describe, expect, it } from "vitest";
@@ -19,7 +24,19 @@ describe("MCP server protocol integration", () => {
     const quests = {
       getDataStatus: async () => ({ state: "ready", questCount: 2 }),
     } as unknown as QuestService;
-    const service = new CompanionToolService({} as ProfileService, {} as PriceProvider, quests);
+    const planner = {
+      getDataStatus: async () => ({
+        state: "ready",
+        methodCount: 42,
+        coveredSkills: ["mining"],
+      }),
+    } as unknown as LevellingPlannerService;
+    const service = new CompanionToolService(
+      {} as ProfileService,
+      {} as PriceProvider,
+      quests,
+      planner,
+    );
     const server = createCompanionServer(service);
     const client = new Client({ name: "integration-test", version: "1.0.0" });
     const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
@@ -45,6 +62,16 @@ describe("MCP server protocol integration", () => {
         "create_quest_shopping_list",
         "refresh_quest_data",
         "get_quest_data_status",
+        "list_training_methods",
+        "get_training_method",
+        "compare_training_methods",
+        "create_levelling_plan",
+        "create_weekly_goal_plan",
+        "estimate_time_to_level",
+        "estimate_cost_to_level",
+        "compare_quest_xp_rewards",
+        "refresh_training_data",
+        "get_training_data_status",
       ]),
     );
 
@@ -70,6 +97,16 @@ describe("MCP server protocol integration", () => {
     expect(status.structuredContent).toMatchObject({
       data: { state: "ready", questCount: 2 },
       meta: { source: "local SQLite quest sync status" },
+    });
+
+    const trainingStatus = await client.callTool({
+      name: "get_training_data_status",
+      arguments: {},
+    });
+    expect(trainingStatus.isError).not.toBe(true);
+    expect(trainingStatus.structuredContent).toMatchObject({
+      data: { state: "ready", methodCount: 42, coveredSkills: ["mining"] },
+      meta: { source: "local SQLite training sync status" },
     });
   });
 });

@@ -200,6 +200,10 @@ export class QuestService {
     return QuestSchema.parse(quest);
   }
 
+  public async listAll(): Promise<Quest[]> {
+    return (await this.repository.list()).map((quest) => QuestSchema.parse(quest));
+  }
+
   public async setStatus(
     profileId: string,
     identifier: string,

@@ -7,8 +7,11 @@ import {
   PlayerProfileSchema,
   QuestDataSnapshotSchema,
   QuestSchema,
+  TrainingDataSnapshotSchema,
+  TrainingMethodSchema,
   type Quest,
   type QuestDataSnapshot,
+  type TrainingMethod,
 } from "@gielinor/shared-types";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -17,6 +20,7 @@ import {
   SqliteCacheStore,
   SqlitePlayerProfileRepository,
   SqliteQuestRepository,
+  SqliteTrainingMethodRepository,
 } from "../src/repositories.js";
 
 const databases: ReturnType<typeof openDatabase>[] = [];
@@ -57,6 +61,34 @@ function snapshot(quests: Quest[], revision = "snapshot-1"): QuestDataSnapshot {
   });
 }
 
+function trainingMethod(id: string, hash = "c".repeat(64)): TrainingMethod {
+  return TrainingMethodSchema.parse({
+    id,
+    name: id,
+    skillId: "mining",
+    minimumLevel: 1,
+    xpPerHour: 1_000,
+    xpPerHourRange: { minimum: 900, maximum: 1_000 },
+    intensity: "medium",
+    afkRating: "low",
+    members: true,
+    ironmanCompatibility: "unknown",
+    requirements: [],
+    questRequirements: [],
+    itemRequirements: [],
+    equipment: [],
+    notes: [],
+    confidence: "high",
+    uncertaintyNotes: [],
+    sourceName: "fixture",
+    sourceUrl: "https://example.test/training",
+    sourceRevision: "1",
+    sourceUpdatedAt: CHECKED_AT,
+    lastCheckedAt: CHECKED_AT,
+    contentHash: hash,
+  });
+}
+
 afterEach(() => {
   for (const database of databases.splice(0)) {
     database.close();
@@ -74,7 +106,7 @@ describe("SQLite migrations and repositories", () => {
   it("applies migrations transactionally to a new database", () => {
     const database = openDatabase(":memory:");
     databases.push(database);
-    expect(getDatabaseSchemaVersion(database)).toBe(2);
+    expect(getDatabaseSchemaVersion(database)).toBe(3);
     expect(
       database
         .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'player_profiles'")
@@ -83,6 +115,13 @@ describe("SQLite migrations and repositories", () => {
     expect(
       database
         .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'quests'")
+        .get(),
+    ).toBeTruthy();
+    expect(
+      database
+        .prepare(
+          "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'training_methods'",
+        )
         .get(),
     ).toBeTruthy();
   });
@@ -251,5 +290,87 @@ describe("SQLite quest snapshot repository", () => {
       lastErrorMessage: "RuneScape Wiki timed out",
     });
     expect((await repository.getByIdOrAlias("stable"))?.id).toBe("stable");
+  });
+});
+
+describe("SQLite training snapshot repository", () => {
+  it("replaces snapshots transactionally and reports source-aware status", async () => {
+    const database = openDatabase(":memory:");
+    databases.push(database);
+    const repository = new SqliteTrainingMethodRepository(database);
+    const first = TrainingDataSnapshotSchema.parse({
+      provider: "fixture",
+      sourceUrl: "https://example.test/training",
+      sourceRevision: "revision-1",
+      retrievedAt: CHECKED_AT,
+      methods: [trainingMethod("copper")],
+    });
+    expect(await repository.replaceSnapshot(first)).toMatchObject({
+      inserted: 1,
+      updated: 0,
+      unchanged: 0,
+    });
+    expect((await repository.list({ skillId: "mining", level: 1 }))[0]?.id).toBe("copper");
+    expect(await repository.getDataStatus()).toEqual({
+      state: "ready",
+      provider: "fixture",
+      sourceRevision: "revision-1",
+      lastAttemptAt: CHECKED_AT,
+      lastSuccessfulSyncAt: CHECKED_AT,
+      methodCount: 1,
+      coveredSkills: ["mining"],
+    });
+
+    const changed = TrainingDataSnapshotSchema.parse({
+      ...first,
+      sourceRevision: "revision-2",
+      methods: [trainingMethod("copper", "d".repeat(64))],
+    });
+    expect(await repository.replaceSnapshot(changed)).toMatchObject({
+      inserted: 0,
+      updated: 1,
+      unchanged: 0,
+    });
+  });
+
+  it("retains the prior training snapshot after suspicious truncation or failure", async () => {
+    const database = openDatabase(":memory:");
+    databases.push(database);
+    const repository = new SqliteTrainingMethodRepository(database);
+    const methods = Array.from({ length: 20 }, (_, index) =>
+      trainingMethod(`method-${index}`, index.toString(16).padStart(64, "0")),
+    );
+    await repository.replaceSnapshot(
+      TrainingDataSnapshotSchema.parse({
+        provider: "fixture",
+        sourceUrl: "https://example.test/training",
+        sourceRevision: "good",
+        retrievedAt: CHECKED_AT,
+        methods,
+      }),
+    );
+    await expect(
+      repository.replaceSnapshot(
+        TrainingDataSnapshotSchema.parse({
+          provider: "fixture",
+          sourceUrl: "https://example.test/training",
+          sourceRevision: "truncated",
+          retrievedAt: CHECKED_AT,
+          methods: [methods[0]],
+        }),
+      ),
+    ).rejects.toMatchObject({ code: "SUSPICIOUS_TRAINING_SNAPSHOT" });
+    await repository.recordSyncFailure(
+      "MALFORMED_TRAINING_DATA",
+      "bad data",
+      "2026-07-23T13:00:00.000Z",
+    );
+    expect(await repository.list()).toHaveLength(20);
+    expect(await repository.getDataStatus()).toMatchObject({
+      state: "failed",
+      sourceRevision: "good",
+      methodCount: 20,
+      lastErrorCode: "MALFORMED_TRAINING_DATA",
+    });
   });
 });

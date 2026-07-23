@@ -1,6 +1,5 @@
-# Version 0.2 known limitations
+# Version 0.3 known limitations
 
-- Training methods and multi-stage budget/time plans start in 0.3.
 - Item search, buy limits, price history, averages, volatility, and valuation
   start in 0.4.
 - The current GE value is Jagex's guide price, not an instant high/low trade.
@@ -18,3 +17,11 @@
   `Follows:` graphs are not treated as start requirements.
 - Quest status is manually tracked because Jagex Hiscores does not expose a
   trustworthy complete quest-state feed.
+- Wiki training rates are human-maintained estimates and can depend on gear,
+  boosts, attention, banking, and unlocks the companion cannot observe.
+- Missing XP/hour or GP data stays unknown. A source-listed method without a
+  rate cannot be used in a time plan.
+- Ironman compatibility defaults to unknown. Item and equipment ownership is
+  never inferred from the profile.
+- Cheapest/balanced selection is limited by the GP values the guide publishes;
+  it returns a visible fallback warning when no comparable cost data exists.
