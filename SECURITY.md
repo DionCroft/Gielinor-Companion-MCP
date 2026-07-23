@@ -28,6 +28,12 @@ Unexpected internal errors are converted to stable public messages so MCP result
 do not expose local paths or provider internals. Local SQLite files should receive
 the same operating-system protections as other user data.
 
+Optional Ollama and LM Studio support accepts only unauthenticated loopback
+endpoints. Runtime URL validation and the Tauri HTTP capability both reject
+remote hosts. The project must not request, store, or proxy model-provider API
+keys. Model output is untrusted: shared schemas validate tool names, arguments,
+and source-stamped results before any call is represented as successful.
+
 ## Acceptable use
 
 This project is a read-only companion and analysis tool. It must not implement or

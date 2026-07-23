@@ -1,4 +1,4 @@
-# Version 0.5 known limitations
+# Version 0.6 known limitations
 
 - Public RS3 sources provide guide prices and daily history, not an instant
   order book. Instant buy/high and sell/low prices are reported as unavailable.
@@ -21,7 +21,21 @@
   not those ad-hoc dashboard entries.
 - Offline mode disables explicit refresh controls and clearly uses retained
   data. It is not an operating-system network firewall.
-- Ollama/LM Studio tool-loop execution is not shipped until Version 0.6.
+- Local AI requires a separately installed, running Ollama or LM Studio server
+  and a model capable of structured tool use. Model quality and hardware needs
+  vary; the project does not download a model automatically.
+- Only loopback model servers without API authentication are supported in
+  Version 0.6. LAN and hosted model endpoints are intentionally rejected by
+  local-only privacy mode.
+- Ollama discovery filters its explicit capability metadata. LM Studio's
+  OpenAI-compatible model list does not consistently expose tool capability, so
+  the UI lists reported models and clearly surfaces a failure if the selected
+  model cannot call tools.
+- Local conversation history is intentionally in memory only and is cleared on
+  app exit, profile changes, provider changes, or manual reset.
+- Responses from a language model can still be incomplete or poorly worded.
+  Only the displayed trusted-tool activity and validated tool envelope represent
+  confirmed companion data.
 - Mode-specific Hiscores endpoint overrides are not independently configurable.
 - Wiki item/reward fields are human-maintained markup. Quantities and explicit
   alternatives are normalized, but consumption and tradeability are not inferred.

@@ -1,6 +1,6 @@
 {
   "name": "gielinor-companion-mcp",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "private": true,
   "description": "An open-source, AI-compatible RuneScape 3 quest, levelling and Grand Exchange companion.",
   "type": "module",
@@ -9,13 +9,14 @@
     "node": ">=20"
   },
   "scripts": {
-    "build": "corepack pnpm --filter @gielinor/shared-types build && corepack pnpm --filter @gielinor/core build && corepack pnpm --filter @gielinor/providers build && corepack pnpm --filter @gielinor/database build && corepack pnpm --filter @gielinor/mcp-server build && corepack pnpm --filter @gielinor/desktop build",
+    "build": "corepack pnpm --filter @gielinor/shared-types build && corepack pnpm --filter @gielinor/core build && corepack pnpm --filter @gielinor/providers build && corepack pnpm --filter @gielinor/database build && corepack pnpm --filter @gielinor/mcp-server build && corepack pnpm --filter @gielinor/agent-runtime build && corepack pnpm --filter @gielinor/desktop build",
     "typecheck": "corepack pnpm build",
     "test": "corepack pnpm build && vitest run && corepack pnpm --filter @gielinor/desktop test",
-    "test:unit": "corepack pnpm build && vitest run packages/core/test packages/providers/test apps/mcp-server/test/schemas.test.ts",
+    "test:unit": "corepack pnpm build && vitest run packages/core/test packages/providers/test packages/agent-runtime/test apps/mcp-server/test/schemas.test.ts",
     "test:integration": "corepack pnpm build && vitest run apps/mcp-server/test/server.integration.test.ts apps/mcp-server/test/quest-flow.e2e.test.ts apps/mcp-server/test/levelling-flow.e2e.test.ts apps/mcp-server/test/grand-exchange-flow.e2e.test.ts",
     "test:mcp": "corepack pnpm build && vitest run apps/mcp-server/test",
     "test:providers": "corepack pnpm build && vitest run packages/providers/test",
+    "test:ai": "corepack pnpm build && vitest run packages/agent-runtime/test",
     "test:database": "corepack pnpm build && vitest run packages/database/test",
     "test:e2e": "corepack pnpm build && vitest run apps/mcp-server/test/quest-flow.e2e.test.ts apps/mcp-server/test/levelling-flow.e2e.test.ts apps/mcp-server/test/grand-exchange-flow.e2e.test.ts && corepack pnpm --filter @gielinor/desktop test:e2e",
     "test:desktop": "corepack pnpm --filter @gielinor/desktop test",
@@ -30,6 +31,8 @@
     "test:live:wiki": "corepack pnpm build && node scripts/run-live-tests.mjs wiki",
     "test:live:training": "corepack pnpm build && node scripts/run-live-tests.mjs training",
     "test:live:prices": "corepack pnpm build && node scripts/run-live-tests.mjs prices",
+    "test:live:ollama": "corepack pnpm build && node scripts/run-local-ai-smoke.mjs ollama",
+    "test:live:lm-studio": "corepack pnpm build && node scripts/run-local-ai-smoke.mjs lm-studio",
     "lint": "eslint . && prettier --check .",
     "format:check": "prettier --check .",
     "format": "prettier --write .",

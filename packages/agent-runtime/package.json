@@ -1,6 +1,7 @@
 {
-  "name": "@gielinor/database",
+  "name": "@gielinor/agent-runtime",
   "version": "0.6.0",
+  "description": "Bounded, model-independent local AI runtime for Gielinor Companion.",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -18,10 +19,12 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@gielinor/core": "workspace:*",
-    "@gielinor/providers": "workspace:*",
     "@gielinor/shared-types": "workspace:*",
-    "better-sqlite3": "^12.2.0"
+    "zod": "^3.25.76",
+    "zod-to-json-schema": "^3.25.2"
+  },
+  "engines": {
+    "node": ">=20"
   },
   "license": "MIT"
 }

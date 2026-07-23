@@ -7,16 +7,17 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 Gielinor Companion MCP is a safe, model-independent foundation for deterministic
-RuneScape 3 planning. Version 0.5 adds an accessible Tauri/React desktop
-application to the existing public Hiscores, local profiles, quest routes,
-levelling plans, Grand Exchange analytics, and standards-based stdio MCP server.
-It works without AI and never controls the game client.
+RuneScape 3 planning. Version 0.6 adds optional local Ollama and LM Studio
+conversations to the accessible Tauri/React desktop application, public
+Hiscores, local profiles, quest routes, levelling plans, Grand Exchange
+analytics, and standards-based stdio MCP server. It still works without AI and
+never controls the game client.
 
 ## Release status
 
-**Current version: 0.5.0 — Standalone Desktop and No-AI Dashboard.** This is an
-early working release. The deterministic desktop application is complete; local
-Ollama/LM Studio chat and hosted MCP remain roadmap work.
+**Current version: 0.6.0 — Local AI Providers.** This is an early working
+release. Ollama and LM Studio can use the same 48 trusted tools through a bounded
+local runtime; hosted MCP remains Version 0.7 roadmap work.
 
 ## Features
 
@@ -54,6 +55,12 @@ Ollama/LM Studio chat and hosted MCP remain roadmap work.
   responsive layouts, system/light/dark themes, offline retained-data status,
   and a complete no-AI mode.
 - Portable, strict, schema-versioned profile import/export.
+- Shared model-independent agent runtime with Ollama and LM Studio adapters,
+  capability-aware model discovery, multi-turn and parallel tool calls, strict
+  input/output validation, request timeouts, loop limits, and safe failures.
+- Desktop provider selection, loopback-only endpoints, connection testing,
+  model selection, in-memory conversation reset, and visible trusted-tool
+  activity. No-AI mode remains the default.
 - Fixture-based unit, component, native-command, integration, and Playwright
   journey tests; live provider tests are opt-in.
 
@@ -68,9 +75,12 @@ domain ports + core services ---- SQLite profiles/quests/training/prices
                               |
                               v
                 MCP tool service ---- stdio MCP client
-                         |
-                         v
-              Tauri command bridge ---- React desktop
+                         |                    ^
+                         v                    |
+              Tauri command bridge ---- shared agent runtime
+                         |                    ^
+                         v                    |
+                    React desktop ---- Ollama / LM Studio
 ```
 
 Business rules are in `packages/core`. Provider parsing, SQLite, and MCP transport
@@ -142,18 +152,21 @@ Use the tested stdio command documented in
 
 Add [the LM Studio example](examples/lm-studio/mcp.json) to LM Studio's MCP
 configuration. LM Studio model support for tool use varies; the MCP server itself
-does not contain LM Studio-specific behavior.
+does not contain LM Studio-specific behavior. For the standalone desktop's
+direct local provider, start LM Studio's Local Server, then follow the
+[local AI setup guide](docs/installation/local-ai.md).
 
 ### Ollama
 
-The shared Ollama agent runtime is planned for 0.6. Version 0.5 does not claim
-direct Ollama tool-loop support. An MCP-capable third-party Ollama host may launch
-the same stdio command, but is outside this release's tested surface.
+Install a tool-capable model, keep Ollama running at its default loopback
+endpoint, then choose **AI providers → Ollama** in the desktop app. The app
+discovers only models whose Ollama metadata advertises tool support. See the
+[local AI setup guide](docs/installation/local-ai.md).
 
 ### Standalone desktop
 
-Version 0.5 includes the standalone no-AI desktop application. Build and run it
-from source:
+Version 0.6 includes both the complete no-AI dashboard and optional local AI.
+Build and run it from source:
 
 ```sh
 corepack pnpm build
@@ -166,7 +179,7 @@ not committed. See the [desktop installation guide](docs/installation/desktop.md
 
 ### ChatGPT-compatible remote MCP
 
-Hosted Streamable HTTP transport is planned for 0.7. Version 0.5 exposes local
+Hosted Streamable HTTP transport is planned for 0.7. Version 0.6 exposes local
 stdio only and cannot be connected as a remote ChatGPT MCP app.
 
 ## MCP tools
@@ -234,6 +247,7 @@ corepack pnpm test:unit
 corepack pnpm test:integration
 corepack pnpm test:mcp
 corepack pnpm test:providers
+corepack pnpm test:ai
 corepack pnpm test:database
 corepack pnpm test:e2e
 corepack pnpm test:desktop
@@ -251,6 +265,8 @@ corepack pnpm test:live:itemdb
 corepack pnpm test:live:wiki
 corepack pnpm test:live:training
 corepack pnpm test:live:prices
+corepack pnpm test:live:ollama
+corepack pnpm test:live:lm-studio
 ```
 
 Normal CI never requires live services. See [CONTRIBUTING.md](CONTRIBUTING.md).
@@ -281,8 +297,10 @@ prices. See the [Version 0.1](docs/data-sources/version-0.1.md) and
 [Version 0.2](docs/data-sources/version-0.2.md), and
 [Version 0.3](docs/data-sources/version-0.3.md), and
 [Version 0.4](docs/data-sources/version-0.4.md) data-source notes.
-The desktop application does not introduce a new game-data provider; see the
-[Version 0.5 desktop source behavior](docs/data-sources/version-0.5.md).
+The desktop and local model adapters do not introduce new RuneScape game-data
+providers; see the
+[Version 0.5 desktop source behavior](docs/data-sources/version-0.5.md) and
+[Version 0.6 local-AI data behavior](docs/data-sources/version-0.6.md).
 
 ## Privacy and safety
 

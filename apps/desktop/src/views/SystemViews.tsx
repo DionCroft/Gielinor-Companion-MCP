@@ -186,22 +186,22 @@ export function UpdatesView() {
         </span>
         <div>
           <p className="eyebrow">Installed release</p>
-          <h2>Version 0.5.0</h2>
-          <p>The standalone desktop and no-AI dashboard release.</p>
+          <h2>Version 0.6.0</h2>
+          <p>The bounded Ollama and LM Studio local-AI release.</p>
         </div>
         <StatusPill state="success">Current source build</StatusPill>
       </section>
       <section className="surface-card release-notes">
         <p className="eyebrow">What is included</p>
-        <h2>Local desktop milestone</h2>
+        <h2>Local AI milestone</h2>
         <ul className="feature-list">
           <li>
             <Icon name="check" />
-            First-run profile setup and public Hiscores refresh
+            Model discovery, connection testing and provider selection
           </li>
           <li>
             <Icon name="check" />
-            Quest, levelling, GE, shopping and goal dashboards
+            Multi-turn trusted tool use with bounded loops and timeouts
           </li>
           <li>
             <Icon name="check" />
@@ -317,54 +317,6 @@ export function SettingsView({
   );
 }
 
-export function AiProvidersView() {
-  return (
-    <div className="page-stack">
-      <PageHeader
-        eyebrow="Optional intelligence"
-        title="AI providers"
-        description="The deterministic companion works fully without a language model."
-        actions={<StatusPill state="neutral">No-AI mode active</StatusPill>}
-      />
-      <section className="surface-card no-ai-hero">
-        <div className="no-ai-icon">
-          <Icon name="spark" size={38} />
-        </div>
-        <div>
-          <p className="eyebrow">Version 0.5 behavior</p>
-          <h2>No model is connected</h2>
-          <p>
-            Every profile, quest route, XP calculation, levelling plan and price analysis on this
-            dashboard comes from validated tools—not generated guesses.
-          </p>
-        </div>
-      </section>
-      <div className="provider-preview-grid">
-        {(
-          [
-            ["Ollama", "Local models on your own machine", "http://127.0.0.1:11434"],
-            ["LM Studio", "Local OpenAI-compatible server", "http://127.0.0.1:1234"],
-          ] as const
-        ).map(([name, description, endpoint]) => (
-          <article className="surface-card provider-preview" key={name}>
-            <span className="provider-logo">{name.slice(0, 2)}</span>
-            <div>
-              <h2>{name}</h2>
-              <p>{description}</p>
-              <code>{endpoint}</code>
-            </div>
-            <StatusPill state="neutral">Arrives in 0.6</StatusPill>
-          </article>
-        ))}
-      </div>
-      <InlineAlert tone="info">
-        Version 0.6 adds connection tests, model discovery and bounded tool loops. No endpoint is
-        contacted in this release.
-      </InlineAlert>
-    </div>
-  );
-}
-
 export function AboutView() {
   return (
     <div className="page-stack">
@@ -379,7 +331,7 @@ export function AboutView() {
             <i />
           </span>
           <div>
-            <p className="eyebrow">Version 0.5.0</p>
+            <p className="eyebrow">Version 0.6.0</p>
             <h2>Built for informed play—not automated play.</h2>
             <p>
               Gielinor Companion brings public player progress, quest dependencies, training methods

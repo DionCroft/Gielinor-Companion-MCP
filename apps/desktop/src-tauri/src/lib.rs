@@ -224,7 +224,7 @@ fn invoke_tool(
                     "capabilities": {},
                     "clientInfo": {
                         "name": "gielinor-companion-desktop",
-                        "version": "0.5.0"
+                        "version": "0.6.0"
                     }
                 }
             }),
@@ -337,6 +337,7 @@ async fn call_companion_tool(
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_http::init())
         .invoke_handler(tauri::generate_handler![
             desktop_runtime_status,
             call_companion_tool
@@ -370,6 +371,30 @@ mod tests {
             assert!(!message.contains("/Users/"));
             assert!(!message.contains("C:"));
         }
+    }
+
+    #[test]
+    fn native_model_network_scope_is_loopback_only() {
+        let capability: Value =
+            serde_json::from_str(include_str!("../capabilities/default.json")).unwrap();
+        let permission = capability["permissions"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|permission| permission["identifier"] == "http:default")
+            .unwrap();
+        let allowed: Vec<&str> = permission["allow"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter_map(|entry| entry["url"].as_str())
+            .collect();
+
+        assert_eq!(
+            allowed,
+            ["http://127.0.0.1:*", "http://localhost:*", "http://[::1]:*"]
+        );
+        assert!(allowed.iter().all(|url| !url.contains("https://")));
     }
 
     #[test]

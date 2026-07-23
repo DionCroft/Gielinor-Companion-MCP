@@ -1,4 +1,4 @@
-# Version 0.5 architecture
+# Version 0.6 architecture
 
 ## Boundaries
 
@@ -11,6 +11,8 @@ adapters, resilient caching, and RuneScape Wiki quest/training adapters.
 catalogue/history, alias, and sync-status ports. `@gielinor/mcp-server` composes
 dependencies and exposes stdio tools. `@gielinor/desktop` is a Tauri/React client
 that reaches those same tools through a least-privilege native stdio bridge.
+`@gielinor/agent-runtime` is a model-independent orchestrator for optional local
+providers; it depends only on shared tool contracts and an injected executor.
 
 Dependencies point inward:
 
@@ -19,6 +21,10 @@ shared-types <- core <- providers
                     <- database
 shared-types/core/providers/database <- mcp-server
                                       <- desktop bridge <- React views
+shared-types <- agent-runtime --------------------^
+                    ^                     |
+                    |                     v
+             Ollama / LM Studio    trusted tool executor
 ```
 
 The database package also implements the provider package's cache-storage
@@ -147,21 +153,51 @@ to path-free public messages.
 Production preparation uses `pnpm deploy` to build a flattened dependency tree
 and copies the current target's Node executable as a Tauri external sidecar.
 Generated runtime, target, and installer files are ignored. The main window has
-only `core:default`, a strict CSP, and prototype freezing; it receives no generic
-filesystem, shell, process, or network capability.
+`core:default`, a strict CSP, and prototype freezing. It receives no generic
+filesystem, shell, or process capability. Tauri's HTTP plugin is narrowed by an
+ACL to loopback HTTP URLs only.
 
 Browser preview and Playwright use deterministic fixtures and never replace
 native command tests. User profiles and provider catalogues continue to use the
 same SQLite file as the headless MCP server.
 
+## Local agent boundary
+
+The 48 MCP input schemas now live in `@gielinor/shared-types`. MCP registration
+and the model-facing JSON function schemas therefore derive from the same Zod
+contracts. `@gielinor/agent-runtime` accepts a provider adapter and a companion
+tool executor; it contains no XP, quest, training, or price calculations.
+
+Ollama uses `/api/tags`, `/api/show`, and `/api/chat`. Discovery filters out
+models whose capability metadata does not include tool use. LM Studio uses the
+OpenAI-compatible `/v1/models` and `/v1/chat/completions` contracts. Both
+adapters normalize provider-specific messages into one internal conversation
+format.
+
+Each model call has an overall 1–120 second timeout and a configurable 1–10
+tool-loop bound. A turn can request no more than eight tools. Input is parsed by
+the selected shared Zod schema before the executor runs; output must be a valid
+source-stamped `ToolEnvelope` before it is returned to the model. Unknown names,
+bad inputs, rejected outputs, and executor errors become explicit failed tool
+messages. Parallel calls use `Promise.all` only for adapters that declare that
+capability.
+
+The desktop uses Tauri's Rust-backed HTTP client, avoiding webview CORS
+configuration. Runtime endpoint parsing and Tauri ACL scopes independently
+restrict requests to `localhost`, `127.0.0.1`, or `::1`; credentials, query
+strings, remote hosts, redirects, and cloud API keys are not accepted.
+Conversations remain in memory. Only non-secret provider choice, endpoints,
+model name, timeout, and loop preferences are stored in local UI storage.
+
 ## Safety
 
-No layer communicates with a RuneScape client. Provider URLs are public read-only
-services. Profile mutations affect companion-local SQLite only. The MCP process
-writes protocol messages to stdout and diagnostics to stderr.
+No layer communicates with a RuneScape client. Game-data provider URLs are
+public read-only services; optional model traffic remains on loopback. Profile
+mutations affect companion-local SQLite only. The MCP process writes protocol
+messages to stdout and diagnostics to stderr.
 
 ## Future extension
 
-Later local-agent and hosted transports must compose these same services; they
-must not reimplement calculations, quest graph traversal, levelling selection,
-price analytics, or valuation.
+The later hosted transport must compose these same services; it must not
+reimplement calculations, quest graph traversal, levelling selection, price
+analytics, valuation, or tool validation.

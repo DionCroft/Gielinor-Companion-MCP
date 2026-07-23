@@ -1,3 +1,9 @@
+import {
+  LocalAiError,
+  type JsonTransport,
+  type JsonTransportRequest,
+  type JsonTransportResponse,
+} from "@gielinor/agent-runtime";
 import { SKILL_IDS, type PlayerProfile, type ProfileExport } from "@gielinor/shared-types";
 
 import type {
@@ -150,6 +156,71 @@ export class TauriCompanionBridge implements CompanionBridge {
       arguments: arguments_,
     });
   }
+
+  public localAiTransport(): JsonTransport {
+    return new TauriJsonTransport();
+  }
+}
+
+class TauriJsonTransport implements JsonTransport {
+  public async request(request: JsonTransportRequest): Promise<JsonTransportResponse> {
+    const body = request.body === undefined ? undefined : JSON.stringify(request.body);
+    if (body !== undefined && new TextEncoder().encode(body).byteLength > 1024 * 1024) {
+      throw new LocalAiError(
+        "INVALID_CONFIGURATION",
+        "The local model request exceeded the one-megabyte safety limit.",
+      );
+    }
+    const controller = new AbortController();
+    const timeout = globalThis.setTimeout(() => controller.abort(), request.timeoutMs);
+    try {
+      const { fetch: nativeFetch } = await import("@tauri-apps/plugin-http");
+      const response = await nativeFetch(request.url, {
+        method: request.method,
+        headers: { "content-type": "application/json" },
+        ...(body === undefined ? {} : { body }),
+        signal: controller.signal,
+        connectTimeout: request.timeoutMs,
+        maxRedirections: 0,
+      });
+      const text = await response.text();
+      if (new TextEncoder().encode(text).byteLength > 2 * 1024 * 1024) {
+        throw new LocalAiError(
+          "PROVIDER_RESPONSE_INVALID",
+          "The local model returned an unexpectedly large response.",
+        );
+      }
+      if (text.trim() === "") {
+        return { status: response.status, body: null };
+      }
+      try {
+        return { status: response.status, body: JSON.parse(text) as unknown };
+      } catch {
+        throw new LocalAiError(
+          "PROVIDER_RESPONSE_INVALID",
+          "The local model returned malformed JSON. Check that its API server is compatible.",
+        );
+      }
+    } catch (error) {
+      if (error instanceof LocalAiError) {
+        throw error;
+      }
+      if (controller.signal.aborted) {
+        throw new LocalAiError(
+          "TIMEOUT",
+          "The local model did not respond before the configured timeout.",
+          true,
+        );
+      }
+      throw new LocalAiError(
+        "PROVIDER_UNAVAILABLE",
+        "The local model server could not be reached. Start it and confirm the endpoint.",
+        true,
+      );
+    } finally {
+      globalThis.clearTimeout(timeout);
+    }
+  }
 }
 
 export class DemoCompanionBridge implements CompanionBridge {
@@ -158,7 +229,15 @@ export class DemoCompanionBridge implements CompanionBridge {
 
   public constructor(fixture = "first-run") {
     this.fixture = fixture;
-    this.profiles = fixture === "returning" || fixture === "offline" ? [demoProfile()] : [];
+    this.profiles = [
+      "returning",
+      "offline",
+      "ai-ready",
+      "ai-provider-error",
+      "ai-model-error",
+    ].includes(fixture)
+      ? [demoProfile()]
+      : [];
   }
 
   public async runtimeStatus(): Promise<RuntimeStatus> {
@@ -170,6 +249,115 @@ export class DemoCompanionBridge implements CompanionBridge {
           ? "Offline preview: validated local fixture data is available."
           : "Browser preview uses deterministic fixture data.",
     };
+  }
+
+  public localAiTransport(): JsonTransport {
+    return {
+      request: (request) => this.localAiResponse(request),
+    };
+  }
+
+  private localAiResponse(request: JsonTransportRequest): Promise<JsonTransportResponse> {
+    if (this.fixture === "ai-provider-error") {
+      return Promise.resolve({ status: 503, body: null });
+    }
+    if (request.url.endsWith("/api/tags")) {
+      return Promise.resolve({
+        status: 200,
+        body: { models: [{ name: "qwen3:8b" }, { name: "llama3.2:3b" }] },
+      });
+    }
+    if (request.url.endsWith("/api/show")) {
+      return Promise.resolve({
+        status: 200,
+        body: { capabilities: ["completion", "tools"] },
+      });
+    }
+    if (request.url.endsWith("/v1/models")) {
+      return Promise.resolve({
+        status: 200,
+        body: { data: [{ id: "local/qwen3-8b" }, { id: "local/llama-3.2-3b" }] },
+      });
+    }
+    if (this.fixture === "ai-model-error") {
+      return Promise.resolve({ status: 404, body: { error: "model not found" } });
+    }
+    const body = request.body as { messages?: Array<{ role?: string }> } | undefined;
+    const hasToolResult = body?.messages?.some((message) => message.role === "tool") ?? false;
+    if (request.url.endsWith("/api/chat")) {
+      return Promise.resolve(
+        hasToolResult
+          ? {
+              status: 200,
+              body: {
+                message: {
+                  content:
+                    "The validated local catalogue lists an Abyssal whip guide price of 83,753 GP.",
+                },
+                done_reason: "stop",
+              },
+            }
+          : {
+              status: 200,
+              body: {
+                message: {
+                  content: "",
+                  tool_calls: [
+                    {
+                      function: {
+                        name: "search_items",
+                        arguments: { query: "abyssal whip", limit: 5 },
+                      },
+                    },
+                  ],
+                },
+                done_reason: "tool_calls",
+              },
+            },
+      );
+    }
+    if (request.url.endsWith("/v1/chat/completions")) {
+      return Promise.resolve(
+        hasToolResult
+          ? {
+              status: 200,
+              body: {
+                choices: [
+                  {
+                    finish_reason: "stop",
+                    message: {
+                      content:
+                        "The validated local catalogue lists an Abyssal whip guide price of 83,753 GP.",
+                    },
+                  },
+                ],
+              },
+            }
+          : {
+              status: 200,
+              body: {
+                choices: [
+                  {
+                    finish_reason: "tool_calls",
+                    message: {
+                      content: null,
+                      tool_calls: [
+                        {
+                          id: "demo-call-1",
+                          function: {
+                            name: "search_items",
+                            arguments: '{"query":"abyssal whip","limit":5}',
+                          },
+                        },
+                      ],
+                    },
+                  },
+                ],
+              },
+            },
+      );
+    }
+    return Promise.resolve({ status: 404, body: null });
   }
 
   private providerGuard(tool: string): void {

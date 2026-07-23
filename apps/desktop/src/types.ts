@@ -1,3 +1,4 @@
+import type { JsonTransport } from "@gielinor/agent-runtime";
 import type { GameMode, PlayerProfile, PlayerSkill, SkillId } from "@gielinor/shared-types";
 
 export type ToolEnvelope<T> = {
@@ -17,6 +18,7 @@ export type RuntimeStatus = {
 export interface CompanionBridge {
   runtimeStatus(): Promise<RuntimeStatus>;
   callTool<T>(tool: string, arguments_: Record<string, unknown>): Promise<ToolEnvelope<T>>;
+  localAiTransport(): JsonTransport;
 }
 
 export type DesktopProfile = PlayerProfile;
