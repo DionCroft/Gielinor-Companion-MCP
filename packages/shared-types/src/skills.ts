@@ -32,6 +32,45 @@ export const SKILL_IDS = [
 
 export type SkillId = (typeof SKILL_IDS)[number];
 
+/**
+ * Current true (non-virtual) skill caps in RuneScape 3.
+ *
+ * Source: RuneScape Wiki Experience/Table revision 37100263 (2026-07-15).
+ * Keep this map revisioned with the training-data documentation whenever a
+ * future 110/120 expansion changes a cap.
+ */
+export const SKILL_LEVEL_CAPS: Readonly<Record<SkillId, 99 | 110 | 120>> = {
+  attack: 120,
+  defence: 99,
+  strength: 120,
+  constitution: 99,
+  ranged: 120,
+  prayer: 99,
+  magic: 120,
+  cooking: 99,
+  woodcutting: 110,
+  fletching: 110,
+  fishing: 99,
+  firemaking: 110,
+  crafting: 110,
+  smithing: 110,
+  mining: 110,
+  herblore: 120,
+  agility: 99,
+  thieving: 120,
+  slayer: 120,
+  farming: 120,
+  runecrafting: 110,
+  hunter: 110,
+  construction: 120,
+  summoning: 99,
+  dungeoneering: 120,
+  divination: 99,
+  invention: 120,
+  archaeology: 120,
+  necromancy: 120,
+};
+
 export const SKILL_DISPLAY_NAMES: Readonly<Record<SkillId, string>> = {
   attack: "Attack",
   defence: "Defence",

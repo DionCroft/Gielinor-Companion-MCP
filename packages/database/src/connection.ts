@@ -67,6 +67,38 @@ const MIGRATIONS: ReadonlyArray<{ version: number; sql: string }> = [
       );
     `,
   },
+  {
+    version: 3,
+    sql: `
+      CREATE TABLE IF NOT EXISTS training_methods (
+        id TEXT PRIMARY KEY,
+        skill_id TEXT NOT NULL,
+        minimum_level INTEGER NOT NULL,
+        maximum_level INTEGER,
+        method_json TEXT NOT NULL,
+        content_hash TEXT NOT NULL,
+        source_revision TEXT NOT NULL,
+        source_updated_at TEXT NOT NULL,
+        last_checked_at TEXT NOT NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_training_methods_skill_level
+        ON training_methods(skill_id, minimum_level, maximum_level);
+
+      CREATE TABLE IF NOT EXISTS training_sync_status (
+        singleton_id INTEGER PRIMARY KEY CHECK (singleton_id = 1),
+        state TEXT NOT NULL CHECK (state IN ('ready', 'failed')),
+        provider TEXT,
+        source_revision TEXT,
+        last_attempt_at TEXT NOT NULL,
+        last_successful_sync_at TEXT,
+        method_count INTEGER NOT NULL DEFAULT 0 CHECK (method_count >= 0),
+        covered_skills_json TEXT NOT NULL DEFAULT '[]',
+        last_error_code TEXT,
+        last_error_message TEXT
+      );
+    `,
+  },
 ];
 
 function migrate(database: DatabaseConnection): void {

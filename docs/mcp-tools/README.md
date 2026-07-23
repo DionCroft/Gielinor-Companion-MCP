@@ -1,4 +1,4 @@
-# MCP tool reference — Version 0.2
+# MCP tool reference — Version 0.3
 
 All tools use strict JSON object inputs. Successful responses use:
 
@@ -18,6 +18,10 @@ Errors set MCP `isError: true` and return
 `MALFORMED_PROVIDER_RESPONSE`, `EMPTY_PROVIDER_RESPONSE`,
 `QUEST_PREREQUISITE_CYCLE`, `MISSING_QUEST_DATA`, and `INTERNAL_ERROR`. Schema
 violations are reported by the MCP SDK before a handler runs.
+
+Levelling-specific errors include `VIRTUAL_LEVEL_OPT_IN_REQUIRED`,
+`UNREACHABLE_LEVEL_TARGET`, `MISSING_TRAINING_RATE`,
+`MALFORMED_TRAINING_DATA`, and `SUSPICIOUS_TRAINING_SNAPSHOT`.
 
 ## `create_player_profile`
 
@@ -250,9 +254,11 @@ Response data:
 ## `calculate_xp_remaining`
 
 Calculates progress without network access. Input: `currentExperience` from 0 to
-5.8 billion and `targetLevel` from 1 to 126. Output: current/target levels and XP,
-remaining XP, and bounded percentage. Source: deterministic RuneScape XP table.
-Errors: invalid XP or target level.
+5.8 billion, `targetLevel`, and optional canonical `skillId`. Without a skill it
+uses the standard curve through 126. With `invention`, it uses the elite curve
+through 150. Other skill IDs add true-cap and virtual-target metadata. Output:
+current/target levels and XP, remaining XP, and bounded percentage. Source:
+deterministic revisioned RuneScape XP tables. Errors: invalid XP or target level.
 
 Request:
 
@@ -446,3 +452,89 @@ Output state (`never-synced`, `ready`, or `failed`), retained quest count,
 provider/revision, last attempt/success times, and safe last error where present.
 Source/cache: local SQLite sync status. Errors: database failure. Privacy: no
 profile data is read and internal paths/stacks are not returned.
+
+## Training-tool data and safety
+
+Training reads use the last fully validated local Wiki snapshot.
+`refresh_training_data` is the only training tool that contacts the network.
+Published rates remain ranges; positive plan GP totals are costs and negative
+totals are projected profit. Missing values are omitted with a warning, never
+invented. All outputs are planning guidance and never operate the game client.
+
+## `list_training_methods`
+
+Lists methods, optionally filtered by `skillId`, `level`, `members`, or
+`ironman`. Input may be `{}`. Output contains complete structured methods,
+including levels, rates where available, attention, requirements, uncertainty,
+revision, timestamps, URL, and hash. Source: local training snapshot. No profile
+is read.
+
+## `get_training_method`
+
+Resolves one exact `methodId`. Example:
+`{"methodId":"mining:89:97:corrupted-ore"}`. Output is the complete method.
+Errors: `NOT_FOUND` or invalid stored data.
+
+## `compare_training_methods`
+
+Compares methods applicable between a refreshed profile's current XP and a
+target. Required input: `profileId`, `skillId`, `targetLevel`. Optional:
+`methodIds`, `members`, `allowVirtualLevels`. Output includes applicable XP,
+best/worst hours where rated, cost/profit where published, access blockers, and
+warnings. Unknown rates have no fake `hoursRange`.
+
+## `create_levelling_plan`
+
+Creates a multi-stage plan. Required input: `profileId`, `skillId`,
+`targetLevel`. Optional:
+
+- `strategy`: `fastest|cheapest|balanced|afk`;
+- `methodId`: force one method;
+- `budgetGp`, `hoursPerDay`, `targetDate`;
+- `members` (defaults true);
+- `allowVirtualLevels` (defaults false).
+
+Output includes exact current/target XP, true cap, virtual status, merged stages,
+per-stage methods/rates/time/cost/warnings, total ranges, completion dates,
+feasibility, and assumptions. Errors identify uncovered ranges, access gates,
+missing rates, invalid targets, or missing profile skills.
+
+## `create_weekly_goal_plan`
+
+Uses the levelling-plan input plus optional `weeks` (1–520). Output embeds the
+full plan and adds weekly XP, weekly best/worst hours, and whether the plan fits
+the tracked or supplied daily play time.
+
+## `estimate_time_to_level`
+
+Uses the levelling-plan input and returns the target, remaining XP, total
+best/worst hours, optional completion-date range, feasibility, and warnings.
+Supplying `methodId` estimates only that method and fails explicitly if its
+source has no hourly rate.
+
+## `estimate_cost_to_level`
+
+Uses the levelling-plan input and returns the target, remaining XP, total GP
+range where supported, feasibility, and warnings. An absent GP range means at
+least one stage has no reliable cost/profit data.
+
+## `compare_quest_xp_rewards`
+
+Required input: `skillId`; optional `profileId` and `limit` (1–100). Output ranks
+quests by total structured XP reward for that skill. With a profile, each row
+marks whether the quest is already manually completed. Source: local quest
+snapshot.
+
+## `refresh_training_data`
+
+Fetches exact Wiki revisions, validates all source pages and methods, and
+transactionally replaces the training catalogue. Input: `{}`. Output includes
+inserted/updated/unchanged/removed counts and a snapshot revision digest.
+Malformed, empty, duplicate, implausible-rate, incomplete, timeout, and
+transport failures retain the previous snapshot.
+
+## `get_training_data_status`
+
+Reads synchronization health without network access. Input: `{}`. Output:
+`never-synced|ready|failed`, retained method count, covered skills, provider,
+revision digest, last attempt/success, and safe last error.

@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { calculateSkillProgress, experienceForLevel, levelFromExperience } from "../src/xp.js";
+import {
+  calculateSkillProgress,
+  experienceForLevel,
+  getSkillLevelCap,
+  isVirtualLevel,
+  levelFromExperience,
+} from "../src/xp.js";
 
 describe("RuneScape XP calculations", () => {
   it.each([
@@ -33,5 +39,32 @@ describe("RuneScape XP calculations", () => {
 
   it("rejects unsupported target levels", () => {
     expect(() => experienceForLevel(127)).toThrow(/1 to 126/);
+  });
+
+  it.each([
+    [2, 830],
+    [99, 36_073_511],
+    [120, 80_618_654],
+    [150, 194_927_409],
+  ])("maps Invention level %i to elite-curve XP %i", (level, experience) => {
+    expect(experienceForLevel(level, "invention")).toBe(experience);
+    expect(levelFromExperience(experience, "invention")).toBe(level);
+  });
+
+  it("uses current true skill caps while supporting explicit virtual calculations", () => {
+    expect(getSkillLevelCap("defence")).toBe(99);
+    expect(getSkillLevelCap("mining")).toBe(110);
+    expect(getSkillLevelCap("construction")).toBe(120);
+    expect(isVirtualLevel("defence", 120)).toBe(true);
+    expect(isVirtualLevel("construction", 120)).toBe(false);
+    expect(calculateSkillProgress(0, 120, "invention")).toMatchObject({
+      targetExperience: 80_618_654,
+      trueSkillCap: 120,
+      virtualTarget: false,
+    });
+  });
+
+  it("rejects non-Invention level 150", () => {
+    expect(() => experienceForLevel(150, "mining")).toThrow(/1 to 126/);
   });
 });

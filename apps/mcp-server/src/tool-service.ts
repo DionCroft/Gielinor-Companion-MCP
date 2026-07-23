@@ -2,6 +2,8 @@ import {
   CompanionError,
   NotFoundError,
   calculateSkillProgress,
+  type LevellingPlanInput,
+  type LevellingPlannerService,
   type PriceProvider,
   type ProfileService,
   type QuestService,
@@ -48,6 +50,7 @@ export class CompanionToolService {
     private readonly profiles: ProfileService,
     private readonly prices: PriceProvider,
     private readonly quests?: QuestService,
+    private readonly planner?: LevellingPlannerService,
   ) {}
 
   private questService(): QuestService {
@@ -55,6 +58,13 @@ export class CompanionToolService {
       throw new CompanionError("Quest companion is not configured", "UNSUPPORTED_FEATURE");
     }
     return this.quests;
+  }
+
+  private plannerService(): LevellingPlannerService {
+    if (this.planner === undefined) {
+      throw new CompanionError("Levelling planner is not configured", "UNSUPPORTED_FEATURE");
+    }
+    return this.planner;
   }
 
   public async createPlayerProfile(input: {
@@ -128,9 +138,10 @@ export class CompanionToolService {
   public calculateXpRemaining(
     currentExperience: number,
     targetLevel: number,
+    skillId?: SkillId,
   ): ToolEnvelope<ReturnType<typeof calculateSkillProgress>> {
     return envelope(
-      calculateSkillProgress(currentExperience, targetLevel),
+      calculateSkillProgress(currentExperience, targetLevel, skillId),
       "deterministic RuneScape XP table",
     );
   }
@@ -156,7 +167,7 @@ export class CompanionToolService {
     return envelope(
       {
         skillId,
-        ...calculateSkillProgress(skill.experience, targetLevel),
+        ...calculateSkillProgress(skill.experience, targetLevel, skillId),
         ...(profile.lastHiscoresRefresh === undefined
           ? {}
           : { hiscoresRefreshedAt: profile.lastHiscoresRefresh }),
@@ -286,5 +297,99 @@ export class CompanionToolService {
 
   public async getQuestDataStatus() {
     return envelope(await this.questService().getDataStatus(), "local SQLite quest sync status");
+  }
+
+  public async listTrainingMethods(input: {
+    skillId?: SkillId | undefined;
+    level?: number | undefined;
+    members?: boolean | undefined;
+    ironman?: boolean | undefined;
+  }) {
+    return envelope(
+      await this.plannerService().list(input),
+      "validated local RuneScape Wiki training snapshot",
+    );
+  }
+
+  public async getTrainingMethod(methodId: string) {
+    const method = await this.plannerService().get(methodId);
+    return envelope(method, method.sourceName);
+  }
+
+  public async compareTrainingMethods(input: {
+    profileId: string;
+    skillId: SkillId;
+    targetLevel: number;
+    methodIds?: string[] | undefined;
+    members?: boolean | undefined;
+    allowVirtualLevels?: boolean | undefined;
+  }) {
+    return envelope(
+      await this.plannerService().compare(input),
+      "local profile and validated RuneScape Wiki training snapshot",
+    );
+  }
+
+  public async createLevellingPlan(input: LevellingPlanInput) {
+    return envelope(
+      await this.plannerService().createPlan(input),
+      "deterministic levelling planner and validated training snapshot",
+    );
+  }
+
+  public async createWeeklyGoalPlan(input: LevellingPlanInput & { weeks?: number | undefined }) {
+    return envelope(
+      await this.plannerService().createWeeklyGoalPlan(input),
+      "deterministic levelling planner and local profile preferences",
+    );
+  }
+
+  public async estimateTimeToLevel(input: LevellingPlanInput) {
+    const plan = await this.plannerService().createPlan(input);
+    return envelope(
+      {
+        skillId: plan.skillId,
+        targetLevel: plan.targetLevel,
+        experienceRequired: plan.experienceRequired,
+        hoursRange: plan.totalHoursRange,
+        completionDateRange: plan.completionDateRange,
+        feasible: plan.feasible,
+        warnings: plan.warnings,
+      },
+      "deterministic levelling planner",
+    );
+  }
+
+  public async estimateCostToLevel(input: LevellingPlanInput) {
+    const plan = await this.plannerService().createPlan(input);
+    return envelope(
+      {
+        skillId: plan.skillId,
+        targetLevel: plan.targetLevel,
+        experienceRequired: plan.experienceRequired,
+        gpRange: plan.totalGpRange,
+        feasible: plan.feasible,
+        warnings: plan.warnings,
+      },
+      "deterministic levelling planner",
+    );
+  }
+
+  public async compareQuestXpRewards(skillId: SkillId, profileId?: string, limit?: number) {
+    return envelope(
+      await this.plannerService().compareQuestXpRewards(skillId, profileId, limit),
+      "validated local RuneScape Wiki quest snapshot",
+    );
+  }
+
+  public async refreshTrainingData() {
+    return envelope(await this.plannerService().refreshData(), "RuneScape Wiki and local SQLite");
+  }
+
+  public async getTrainingDataStatus() {
+    return envelope(
+      await this.plannerService().getDataStatus(),
+      "local SQLite training sync status",
+    );
   }
 }

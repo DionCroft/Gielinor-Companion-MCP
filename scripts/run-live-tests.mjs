@@ -19,7 +19,11 @@ const selections = {
   ],
   itemdb: ["packages/providers/test/live-providers.live.test.ts", "--testNamePattern", "ItemDB"],
   prices: ["packages/providers/test/live-providers.live.test.ts", "--testNamePattern", "ItemDB"],
-  wiki: ["packages/providers/test/runescape-wiki-quests.live.test.ts"],
+  wiki: [
+    "packages/providers/test/runescape-wiki-quests.live.test.ts",
+    "packages/providers/test/runescape-wiki-training.live.test.ts",
+  ],
+  training: ["packages/providers/test/runescape-wiki-training.live.test.ts"],
 };
 
 const selection = selections[suite];

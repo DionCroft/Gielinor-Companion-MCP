@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   CreatePlayerProfileToolInputSchema,
+  CreateLevellingPlanToolInputSchema,
   ImportPlayerProfileToolInputSchema,
   SetMultipleQuestStatusesToolInputSchema,
   ToolEnvelopeSchema,
@@ -58,6 +59,26 @@ describe("MCP tool schemas", () => {
       ToolEnvelopeSchema.safeParse({
         data: {},
         meta: { generatedAt: "not-a-date", source: "" },
+      }).success,
+    ).toBe(false);
+  });
+
+  it("rejects unsafe or invalid levelling-plan input", () => {
+    expect(
+      CreateLevellingPlanToolInputSchema.safeParse({
+        profileId: "00000000-0000-4000-8000-000000000001",
+        skillId: "mining",
+        targetLevel: 110,
+        hoursPerDay: 25,
+      }).success,
+    ).toBe(false);
+    expect(
+      CreateLevellingPlanToolInputSchema.safeParse({
+        profileId: "00000000-0000-4000-8000-000000000001",
+        skillId: "invention",
+        targetLevel: 150,
+        allowVirtualLevels: true,
+        password: "never accept this",
       }).success,
     ).toBe(false);
   });

@@ -9,6 +9,11 @@ import type {
   QuestDataSnapshot,
   QuestDataStatus,
   QuestSyncResult,
+  SkillId,
+  TrainingDataSnapshot,
+  TrainingDataStatus,
+  TrainingMethod,
+  TrainingSyncResult,
 } from "@gielinor/shared-types";
 
 export interface ProviderRequestOptions {
@@ -49,5 +54,20 @@ export interface QuestRepository {
   search(query: string, limit: number): Promise<Quest[]>;
   replaceSnapshot(snapshot: QuestDataSnapshot): Promise<QuestSyncResult>;
   getDataStatus(): Promise<QuestDataStatus>;
+  recordSyncFailure(code: string, message: string, attemptedAt: string): Promise<void>;
+}
+
+export interface TrainingMethodProvider {
+  fetchSnapshot(): Promise<TrainingDataSnapshot>;
+}
+
+export interface TrainingMethodRepository {
+  getById(id: string): Promise<TrainingMethod | null>;
+  list(filters?: {
+    skillId?: SkillId | undefined;
+    level?: number | undefined;
+  }): Promise<TrainingMethod[]>;
+  replaceSnapshot(snapshot: TrainingDataSnapshot): Promise<TrainingSyncResult>;
+  getDataStatus(): Promise<TrainingDataStatus>;
   recordSyncFailure(code: string, message: string, attemptedAt: string): Promise<void>;
 }

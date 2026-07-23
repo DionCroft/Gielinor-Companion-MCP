@@ -3,12 +3,18 @@ import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 
 import {
   CalculateXpRemainingToolInputSchema,
+  CompareQuestXpRewardsToolInputSchema,
+  CompareTrainingMethodsToolInputSchema,
+  CreateLevellingPlanToolInputSchema,
   CreatePlayerProfileToolInputSchema,
+  CreateWeeklyGoalPlanToolInputSchema,
   EmptyInputSchema,
   GetItemPriceToolInputSchema,
   GetPlayerStatsToolInputSchema,
   GetSkillProgressToolInputSchema,
+  GetTrainingMethodToolInputSchema,
   ImportPlayerProfileToolInputSchema,
+  ListTrainingMethodsToolInputSchema,
   ProfileQuestInputSchema,
   ProfileIdInputSchema,
   QuestIdentifierInputSchema,
@@ -40,7 +46,7 @@ async function run(operation: () => Promise<ToolEnvelope<unknown>>): Promise<Cal
 
 export function createCompanionServer(tools: CompanionToolService): McpServer {
   const server = new McpServer(
-    { name: "gielinor-companion-mcp", version: "0.2.0" },
+    { name: "gielinor-companion-mcp", version: "0.3.0" },
     {
       instructions:
         "Use these deterministic, read-only RuneScape 3 data and planning tools. " +
@@ -142,8 +148,8 @@ export function createCompanionServer(tools: CompanionToolService): McpServer {
       inputSchema: CalculateXpRemainingToolInputSchema.shape,
       annotations: { readOnlyHint: true },
     },
-    ({ currentExperience, targetLevel }) =>
-      Promise.resolve(success(tools.calculateXpRemaining(currentExperience, targetLevel))),
+    ({ currentExperience, targetLevel, skillId }) =>
+      Promise.resolve(success(tools.calculateXpRemaining(currentExperience, targetLevel, skillId))),
   );
 
   server.registerTool(
@@ -307,6 +313,117 @@ export function createCompanionServer(tools: CompanionToolService): McpServer {
       annotations: { readOnlyHint: true },
     },
     () => run(() => tools.getQuestDataStatus()),
+  );
+
+  server.registerTool(
+    "list_training_methods",
+    {
+      description:
+        "List revisioned training methods, optionally filtered by skill, level, membership, or Ironman compatibility.",
+      inputSchema: ListTrainingMethodsToolInputSchema.shape,
+      annotations: { readOnlyHint: true },
+    },
+    (input) => run(() => tools.listTrainingMethods(input)),
+  );
+
+  server.registerTool(
+    "get_training_method",
+    {
+      description:
+        "Get one structured training method with rate ranges, requirements, uncertainty, and source provenance.",
+      inputSchema: GetTrainingMethodToolInputSchema.shape,
+      annotations: { readOnlyHint: true },
+    },
+    ({ methodId }) => run(() => tools.getTrainingMethod(methodId)),
+  );
+
+  server.registerTool(
+    "compare_training_methods",
+    {
+      description:
+        "Compare applicable time, GP information, access blockers, and uncertainty for training methods.",
+      inputSchema: CompareTrainingMethodsToolInputSchema.shape,
+      annotations: { readOnlyHint: true },
+    },
+    (input) => run(() => tools.compareTrainingMethods(input)),
+  );
+
+  server.registerTool(
+    "create_levelling_plan",
+    {
+      description:
+        "Create a deterministic multi-stage fastest, cheapest, balanced, or AFK levelling plan with budget and date checks.",
+      inputSchema: CreateLevellingPlanToolInputSchema.shape,
+      annotations: { readOnlyHint: true },
+    },
+    (input) => run(() => tools.createLevellingPlan(input)),
+  );
+
+  server.registerTool(
+    "create_weekly_goal_plan",
+    {
+      description:
+        "Convert a levelling plan into weekly XP and play-time goals using local profile preferences.",
+      inputSchema: CreateWeeklyGoalPlanToolInputSchema.shape,
+      annotations: { readOnlyHint: true },
+    },
+    (input) => run(() => tools.createWeeklyGoalPlan(input)),
+  );
+
+  server.registerTool(
+    "estimate_time_to_level",
+    {
+      description:
+        "Estimate an honest best/worst time range to a skill level, optionally using one specific method.",
+      inputSchema: CreateLevellingPlanToolInputSchema.shape,
+      annotations: { readOnlyHint: true },
+    },
+    (input) => run(() => tools.estimateTimeToLevel(input)),
+  );
+
+  server.registerTool(
+    "estimate_cost_to_level",
+    {
+      description:
+        "Estimate cost or profit to a skill level where reliable GP data exists; otherwise return an explicit unknown.",
+      inputSchema: CreateLevellingPlanToolInputSchema.shape,
+      annotations: { readOnlyHint: true },
+    },
+    (input) => run(() => tools.estimateCostToLevel(input)),
+  );
+
+  server.registerTool(
+    "compare_quest_xp_rewards",
+    {
+      description:
+        "Rank structured quest XP rewards for a skill and optionally mark rewards already completed by a local profile.",
+      inputSchema: CompareQuestXpRewardsToolInputSchema.shape,
+      annotations: { readOnlyHint: true },
+    },
+    ({ skillId, profileId, limit }) =>
+      run(() => tools.compareQuestXpRewards(skillId, profileId, limit)),
+  );
+
+  server.registerTool(
+    "refresh_training_data",
+    {
+      description:
+        "Fetch, validate, and transactionally store revision-aware RuneScape Wiki training data while retaining the previous snapshot on failure.",
+      inputSchema: EmptyInputSchema.shape,
+      annotations: { destructiveHint: false, idempotentHint: true },
+    },
+    () => run(() => tools.refreshTrainingData()),
+  );
+
+  server.registerTool(
+    "get_training_data_status",
+    {
+      description:
+        "Read training method count, covered skills, source revision, last successful sync, and last safe refresh error.",
+      inputSchema: EmptyInputSchema.shape,
+      annotations: { readOnlyHint: true },
+    },
+    () => run(() => tools.getTrainingDataStatus()),
   );
 
   return server;
