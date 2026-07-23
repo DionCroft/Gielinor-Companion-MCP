@@ -1,4 +1,5 @@
 import type {
+  GrandExchangeService,
   LevellingPlannerService,
   PriceProvider,
   ProfileService,
@@ -31,11 +32,22 @@ describe("MCP server protocol integration", () => {
         coveredSkills: ["mining"],
       }),
     } as unknown as LevellingPlannerService;
+    const exchange = {
+      getDataStatus: async () => ({
+        state: "ready",
+        itemCount: 7_000,
+        historyItemCount: 1,
+        historyPointCount: 180,
+        catalogueFreshness: { state: "fresh" },
+        disclaimer: "fixture",
+      }),
+    } as unknown as GrandExchangeService;
     const service = new CompanionToolService(
       {} as ProfileService,
       {} as PriceProvider,
       quests,
       planner,
+      exchange,
     );
     const server = createCompanionServer(service);
     const client = new Client({ name: "integration-test", version: "1.0.0" });
@@ -72,6 +84,20 @@ describe("MCP server protocol integration", () => {
         "compare_quest_xp_rewards",
         "refresh_training_data",
         "get_training_data_status",
+        "search_items",
+        "get_item_details",
+        "get_item_price_history",
+        "get_item_buy_limit",
+        "get_item_alchemy_value",
+        "get_item_price_summary",
+        "compare_item_prices",
+        "value_item_list",
+        "value_equipment_setup",
+        "calculate_quest_shopping_cost",
+        "calculate_training_cost",
+        "export_price_data",
+        "refresh_price_data",
+        "get_price_data_status",
       ]),
     );
 
@@ -107,6 +133,16 @@ describe("MCP server protocol integration", () => {
     expect(trainingStatus.structuredContent).toMatchObject({
       data: { state: "ready", methodCount: 42, coveredSkills: ["mining"] },
       meta: { source: "local SQLite training sync status" },
+    });
+
+    const priceStatus = await client.callTool({
+      name: "get_price_data_status",
+      arguments: {},
+    });
+    expect(priceStatus.isError).not.toBe(true);
+    expect(priceStatus.structuredContent).toMatchObject({
+      data: { state: "ready", itemCount: 7_000, historyPointCount: 180 },
+      meta: { source: "local SQLite Grand Exchange sync status" },
     });
   });
 });

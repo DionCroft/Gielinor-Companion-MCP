@@ -2,11 +2,16 @@ import {
   CompanionError,
   NotFoundError,
   calculateSkillProgress,
+  type EquipmentValuationRequestLine,
+  type ExportPriceDataInput,
+  type GrandExchangeService,
+  type ItemReference,
   type LevellingPlanInput,
   type LevellingPlannerService,
   type PriceProvider,
   type ProfileService,
   type QuestService,
+  type ValuationRequestLine,
 } from "@gielinor/core";
 import type { GameMode, ProfileExport, QuestStatus, SkillId } from "@gielinor/shared-types";
 
@@ -51,6 +56,7 @@ export class CompanionToolService {
     private readonly prices: PriceProvider,
     private readonly quests?: QuestService,
     private readonly planner?: LevellingPlannerService,
+    private readonly exchange?: GrandExchangeService,
   ) {}
 
   private questService(): QuestService {
@@ -65,6 +71,16 @@ export class CompanionToolService {
       throw new CompanionError("Levelling planner is not configured", "UNSUPPORTED_FEATURE");
     }
     return this.planner;
+  }
+
+  private exchangeService(): GrandExchangeService {
+    if (this.exchange === undefined) {
+      throw new CompanionError(
+        "Grand Exchange intelligence is not configured",
+        "UNSUPPORTED_FEATURE",
+      );
+    }
+    return this.exchange;
   }
 
   public async createPlayerProfile(input: {
@@ -182,6 +198,133 @@ export class CompanionToolService {
   ): Promise<ToolEnvelope<Awaited<ReturnType<PriceProvider["getCurrentPrice"]>>>> {
     const item = await this.prices.getCurrentPrice(itemId, { forceRefresh });
     return envelope(item, item.sourceName);
+  }
+
+  public async searchItems(query: string, limit?: number) {
+    return envelope(
+      await this.exchangeService().search(query, limit),
+      "validated local RS3 Grand Exchange catalogue",
+    );
+  }
+
+  public async getItemDetails(item: ItemReference) {
+    const details = await this.exchangeService().getItemDetails(item);
+    return envelope(details, details.sourceName);
+  }
+
+  public async getItemPriceHistory(
+    item: ItemReference,
+    range: "24h" | "7d" | "30d" | "90d" | "180d" = "30d",
+    forceRefresh = false,
+  ) {
+    return envelope(
+      await this.exchangeService().getPriceHistory(item, range, forceRefresh),
+      "Jagex Grand Exchange ItemDB graph and local SQLite history",
+    );
+  }
+
+  public async getItemBuyLimit(item: ItemReference) {
+    const details = await this.exchangeService().getItemDetails(item);
+    return envelope(
+      {
+        itemId: details.itemId,
+        name: details.name,
+        ...(details.buyLimit === undefined ? {} : { buyLimit: details.buyLimit }),
+        available: details.buyLimit !== undefined,
+        sourceUpdatedAt: details.timestamp,
+      },
+      details.sourceName,
+    );
+  }
+
+  public async getItemAlchemyValue(item: ItemReference) {
+    const details = await this.exchangeService().getItemDetails(item);
+    return envelope(
+      {
+        itemId: details.itemId,
+        name: details.name,
+        ...(details.alchemyValue === undefined ? {} : { highAlchemyValue: details.alchemyValue }),
+        ...(details.lowAlchemyValue === undefined
+          ? {}
+          : { lowAlchemyValue: details.lowAlchemyValue }),
+        available: details.alchemyValue !== undefined || details.lowAlchemyValue !== undefined,
+        sourceUpdatedAt: details.timestamp,
+      },
+      details.sourceName,
+    );
+  }
+
+  public async getItemPriceSummary(
+    item: ItemReference,
+    range: "24h" | "7d" | "30d" | "90d" | "180d" = "30d",
+    forceRefresh = false,
+  ) {
+    return envelope(
+      await this.exchangeService().getPriceSummary(item, range, forceRefresh),
+      "deterministic price analytics over validated Jagex history",
+    );
+  }
+
+  public async compareItemPrices(
+    items: ItemReference[],
+    range: "24h" | "7d" | "30d" | "90d" | "180d" = "30d",
+  ) {
+    return envelope(
+      await this.exchangeService().comparePrices(items, range),
+      "deterministic price analytics over validated Jagex history",
+    );
+  }
+
+  public async valueItemList(items: ValuationRequestLine[]) {
+    return envelope(
+      await this.exchangeService().valueItemList(items),
+      "validated local RS3 Grand Exchange guide prices",
+    );
+  }
+
+  public async valueEquipmentSetup(items: EquipmentValuationRequestLine[]) {
+    return envelope(
+      await this.exchangeService().valueEquipmentSetup(items),
+      "validated local RS3 Grand Exchange guide prices",
+    );
+  }
+
+  public async calculateQuestShoppingCost(profileId: string, quest: string) {
+    return envelope(
+      await this.exchangeService().calculateQuestShoppingCost(profileId, quest),
+      "deterministic quest shopping list and validated guide prices",
+    );
+  }
+
+  public async calculateTrainingCost(
+    input: LevellingPlanInput,
+    materials: ValuationRequestLine[] = [],
+  ) {
+    return envelope(
+      await this.exchangeService().calculateTrainingCost(input, materials),
+      "deterministic levelling plan and validated guide prices",
+    );
+  }
+
+  public async exportPriceData(input: ExportPriceDataInput) {
+    return envelope(
+      await this.exchangeService().exportPriceData(input),
+      "validated local catalogue and Jagex price history",
+    );
+  }
+
+  public async refreshPriceData(itemIds?: number[]) {
+    return envelope(
+      await this.exchangeService().refreshData(itemIds),
+      "RS3 Grand Exchange public sources and local SQLite",
+    );
+  }
+
+  public async getPriceDataStatus() {
+    return envelope(
+      await this.exchangeService().getDataStatus(),
+      "local SQLite Grand Exchange sync status",
+    );
   }
 
   public async searchQuests(query: string, limit?: number) {

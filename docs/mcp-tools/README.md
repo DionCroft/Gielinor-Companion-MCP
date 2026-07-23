@@ -1,4 +1,4 @@
-# MCP tool reference — Version 0.3
+# MCP tool reference — Version 0.4
 
 All tools use strict JSON object inputs. Successful responses use:
 
@@ -538,3 +538,157 @@ transport failures retain the previous snapshot.
 Reads synchronization health without network access. Input: `{}`. Output:
 `never-synced|ready|failed`, retained method count, covered skills, provider,
 revision digest, last attempt/success, and safe last error.
+
+## Grand Exchange data and safety
+
+Grand Exchange intelligence uses the last transactionally validated local
+catalogue and on-demand official Jagex graph history. Guide prices are not
+instant offers, predictions, or guaranteed transactions. Public RS3 sources do
+not publish an instant high/low order book, so those fields remain explicitly
+unavailable. Tools never place, modify, or collect an offer.
+
+## `search_items`
+
+Purpose: search canonical names, normalized aliases, Portuguese source aliases,
+or exact numeric IDs. Input: `query` and optional `limit` (1–100, default 20).
+Example: `{"query":"abyssal whip","limit":5}`. Output: matching complete
+catalogue records with timestamps and hashes. Source/cache: local snapshot; no
+network call or profile read. Errors: empty query, invalid limit, database or
+stored-data failure.
+
+## `get_item_details`
+
+Purpose: resolve an item name/alias/ID and explain all known current metadata.
+Input: `{"item":"Abyssal whip"}` or `{"item":4151}`. Output includes current and
+previous guide price, buy limit, high/low alchemy, latest volume, membership,
+source URL/timestamps/hash, freshness, unavailable fields, and disclaimer.
+Source/cache: local catalogue. Errors: `NOT_FOUND`, `AMBIGUOUS_ITEM_ALIAS`, or
+invalid stored data. Privacy: no profile is read.
+
+## `get_item_price_history`
+
+Purpose: return ordered chart data. Input: `item`, optional
+`range=24h|7d|30d|90d|180d` (default `30d`), and optional `forceRefresh`.
+Example: `{"item":4151,"range":"90d"}`. Output includes item/name/range,
+`points[{timestamp,price,averagePrice?}]`, retrieval time, cache state, source,
+warnings, and `chartReady:true`. Source: official Jagex ItemDB graph plus SQLite.
+Fresh history is reused for six hours; validated history up to seven days old
+may be returned as `stale` on outage. Errors distinguish missing item/history,
+timeout, rate limit/HTTP, network, malformed response, and database failure.
+
+## `get_item_buy_limit`
+
+Purpose: return a published four-hour buy limit. Input: `item` name/alias/ID.
+Output: item ID/name, optional `buyLimit`, `available`, and source update time.
+Source/cache: local catalogue. Missing source values return `available:false`
+rather than an estimate. No profile is read and no GE action occurs.
+
+## `get_item_alchemy_value`
+
+Purpose: return published high- and low-alchemy values. Input: `item`.
+Output: item ID/name, optional `highAlchemyValue`/`lowAlchemyValue`, `available`,
+and source update time. Source/cache: local catalogue. Missing data is omitted;
+the result is not a profit claim.
+
+## `get_item_price_summary`
+
+Purpose: calculate transparent descriptive statistics. Input matches
+`get_item_price_history`. Output includes current/first/latest price,
+range high/low, percentage change, 7/30/90-point moving averages, population
+daily-return volatility percent, 2.5-standard-deviation outliers, freshness,
+cache state, chart points, unavailable fields, and warnings. Source: deterministic
+core over validated history. Too few points omit unsupported statistics.
+
+Example response data:
+
+```json
+{
+  "itemId": 4151,
+  "name": "Abyssal whip",
+  "range": "30d",
+  "currentPrice": 83753,
+  "historicalHigh": 85000,
+  "historicalLow": 80000,
+  "percentageChange": 1.42,
+  "movingAverages": { "days7": 83310.14, "days30": 82540.7 },
+  "volatilityPercent": 0.84,
+  "outliers": [],
+  "priceFreshness": { "state": "fresh", "timestamp": "2026-07-23T00:00:00.000Z" },
+  "historyFreshness": { "state": "fresh" },
+  "cacheStatus": "fresh",
+  "chart": [],
+  "unavailableFields": ["instant buy/high price", "instant sell/low price"],
+  "warnings": []
+}
+```
+
+## `compare_item_prices`
+
+Purpose: compare statistics for 1–20 items. Input:
+`{"items":[4151,"Coal"],"range":"30d"}`. Output: one full price summary per item
+in request order. Source/cache/errors match `get_item_price_summary`. The tool
+does not rank expected profit.
+
+## `value_item_list`
+
+Purpose: value inventory or shopping lines and aggregate duplicate aliases/IDs.
+Input: 1–500 `items`, each with `item` and positive safe-integer `quantity`.
+Example: `{"items":[{"item":"Coal","quantity":1000}]}`. Output contains resolved
+lines, unit/total prices, timestamps/freshness, missing reasons, safe total,
+priced/unpriced counts, completeness, and warnings. Unknown/ambiguous/unpriced
+lines remain visible. Multiplication/addition overflow returns `VALUE_OVERFLOW`.
+Source: local catalogue. No bank or inventory is inspected.
+
+## `value_equipment_setup`
+
+Purpose: retain named slots while valuing a setup. Input: 1–100 lines with
+`slot`, `item`, and `quantity`. Example:
+`{"items":[{"slot":"main hand","item":4151,"quantity":1}]}`. Output contains the
+requested slots and the same complete valuation object as `value_item_list`.
+Source/errors/privacy are identical; actual worn equipment is never read.
+
+## `calculate_quest_shopping_cost`
+
+Purpose: price the aggregate shopping list for a profile-aware quest route.
+Input: `profileId` and `quest`. Output: the complete deterministic quest shopping
+list plus valuation. Source: local profile, local quest snapshot, and local GE
+catalogue. Errors include route/cycle/missing quest data and valuation errors.
+Bank contents, alternatives chosen, consumption, and tradeability are not
+inferred.
+
+## `calculate_training_cost`
+
+Purpose: expose the levelling plan's published GP range and optionally value
+caller-supplied consumables at current guide prices. Input is the full
+`create_levelling_plan` input plus optional
+`materials:[{item,quantity}]`. Output: plan, optional separate material
+valuation, recalculation basis, and warnings. Separation prevents accidental
+double-counting. Source: deterministic planner, training snapshot, and local GE
+catalogue. No rate, usage quantity, outcome, or profit is guaranteed.
+
+## `export_price_data`
+
+Purpose: return portable price history content. Input: 1–20 `items`, optional
+range, `format=json|csv`, and optional `forceRefresh`. Output: format, MIME type,
+safe suggested filename, content string, item count, and point count. JSON
+includes schema version, export time, disclaimer, summaries, and charts. CSV
+contains item ID/name/timestamp/price/average/range; cells are quoted and
+formula-leading text is neutralized. No arbitrary path is accepted or written.
+
+## `refresh_price_data`
+
+Purpose: fetch and transactionally replace the complete catalogue, optionally
+refreshing history for up to 20 positive `itemIds`. Input:
+`{"itemIds":[4151]}` or `{}`. Output: catalogue inserted/updated/unchanged/removed
+counts and selected history counts/timestamps/cache states. Source: Wiki GE
+Market Watch dump and official Jagex graph. Errors distinguish timeout, rate
+limit/HTTP, network, malformed/duplicate/incomplete data, missing items, and
+database failure. The prior catalogue survives any failed candidate.
+
+## `get_price_data_status`
+
+Purpose: inspect local GE health without contacting the network. Input: `{}`.
+Output: `never-synced|ready|failed`, provider/revision/update/attempt/success
+times, catalogue/history item and point counts, newest history time, safe last
+error, catalogue freshness, and public-source disclaimer. No profile data,
+filesystem path, or stack trace is returned.

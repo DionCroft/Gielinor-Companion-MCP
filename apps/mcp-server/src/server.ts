@@ -3,25 +3,34 @@ import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 
 import {
   CalculateXpRemainingToolInputSchema,
+  CalculateTrainingCostToolInputSchema,
+  CompareItemPricesToolInputSchema,
   CompareQuestXpRewardsToolInputSchema,
   CompareTrainingMethodsToolInputSchema,
   CreateLevellingPlanToolInputSchema,
   CreatePlayerProfileToolInputSchema,
   CreateWeeklyGoalPlanToolInputSchema,
   EmptyInputSchema,
+  ExportPriceDataToolInputSchema,
   GetItemPriceToolInputSchema,
   GetPlayerStatsToolInputSchema,
   GetSkillProgressToolInputSchema,
   GetTrainingMethodToolInputSchema,
   ImportPlayerProfileToolInputSchema,
+  ItemIdentifierInputSchema,
+  ItemPriceHistoryToolInputSchema,
   ListTrainingMethodsToolInputSchema,
   ProfileQuestInputSchema,
   ProfileIdInputSchema,
   QuestIdentifierInputSchema,
+  RefreshPriceDataToolInputSchema,
+  SearchItemsToolInputSchema,
   SearchQuestsToolInputSchema,
   SetMultipleQuestStatusesToolInputSchema,
   SetQuestStatusToolInputSchema,
   UpdatePlayerPreferencesToolInputSchema,
+  ValueEquipmentSetupToolInputSchema,
+  ValueItemListToolInputSchema,
 } from "./schemas.js";
 import { publicToolError, type CompanionToolService, type ToolEnvelope } from "./tool-service.js";
 
@@ -46,7 +55,7 @@ async function run(operation: () => Promise<ToolEnvelope<unknown>>): Promise<Cal
 
 export function createCompanionServer(tools: CompanionToolService): McpServer {
   const server = new McpServer(
-    { name: "gielinor-companion-mcp", version: "0.3.0" },
+    { name: "gielinor-companion-mcp", version: "0.4.0" },
     {
       instructions:
         "Use these deterministic, read-only RuneScape 3 data and planning tools. " +
@@ -173,6 +182,168 @@ export function createCompanionServer(tools: CompanionToolService): McpServer {
       annotations: { readOnlyHint: true },
     },
     ({ itemId, forceRefresh }) => run(() => tools.getItemPrice(itemId, forceRefresh ?? false)),
+  );
+
+  server.registerTool(
+    "search_items",
+    {
+      description:
+        "Search the validated local RS3 Grand Exchange catalogue by item name, alias, or ID.",
+      inputSchema: SearchItemsToolInputSchema.shape,
+      annotations: { readOnlyHint: true },
+    },
+    ({ query, limit }) => run(() => tools.searchItems(query, limit)),
+  );
+
+  server.registerTool(
+    "get_item_details",
+    {
+      description:
+        "Get current guide price, limit, alchemy values, volume, source timestamps, freshness, and explicitly unavailable fields for an item.",
+      inputSchema: ItemIdentifierInputSchema.shape,
+      annotations: { readOnlyHint: true },
+    },
+    ({ item }) => run(() => tools.getItemDetails(item)),
+  );
+
+  server.registerTool(
+    "get_item_price_history",
+    {
+      description:
+        "Get validated, ordered, chart-ready Jagex guide-price history over 24 hours to 180 days. No transaction outcome is guaranteed.",
+      inputSchema: ItemPriceHistoryToolInputSchema.shape,
+      annotations: { readOnlyHint: true },
+    },
+    ({ item, range, forceRefresh }) =>
+      run(() => tools.getItemPriceHistory(item, range, forceRefresh ?? false)),
+  );
+
+  server.registerTool(
+    "get_item_buy_limit",
+    {
+      description:
+        "Get the published four-hour Grand Exchange buy limit when the public source provides it.",
+      inputSchema: ItemIdentifierInputSchema.shape,
+      annotations: { readOnlyHint: true },
+    },
+    ({ item }) => run(() => tools.getItemBuyLimit(item)),
+  );
+
+  server.registerTool(
+    "get_item_alchemy_value",
+    {
+      description:
+        "Get published high- and low-alchemy values when available; this does not claim a profitable trade.",
+      inputSchema: ItemIdentifierInputSchema.shape,
+      annotations: { readOnlyHint: true },
+    },
+    ({ item }) => run(() => tools.getItemAlchemyValue(item)),
+  );
+
+  server.registerTool(
+    "get_item_price_summary",
+    {
+      description:
+        "Calculate percentage change, moving averages, daily-return volatility, historical high/low, and statistical outliers from validated history.",
+      inputSchema: ItemPriceHistoryToolInputSchema.shape,
+      annotations: { readOnlyHint: true },
+    },
+    ({ item, range, forceRefresh }) =>
+      run(() => tools.getItemPriceSummary(item, range, forceRefresh ?? false)),
+  );
+
+  server.registerTool(
+    "compare_item_prices",
+    {
+      description:
+        "Compare current guide prices and historical analytics for up to 20 items without making profit guarantees.",
+      inputSchema: CompareItemPricesToolInputSchema.shape,
+      annotations: { readOnlyHint: true },
+    },
+    ({ items, range }) => run(() => tools.compareItemPrices(items, range)),
+  );
+
+  server.registerTool(
+    "value_item_list",
+    {
+      description:
+        "Aggregate duplicate item lines and value an inventory or shopping list with overflow protection and freshness warnings.",
+      inputSchema: ValueItemListToolInputSchema.shape,
+      annotations: { readOnlyHint: true },
+    },
+    ({ items }) => run(() => tools.valueItemList(items)),
+  );
+
+  server.registerTool(
+    "value_equipment_setup",
+    {
+      description:
+        "Value a named equipment-slot setup using current validated guide prices and explicit missing-price lines.",
+      inputSchema: ValueEquipmentSetupToolInputSchema.shape,
+      annotations: { readOnlyHint: true },
+    },
+    ({ items }) => run(() => tools.valueEquipmentSetup(items)),
+  );
+
+  server.registerTool(
+    "calculate_quest_shopping_cost",
+    {
+      description:
+        "Value the aggregated shopping list for a profile-aware target quest route at current guide prices.",
+      inputSchema: ProfileQuestInputSchema.shape,
+      annotations: { readOnlyHint: true },
+    },
+    ({ profileId, quest }) => run(() => tools.calculateQuestShoppingCost(profileId, quest)),
+  );
+
+  server.registerTool(
+    "calculate_training_cost",
+    {
+      description:
+        "Return a levelling plan's published GP range and optionally reprice user-supplied consumable quantities without double-counting.",
+      inputSchema: CalculateTrainingCostToolInputSchema.shape,
+      annotations: { readOnlyHint: true },
+    },
+    ({ materials, ...input }) => run(() => tools.calculateTrainingCost(input, materials)),
+  );
+
+  server.registerTool(
+    "export_price_data",
+    {
+      description:
+        "Export validated chart-ready price history for up to 20 items as returned JSON or CSV content; no arbitrary file is written.",
+      inputSchema: ExportPriceDataToolInputSchema.shape,
+      annotations: { readOnlyHint: true },
+    },
+    (input) =>
+      run(() =>
+        tools.exportPriceData({
+          ...input,
+          range: input.range ?? "30d",
+        }),
+      ),
+  );
+
+  server.registerTool(
+    "refresh_price_data",
+    {
+      description:
+        "Validate and transactionally refresh the RS3 GE catalogue and optionally selected histories; previous valid data survives failures.",
+      inputSchema: RefreshPriceDataToolInputSchema.shape,
+      annotations: { destructiveHint: false, idempotentHint: true },
+    },
+    ({ itemIds }) => run(() => tools.refreshPriceData(itemIds)),
+  );
+
+  server.registerTool(
+    "get_price_data_status",
+    {
+      description:
+        "Read catalogue/history counts, revisions, timestamps, freshness, and the last safe synchronization error.",
+      inputSchema: EmptyInputSchema.shape,
+      annotations: { readOnlyHint: true },
+    },
+    () => run(() => tools.getPriceDataStatus()),
   );
 
   server.registerTool(

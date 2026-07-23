@@ -99,6 +99,60 @@ const MIGRATIONS: ReadonlyArray<{ version: number; sql: string }> = [
       );
     `,
   },
+  {
+    version: 4,
+    sql: `
+      CREATE TABLE IF NOT EXISTS ge_items (
+        item_id INTEGER PRIMARY KEY,
+        name TEXT NOT NULL,
+        item_json TEXT NOT NULL,
+        content_hash TEXT NOT NULL,
+        price_timestamp TEXT NOT NULL,
+        source_revision TEXT NOT NULL,
+        retrieved_at TEXT NOT NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_ge_items_name
+        ON ge_items(name COLLATE NOCASE);
+
+      CREATE TABLE IF NOT EXISTS ge_item_aliases (
+        alias_key TEXT NOT NULL,
+        alias TEXT NOT NULL,
+        item_id INTEGER NOT NULL REFERENCES ge_items(item_id) ON DELETE CASCADE,
+        PRIMARY KEY (alias_key, item_id)
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_ge_item_aliases_item_id
+        ON ge_item_aliases(item_id);
+
+      CREATE TABLE IF NOT EXISTS ge_price_history (
+        item_id INTEGER NOT NULL REFERENCES ge_items(item_id) ON DELETE CASCADE,
+        timestamp TEXT NOT NULL,
+        price INTEGER NOT NULL CHECK (price >= 0),
+        average_price INTEGER CHECK (average_price >= 0),
+        volume INTEGER CHECK (volume >= 0),
+        retrieved_at TEXT NOT NULL,
+        source_name TEXT NOT NULL,
+        PRIMARY KEY (item_id, timestamp)
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_ge_price_history_item_timestamp
+        ON ge_price_history(item_id, timestamp);
+
+      CREATE TABLE IF NOT EXISTS ge_sync_status (
+        singleton_id INTEGER PRIMARY KEY CHECK (singleton_id = 1),
+        state TEXT NOT NULL CHECK (state IN ('ready', 'failed')),
+        provider TEXT,
+        source_revision TEXT,
+        source_updated_at TEXT,
+        last_attempt_at TEXT NOT NULL,
+        last_successful_sync_at TEXT,
+        item_count INTEGER NOT NULL DEFAULT 0 CHECK (item_count >= 0),
+        last_error_code TEXT,
+        last_error_message TEXT
+      );
+    `,
+  },
 ];
 
 function migrate(database: DatabaseConnection): void {

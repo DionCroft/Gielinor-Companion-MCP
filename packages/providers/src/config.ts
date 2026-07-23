@@ -10,10 +10,13 @@ export type ProviderConfig = {
   retries: number;
   hiscoresUrl: string;
   geUrl: string;
+  geGraphUrl: string;
+  geBulkUrl: string;
   wikiApiUrl: string;
   wikiPageUrl: string;
   hiscoresCache: CachePolicy;
   geCache: CachePolicy;
+  geHistoryCache: CachePolicy;
 };
 
 function envInteger(environment: NodeJS.ProcessEnv, name: string, fallback: number): number {
@@ -24,7 +27,7 @@ export function loadProviderConfig(environment: NodeJS.ProcessEnv = process.env)
   return {
     userAgent:
       environment.GIELINOR_USER_AGENT ??
-      "Gielinor-Companion-MCP/0.3.0 (https://github.com/DionCroft/Gielinor-Companion-MCP)",
+      "Gielinor-Companion-MCP/0.4.0 (https://github.com/DionCroft/Gielinor-Companion-MCP)",
     timeoutMs: envInteger(environment, "GIELINOR_HTTP_TIMEOUT_MS", 10_000),
     retries: z.coerce
       .number()
@@ -37,6 +40,11 @@ export function loadProviderConfig(environment: NodeJS.ProcessEnv = process.env)
     geUrl:
       environment.GIELINOR_GE_URL ??
       "https://secure.runescape.com/m=itemdb_rs/api/catalogue/detail.json",
+    geGraphUrl:
+      environment.GIELINOR_GE_GRAPH_URL ?? "https://secure.runescape.com/m=itemdb_rs/api/graph/",
+    geBulkUrl:
+      environment.GIELINOR_GE_BULK_URL ??
+      "https://chisel.weirdgloop.org/gazproj/gazbot/rs_dump.json",
     wikiApiUrl: environment.GIELINOR_WIKI_API_URL ?? "https://runescape.wiki/api.php",
     wikiPageUrl: environment.GIELINOR_WIKI_PAGE_URL ?? "https://runescape.wiki/w/",
     hiscoresCache: {
@@ -46,6 +54,10 @@ export function loadProviderConfig(environment: NodeJS.ProcessEnv = process.env)
     geCache: {
       freshForMs: envInteger(environment, "GIELINOR_GE_TTL_MS", 5 * 60_000),
       staleForMs: envInteger(environment, "GIELINOR_GE_STALE_MS", 60 * 60_000),
+    },
+    geHistoryCache: {
+      freshForMs: envInteger(environment, "GIELINOR_GE_HISTORY_TTL_MS", 6 * 60 * 60_000),
+      staleForMs: envInteger(environment, "GIELINOR_GE_HISTORY_STALE_MS", 7 * 24 * 60 * 60_000),
     },
   };
 }

@@ -5,6 +5,8 @@ import { join } from "node:path";
 
 import {
   PlayerProfileSchema,
+  PriceCatalogueItemSchema,
+  PriceDataSnapshotSchema,
   QuestDataSnapshotSchema,
   QuestSchema,
   TrainingDataSnapshotSchema,
@@ -12,6 +14,7 @@ import {
   type Quest,
   type QuestDataSnapshot,
   type TrainingMethod,
+  type PriceCatalogueItem,
 } from "@gielinor/shared-types";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -19,6 +22,7 @@ import { backupDatabase, getDatabaseSchemaVersion, openDatabase } from "../src/c
 import {
   SqliteCacheStore,
   SqlitePlayerProfileRepository,
+  SqlitePriceRepository,
   SqliteQuestRepository,
   SqliteTrainingMethodRepository,
 } from "../src/repositories.js";
@@ -89,6 +93,24 @@ function trainingMethod(id: string, hash = "c".repeat(64)): TrainingMethod {
   });
 }
 
+function priceItem(
+  itemId: number,
+  name = `Item ${itemId}`,
+  hash = "d".repeat(64),
+): PriceCatalogueItem {
+  return PriceCatalogueItemSchema.parse({
+    itemId,
+    name,
+    aliases: itemId === 1 ? ["Alias one"] : [],
+    currentPrice: itemId * 100,
+    timestamp: CHECKED_AT,
+    sourceName: "fixture",
+    sourceUrl: "https://example.test/prices",
+    retrievedAt: CHECKED_AT,
+    contentHash: hash,
+  });
+}
+
 afterEach(() => {
   for (const database of databases.splice(0)) {
     database.close();
@@ -106,10 +128,15 @@ describe("SQLite migrations and repositories", () => {
   it("applies migrations transactionally to a new database", () => {
     const database = openDatabase(":memory:");
     databases.push(database);
-    expect(getDatabaseSchemaVersion(database)).toBe(3);
+    expect(getDatabaseSchemaVersion(database)).toBe(4);
     expect(
       database
         .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'player_profiles'")
+        .get(),
+    ).toBeTruthy();
+    expect(
+      database
+        .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'ge_items'")
         .get(),
     ).toBeTruthy();
     expect(
@@ -371,6 +398,92 @@ describe("SQLite training snapshot repository", () => {
       sourceRevision: "good",
       methodCount: 20,
       lastErrorCode: "MALFORMED_TRAINING_DATA",
+    });
+  });
+});
+
+describe("SQLite Grand Exchange repository", () => {
+  it("stores searchable aliases, ordered history, and source-aware status", async () => {
+    const database = openDatabase(":memory:");
+    databases.push(database);
+    const repository = new SqlitePriceRepository(database);
+    const snapshot = PriceDataSnapshotSchema.parse({
+      provider: "fixture GE",
+      sourceRevision: "1700000000",
+      sourceUpdatedAt: CHECKED_AT,
+      retrievedAt: CHECKED_AT,
+      items: [priceItem(1, "Abyssal whip"), priceItem(2, "Coal")],
+    });
+    expect(await repository.replaceSnapshot(snapshot)).toMatchObject({
+      total: 2,
+      inserted: 2,
+      updated: 0,
+    });
+    expect((await repository.getByIdOrAlias("Alias one"))?.itemId).toBe(1);
+    expect((await repository.search("whip", 10))[0]?.name).toBe("Abyssal whip");
+
+    await repository.replacePriceHistory(
+      1,
+      [
+        { timestamp: "2026-07-22T00:00:00.000Z", price: 90, averagePrice: 85 },
+        { timestamp: "2026-07-23T00:00:00.000Z", price: 100, averagePrice: 90 },
+      ],
+      CHECKED_AT,
+      "Jagex graph",
+    );
+    expect(await repository.getPriceHistory(1)).toMatchObject({
+      itemId: 1,
+      sourceName: "Jagex graph",
+      points: [{ price: 90 }, { price: 100 }],
+    });
+    expect(await repository.getDataStatus()).toMatchObject({
+      state: "ready",
+      provider: "fixture GE",
+      itemCount: 2,
+      historyItemCount: 1,
+      historyPointCount: 2,
+      newestHistoryAt: "2026-07-23T00:00:00.000Z",
+    });
+  });
+
+  it("retains a complete price snapshot after suspicious truncation and records failure", async () => {
+    const database = openDatabase(":memory:");
+    databases.push(database);
+    const repository = new SqlitePriceRepository(database);
+    const items = Array.from({ length: 1_000 }, (_, index) =>
+      priceItem(index + 1, `Item ${index + 1}`, index.toString(16).padStart(64, "0")),
+    );
+    await repository.replaceSnapshot(
+      PriceDataSnapshotSchema.parse({
+        provider: "fixture GE",
+        sourceRevision: "good",
+        sourceUpdatedAt: CHECKED_AT,
+        retrievedAt: CHECKED_AT,
+        items,
+      }),
+    );
+    await expect(
+      repository.replaceSnapshot(
+        PriceDataSnapshotSchema.parse({
+          provider: "fixture GE",
+          sourceRevision: "truncated",
+          sourceUpdatedAt: CHECKED_AT,
+          retrievedAt: CHECKED_AT,
+          items: items.slice(0, 1),
+        }),
+      ),
+    ).rejects.toMatchObject({ code: "SUSPICIOUS_PRICE_SNAPSHOT" });
+    await repository.recordSyncFailure(
+      "PROVIDER_TIMEOUT",
+      "GE provider timed out",
+      "2026-07-23T13:00:00.000Z",
+    );
+    expect((await repository.search("Item", 100)).length).toBe(100);
+    expect(await repository.getDataStatus()).toMatchObject({
+      state: "failed",
+      sourceRevision: "good",
+      itemCount: 1_000,
+      lastErrorCode: "PROVIDER_TIMEOUT",
     });
   });
 });

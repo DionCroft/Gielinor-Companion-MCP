@@ -15,13 +15,13 @@ Wiki-backed revision-aware quest sync, transactional validation, prerequisite
 graph and cycle detection, manual progress, available quests, missing
 requirements, routes, shopping lists, and quest MCP tools.
 
-## 0.3 — Levelling planner (current)
+## 0.3 — Levelling planner (complete)
 
 Structured training methods, time/XP/GP calculations, multi-stage fastest,
 cheapest, balanced, and low-intensity plans, quest comparisons, budgets, and
 weekly schedules.
 
-## 0.4 — Grand Exchange intelligence
+## 0.4 — Grand Exchange intelligence (current)
 
 Item search, historical data, moving averages, percentage changes, volatility,
 volume where available, list/equipment valuation, charts, and freshness display.

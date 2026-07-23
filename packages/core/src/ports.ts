@@ -3,8 +3,12 @@ import type {
   GrandExchangeItem,
   PlayerProfile,
   PlayerStatsResult,
+  PriceCatalogueItem,
+  PriceDataSnapshot,
+  PriceDataStatus,
   PriceHistoryRange,
   PricePoint,
+  PriceSyncResult,
   Quest,
   QuestDataSnapshot,
   QuestDataStatus,
@@ -14,6 +18,7 @@ import type {
   TrainingDataStatus,
   TrainingMethod,
   TrainingSyncResult,
+  StoredPriceHistory,
 } from "@gielinor/shared-types";
 
 export interface ProviderRequestOptions {
@@ -35,6 +40,25 @@ export interface PriceProvider {
     range: PriceHistoryRange,
     options?: ProviderRequestOptions,
   ): Promise<PricePoint[]>;
+}
+
+export interface GrandExchangeDataProvider extends PriceProvider {
+  fetchSnapshot(): Promise<PriceDataSnapshot>;
+}
+
+export interface PriceRepository {
+  getByIdOrAlias(identifier: number | string): Promise<PriceCatalogueItem | null>;
+  search(query: string, limit: number): Promise<PriceCatalogueItem[]>;
+  replaceSnapshot(snapshot: PriceDataSnapshot): Promise<PriceSyncResult>;
+  getDataStatus(): Promise<PriceDataStatus>;
+  recordSyncFailure(code: string, message: string, attemptedAt: string): Promise<void>;
+  getPriceHistory(itemId: number): Promise<StoredPriceHistory | null>;
+  replacePriceHistory(
+    itemId: number,
+    points: PricePoint[],
+    retrievedAt: string,
+    sourceName: string,
+  ): Promise<StoredPriceHistory>;
 }
 
 export interface PlayerProfileRepository {
