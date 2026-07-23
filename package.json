@@ -1,0 +1,32 @@
+{
+  "name": "gielinor-companion-mcp",
+  "version": "0.1.0",
+  "private": true,
+  "description": "An open-source, AI-compatible RuneScape 3 quest, levelling and Grand Exchange companion.",
+  "type": "module",
+  "packageManager": "pnpm@10.34.5",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "corepack pnpm --filter @gielinor/shared-types build && corepack pnpm --filter @gielinor/core build && corepack pnpm --filter @gielinor/providers build && corepack pnpm --filter @gielinor/database build && corepack pnpm --filter @gielinor/mcp-server build",
+    "typecheck": "corepack pnpm build",
+    "test": "corepack pnpm build && vitest run",
+    "test:watch": "vitest",
+    "test:live": "vitest run --config vitest.live.config.ts",
+    "lint": "eslint . && prettier --check .",
+    "format": "prettier --write .",
+    "start:mcp": "node apps/mcp-server/dist/index.js"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.31.0",
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^20.17.0",
+    "eslint": "^9.31.0",
+    "prettier": "^3.6.2",
+    "typescript": "^5.8.3",
+    "typescript-eslint": "^8.38.0",
+    "vitest": "^3.2.4"
+  },
+  "license": "MIT"
+}

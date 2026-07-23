@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/DionCroft/Gielinor-Companion-MCP/schemas/profile-export-v1.json",
+  "title": "Gielinor Companion player profile export v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "displayName",
+    "gameMode",
+    "completedQuestIds",
+    "inProgressQuestIds",
+    "goals"
+  ],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "displayName": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 12,
+      "pattern": "^[A-Za-z0-9 _-]+$"
+    },
+    "gameMode": {
+      "enum": ["normal", "ironman", "hardcore-ironman", "unknown"]
+    },
+    "availableGp": { "type": "integer", "minimum": 0 },
+    "preferredPlayStyle": {
+      "enum": ["fastest", "cheapest", "balanced", "afk"]
+    },
+    "availableHoursPerDay": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "maximum": 24
+    },
+    "completedQuestIds": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "inProgressQuestIds": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "goals": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["type"],
+        "properties": {
+          "type": {
+            "enum": ["level", "experience", "quest", "quest-cape", "item", "custom"]
+          },
+          "targetId": { "type": "string", "minLength": 1 },
+          "targetLevel": { "type": "integer", "minimum": 1, "maximum": 126 },
+          "targetExperience": { "type": "integer", "minimum": 0 },
+          "targetQuantity": { "type": "integer", "minimum": 1 },
+          "targetDate": { "type": "string", "format": "date-time" }
+        }
+      }
+    }
+  }
+}

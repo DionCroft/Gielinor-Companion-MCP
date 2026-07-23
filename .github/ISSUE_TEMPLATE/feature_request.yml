@@ -1,0 +1,25 @@
+name: Feature request
+description: Propose a safe companion feature
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Player problem
+      description: What deterministic planning or information problem should this solve?
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed behavior
+    validations:
+      required: true
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Safety boundary
+      options:
+        - label: This does not generate gameplay input, automate trades, request credentials, read client memory, or bypass anti-cheat systems.
+          required: true

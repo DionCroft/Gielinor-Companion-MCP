@@ -1,0 +1,27 @@
+{
+  "name": "@gielinor/database",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@gielinor/core": "workspace:*",
+    "@gielinor/providers": "workspace:*",
+    "@gielinor/shared-types": "workspace:*",
+    "better-sqlite3": "^12.2.0"
+  },
+  "license": "MIT"
+}
