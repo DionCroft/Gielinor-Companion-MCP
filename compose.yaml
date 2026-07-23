@@ -1,0 +1,47 @@
+services:
+  gielinor-hosted:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: gielinor-companion-mcp:0.7.0
+    restart: unless-stopped
+    init: true
+    read_only: true
+    user: "10001:10001"
+    ports:
+      - "127.0.0.1:3333:3333"
+    environment:
+      NODE_ENV: production
+      GIELINOR_HOST: 0.0.0.0
+      GIELINOR_HOSTED_PORT: 3333
+      GIELINOR_HOSTED_DATA_DIR: /data
+      GIELINOR_ALLOWED_HOSTS: ${GIELINOR_ALLOWED_HOSTS:-localhost,127.0.0.1}
+      GIELINOR_ALLOWED_ORIGINS: ${GIELINOR_ALLOWED_ORIGINS:-}
+      GIELINOR_TRUST_PROXY: ${GIELINOR_TRUST_PROXY:-false}
+      GIELINOR_REQUIRE_HTTPS: ${GIELINOR_REQUIRE_HTTPS:-false}
+      GIELINOR_ACCOUNT_CREATION_ENABLED: ${GIELINOR_ACCOUNT_CREATION_ENABLED:-false}
+      GIELINOR_OPERATOR_TOKEN: ${GIELINOR_OPERATOR_TOKEN:-}
+      GIELINOR_USER_AGENT: ${GIELINOR_USER_AGENT:-Gielinor-Companion-MCP/0.7.0}
+    volumes:
+      - gielinor-data:/data
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3333/health/ready',{headers:{'x-forwarded-proto':'https'}}).then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+volumes:
+  gielinor-data:

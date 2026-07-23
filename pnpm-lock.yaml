@@ -94,6 +94,33 @@ importers:
         specifier: ^3.2.4
         version: 3.2.7(@types/node@20.19.43)(jsdom@29.1.1)(lightningcss@1.33.0)
 
+  apps/hosted-server:
+    dependencies:
+      '@gielinor/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@gielinor/database':
+        specifier: workspace:*
+        version: link:../../packages/database
+      '@gielinor/mcp-server':
+        specifier: workspace:*
+        version: link:../mcp-server
+      '@gielinor/providers':
+        specifier: workspace:*
+        version: link:../../packages/providers
+      '@gielinor/shared-types':
+        specifier: workspace:*
+        version: link:../../packages/shared-types
+      '@modelcontextprotocol/sdk':
+        specifier: ^1.29.0
+        version: 1.29.0(zod@3.25.76)
+      better-sqlite3:
+        specifier: ^12.2.0
+        version: 12.11.1
+      zod:
+        specifier: ^3.25.76
+        version: 3.25.76
+
   apps/mcp-server:
     dependencies:
       '@gielinor/core':

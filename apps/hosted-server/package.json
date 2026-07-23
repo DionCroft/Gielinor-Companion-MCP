@@ -1,0 +1,33 @@
+{
+  "name": "@gielinor/hosted-server",
+  "version": "0.7.0",
+  "description": "Production-oriented Streamable HTTP MCP service for Gielinor Companion.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "gielinor-companion-hosted": "./dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@gielinor/core": "workspace:*",
+    "@gielinor/database": "workspace:*",
+    "@gielinor/mcp-server": "workspace:*",
+    "@gielinor/providers": "workspace:*",
+    "@gielinor/shared-types": "workspace:*",
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "better-sqlite3": "^12.2.0",
+    "zod": "^3.25.76"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "license": "MIT"
+}

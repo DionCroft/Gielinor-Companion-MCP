@@ -1,4 +1,4 @@
-# Version 0.6 known limitations
+# Version 0.7 known limitations
 
 - Public RS3 sources provide guide prices and daily history, not an instant
   order book. Instant buy/high and sell/low prices are reported as unavailable.
@@ -13,7 +13,17 @@
   discovery, or private account data.
 - Profiles have no delete tool in 0.1; this avoids an unnecessary destructive MCP
   operation before profile-management UI work.
-- Only local stdio transport is shipped. There is no hosted endpoint.
+- Hosted profiles use fixed bearer headers rather than OAuth. Anonymous public
+  tools work with current ChatGPT and Claude custom connectors; private hosted
+  profiles require a client that can configure an Authorization header.
+- In-memory rate limits are per service instance. Multi-replica deployments need
+  an external gateway/distributed limiter before horizontal scaling.
+- The hosted Node process does not terminate TLS. Operators must keep its port
+  private and configure an HTTPS reverse proxy correctly.
+- Account deletion covers the live data directory, not infrastructure backups
+  or snapshots retained by an operator.
+- Fresh hosted databases report public catalogues as `never-synced` until an
+  operator invokes the restricted refresh tools.
 - The desktop source and unsigned installer build are verified, but this
   development release does not publish signed/notarized binaries.
 - Goals and ad-hoc shopping lists use installation-local UI storage/state;

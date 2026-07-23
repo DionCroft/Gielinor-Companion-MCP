@@ -34,6 +34,18 @@ remote hosts. The project must not request, store, or proxy model-provider API
 keys. Model output is untrusted: shared schemas validate tool names, arguments,
 and source-stamped results before any call is represented as successful.
 
+The optional hosted service uses random Gielinor-specific bearer tokens, never
+Jagex credentials. Only SHA-256 token digests are stored. Private profiles are
+split into one SQLite file per validated account UUID; public source data is
+shared separately. Logs must not contain tokens, tool arguments, display names,
+profile content, provider bodies, local paths, or stack traces.
+
+Production operators must terminate TLS, keep the Node listener private, set
+explicit Host values, enable HTTPS enforcement only behind a correctly
+configured trusted proxy, protect the operator token, and publish their own
+retention/privacy policy. See
+[hosted privacy and account lifecycle](docs/security/hosted-privacy.md).
+
 ## Acceptable use
 
 This project is a read-only companion and analysis tool. It must not implement or

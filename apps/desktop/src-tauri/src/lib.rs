@@ -224,7 +224,7 @@ fn invoke_tool(
                     "capabilities": {},
                     "clientInfo": {
                         "name": "gielinor-companion-desktop",
-                        "version": "0.6.0"
+                        "version": "0.7.0"
                     }
                 }
             }),
