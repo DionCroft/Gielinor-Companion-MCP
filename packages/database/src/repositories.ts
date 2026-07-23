@@ -1,7 +1,18 @@
-import type { PlayerProfileRepository } from "@gielinor/core";
+import type { PlayerProfileRepository, QuestRepository } from "@gielinor/core";
 import { CompanionError, NotFoundError } from "@gielinor/core";
 import type { CacheEntry, CacheStore } from "@gielinor/providers";
-import { PlayerProfileSchema, type PlayerProfile } from "@gielinor/shared-types";
+import {
+  PlayerProfileSchema,
+  QuestDataSnapshotSchema,
+  QuestDataStatusSchema,
+  QuestSchema,
+  QuestSyncResultSchema,
+  type PlayerProfile,
+  type Quest,
+  type QuestDataSnapshot,
+  type QuestDataStatus,
+  type QuestSyncResult,
+} from "@gielinor/shared-types";
 
 import type { DatabaseConnection } from "./connection.js";
 
@@ -16,6 +27,26 @@ type CacheRow = {
   stale_until: number;
 };
 
+type QuestRow = {
+  quest_json: string;
+};
+
+type QuestHashRow = {
+  id: string;
+  content_hash: string;
+};
+
+type QuestSyncStatusRow = {
+  state: "ready" | "failed";
+  provider: string | null;
+  source_revision: string | null;
+  last_attempt_at: string;
+  last_successful_sync_at: string | null;
+  quest_count: number;
+  last_error_code: string | null;
+  last_error_message: string | null;
+};
+
 function parseProfile(row: ProfileRow): PlayerProfile {
   try {
     return PlayerProfileSchema.parse(JSON.parse(row.profile_json));
@@ -24,6 +55,26 @@ function parseProfile(row: ProfileRow): PlayerProfile {
       cause: error,
     });
   }
+}
+
+function parseQuest(row: QuestRow): Quest {
+  try {
+    return QuestSchema.parse(JSON.parse(row.quest_json));
+  } catch (error) {
+    throw new CompanionError("Stored quest data is invalid", "INVALID_STORED_DATA", {
+      cause: error,
+    });
+  }
+}
+
+function aliasKey(value: string): string {
+  return value
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[’']/g, "")
+    .toLocaleLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
 }
 
 export class SqlitePlayerProfileRepository implements PlayerProfileRepository {
@@ -128,5 +179,241 @@ export class SqliteCacheStore implements CacheStore {
            stale_until = excluded.stale_until`,
       )
       .run(key, JSON.stringify(entry.value), entry.storedAt, entry.freshUntil, entry.staleUntil);
+  }
+}
+
+export class SqliteQuestRepository implements QuestRepository {
+  public constructor(private readonly database: DatabaseConnection) {}
+
+  public async getByIdOrAlias(identifier: string): Promise<Quest | null> {
+    const direct = this.database
+      .prepare("SELECT quest_json FROM quests WHERE id = ? COLLATE NOCASE")
+      .get(identifier) as QuestRow | undefined;
+    if (direct !== undefined) {
+      return parseQuest(direct);
+    }
+
+    const alias = this.database
+      .prepare(
+        `SELECT q.quest_json
+         FROM quest_aliases AS a
+         JOIN quests AS q ON q.id = a.quest_id
+         WHERE a.alias_key = ?`,
+      )
+      .get(aliasKey(identifier)) as QuestRow | undefined;
+    return alias === undefined ? null : parseQuest(alias);
+  }
+
+  public async list(): Promise<Quest[]> {
+    const rows = this.database
+      .prepare("SELECT quest_json FROM quests ORDER BY name COLLATE NOCASE")
+      .all() as QuestRow[];
+    return rows.map(parseQuest);
+  }
+
+  public async search(query: string, limit: number): Promise<Quest[]> {
+    const needle = `%${query.replaceAll("\\", "\\\\").replaceAll("%", "\\%").replaceAll("_", "\\_")}%`;
+    const rows = this.database
+      .prepare(
+        `SELECT DISTINCT q.quest_json
+         FROM quests AS q
+         LEFT JOIN quest_aliases AS a ON a.quest_id = q.id
+         WHERE q.name LIKE ? ESCAPE '\\' COLLATE NOCASE
+            OR q.id LIKE ? ESCAPE '\\' COLLATE NOCASE
+            OR a.alias LIKE ? ESCAPE '\\' COLLATE NOCASE
+         ORDER BY q.name COLLATE NOCASE
+         LIMIT ?`,
+      )
+      .all(needle, needle, needle, limit) as QuestRow[];
+    return rows.map(parseQuest);
+  }
+
+  public async replaceSnapshot(snapshot: QuestDataSnapshot): Promise<QuestSyncResult> {
+    const validated = QuestDataSnapshotSchema.parse(snapshot);
+    const questIds = new Set<string>();
+    const aliasOwners = new Map<string, string>();
+
+    for (const quest of validated.quests) {
+      if (questIds.has(quest.id)) {
+        throw new CompanionError(
+          `Quest snapshot contains duplicate ID ${quest.id}`,
+          "INVALID_QUEST_SNAPSHOT",
+        );
+      }
+      questIds.add(quest.id);
+      for (const alias of [quest.id, quest.name, ...quest.aliases]) {
+        const key = aliasKey(alias);
+        const owner = aliasOwners.get(key);
+        if (owner !== undefined && owner !== quest.id) {
+          throw new CompanionError(`Quest alias "${alias}" is ambiguous`, "INVALID_QUEST_SNAPSHOT");
+        }
+        aliasOwners.set(key, quest.id);
+      }
+    }
+
+    const existingRows = this.database
+      .prepare("SELECT id, content_hash FROM quests")
+      .all() as QuestHashRow[];
+    if (
+      existingRows.length >= 20 &&
+      validated.quests.length < Math.floor(existingRows.length * 0.8)
+    ) {
+      throw new CompanionError(
+        "Quest refresh returned a suspiciously incomplete snapshot; previous data was retained",
+        "SUSPICIOUS_QUEST_SNAPSHOT",
+      );
+    }
+    const existing = new Map(existingRows.map((row) => [row.id, row.content_hash]));
+    let inserted = 0;
+    let updated = 0;
+    let unchanged = 0;
+    const removed = existingRows.filter((row) => !questIds.has(row.id)).length;
+
+    this.database.transaction(() => {
+      const upsert = this.database.prepare(
+        `INSERT INTO quests
+           (id, name, quest_json, content_hash, source_revision, source_updated_at, last_checked_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(id) DO UPDATE SET
+           name = excluded.name,
+           quest_json = excluded.quest_json,
+           content_hash = excluded.content_hash,
+           source_revision = excluded.source_revision,
+           source_updated_at = excluded.source_updated_at,
+           last_checked_at = excluded.last_checked_at`,
+      );
+      for (const quest of validated.quests) {
+        const previousHash = existing.get(quest.id);
+        if (previousHash === undefined) {
+          inserted += 1;
+        } else if (previousHash === quest.contentHash) {
+          unchanged += 1;
+        } else {
+          updated += 1;
+        }
+        upsert.run(
+          quest.id,
+          quest.name,
+          JSON.stringify(quest),
+          quest.contentHash,
+          quest.sourceRevision ?? null,
+          quest.sourceUpdatedAt ?? null,
+          quest.lastCheckedAt,
+        );
+      }
+
+      if (removed > 0) {
+        const placeholders = [...questIds].map(() => "?").join(",");
+        if (placeholders.length === 0) {
+          this.database.prepare("DELETE FROM quests").run();
+        } else {
+          this.database
+            .prepare(`DELETE FROM quests WHERE id NOT IN (${placeholders})`)
+            .run(...questIds);
+        }
+      }
+
+      this.database.prepare("DELETE FROM quest_aliases").run();
+      const insertAlias = this.database.prepare(
+        `INSERT INTO quest_aliases (alias_key, alias, quest_id)
+         VALUES (?, ?, ?)`,
+      );
+      for (const quest of validated.quests) {
+        const aliases = new Map<string, string>();
+        for (const alias of [quest.id, quest.name, ...quest.aliases]) {
+          aliases.set(aliasKey(alias), alias);
+        }
+        for (const [key, alias] of aliases) {
+          insertAlias.run(key, alias, quest.id);
+        }
+      }
+
+      this.database
+        .prepare(
+          `INSERT INTO quest_sync_status
+             (singleton_id, state, provider, source_revision, last_attempt_at,
+              last_successful_sync_at, quest_count, last_error_code, last_error_message)
+           VALUES (1, 'ready', ?, ?, ?, ?, ?, NULL, NULL)
+           ON CONFLICT(singleton_id) DO UPDATE SET
+             state = 'ready',
+             provider = excluded.provider,
+             source_revision = excluded.source_revision,
+             last_attempt_at = excluded.last_attempt_at,
+             last_successful_sync_at = excluded.last_successful_sync_at,
+             quest_count = excluded.quest_count,
+             last_error_code = NULL,
+             last_error_message = NULL`,
+        )
+        .run(
+          validated.provider,
+          validated.sourceRevision,
+          validated.retrievedAt,
+          validated.retrievedAt,
+          validated.quests.length,
+        );
+    })();
+
+    return QuestSyncResultSchema.parse({
+      provider: validated.provider,
+      sourceRevision: validated.sourceRevision,
+      checkedAt: validated.retrievedAt,
+      total: validated.quests.length,
+      inserted,
+      updated,
+      unchanged,
+      removed,
+    });
+  }
+
+  public async getDataStatus(): Promise<QuestDataStatus> {
+    const row = this.database
+      .prepare(
+        `SELECT state, provider, source_revision, last_attempt_at, last_successful_sync_at,
+                quest_count, last_error_code, last_error_message
+         FROM quest_sync_status
+         WHERE singleton_id = 1`,
+      )
+      .get() as QuestSyncStatusRow | undefined;
+    if (row === undefined) {
+      return QuestDataStatusSchema.parse({
+        state: "never-synced",
+        questCount: 0,
+      });
+    }
+    return QuestDataStatusSchema.parse({
+      state: row.state,
+      ...(row.provider === null ? {} : { provider: row.provider }),
+      ...(row.source_revision === null ? {} : { sourceRevision: row.source_revision }),
+      lastAttemptAt: row.last_attempt_at,
+      ...(row.last_successful_sync_at === null
+        ? {}
+        : { lastSuccessfulSyncAt: row.last_successful_sync_at }),
+      questCount: row.quest_count,
+      ...(row.last_error_code === null ? {} : { lastErrorCode: row.last_error_code }),
+      ...(row.last_error_message === null ? {} : { lastErrorMessage: row.last_error_message }),
+    });
+  }
+
+  public async recordSyncFailure(
+    code: string,
+    message: string,
+    attemptedAt: string,
+  ): Promise<void> {
+    const count = (
+      this.database.prepare("SELECT COUNT(*) AS count FROM quests").get() as { count: number }
+    ).count;
+    this.database
+      .prepare(
+        `INSERT INTO quest_sync_status
+           (singleton_id, state, last_attempt_at, quest_count, last_error_code, last_error_message)
+         VALUES (1, 'failed', ?, ?, ?, ?)
+         ON CONFLICT(singleton_id) DO UPDATE SET
+           state = 'failed',
+           last_attempt_at = excluded.last_attempt_at,
+           quest_count = excluded.quest_count,
+           last_error_code = excluded.last_error_code,
+           last_error_message = excluded.last_error_message`,
+      )
+      .run(attemptedAt, count, code, message);
   }
 }

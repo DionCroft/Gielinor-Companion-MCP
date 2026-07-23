@@ -10,6 +10,7 @@ import {
   type PlayerStatsResult,
   type PlayStyle,
   type ProfileExport,
+  type QuestStatus,
 } from "@gielinor/shared-types";
 import { z } from "zod";
 
@@ -35,6 +36,14 @@ export const UpdatePlayerPreferencesInputSchema = z
   })
   .strict();
 export type UpdatePlayerPreferencesInput = z.infer<typeof UpdatePlayerPreferencesInputSchema>;
+
+export const QuestStatusUpdateSchema = z
+  .object({
+    questId: z.string().trim().min(1),
+    status: z.enum(["not-started", "in-progress", "completed"]),
+  })
+  .strict();
+export type QuestStatusUpdate = z.infer<typeof QuestStatusUpdateSchema>;
 
 export class ProfileService {
   public constructor(
@@ -83,6 +92,42 @@ export class ProfileService {
     const profile = await this.get(id);
     const parsed = UpdatePlayerPreferencesInputSchema.parse(input);
     const next = PlayerProfileSchema.parse({ ...profile, ...parsed });
+    return this.repository.save(next);
+  }
+
+  public async updateQuestStatuses(
+    id: string,
+    updates: ReadonlyArray<QuestStatusUpdate>,
+  ): Promise<PlayerProfile> {
+    const profile = await this.get(id);
+    const parsedUpdates = z.array(QuestStatusUpdateSchema).min(1).parse(updates);
+    const statuses = new Map<string, QuestStatus>();
+
+    for (const questId of profile.inProgressQuestIds) {
+      statuses.set(questId, "in-progress");
+    }
+    for (const questId of profile.completedQuestIds) {
+      statuses.set(questId, "completed");
+    }
+    for (const update of parsedUpdates) {
+      if (update.status === "not-started") {
+        statuses.delete(update.questId);
+      } else {
+        statuses.set(update.questId, update.status);
+      }
+    }
+
+    const next = PlayerProfileSchema.parse({
+      ...profile,
+      completedQuestIds: [...statuses.entries()]
+        .filter(([, status]) => status === "completed")
+        .map(([questId]) => questId)
+        .sort(),
+      inProgressQuestIds: [...statuses.entries()]
+        .filter(([, status]) => status === "in-progress")
+        .map(([questId]) => questId)
+        .sort(),
+    });
     return this.repository.save(next);
   }
 

@@ -3,12 +3,18 @@
 import { homedir } from "node:os";
 import { join } from "node:path";
 
-import { ProfileService } from "@gielinor/core";
-import { openDatabase, SqliteCacheStore, SqlitePlayerProfileRepository } from "@gielinor/database";
+import { ProfileService, QuestService } from "@gielinor/core";
+import {
+  openDatabase,
+  SqliteCacheStore,
+  SqlitePlayerProfileRepository,
+  SqliteQuestRepository,
+} from "@gielinor/database";
 import {
   JagexGrandExchangeProvider,
   JagexHiscoresProvider,
   ResilientHttpClient,
+  RuneScapeWikiQuestProvider,
   loadProviderConfig,
 } from "@gielinor/providers";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
@@ -40,7 +46,16 @@ async function main(): Promise<void> {
     endpoint: config.geUrl,
   });
   const profiles = new ProfileService(new SqlitePlayerProfileRepository(database), statsProvider);
-  const tools = new CompanionToolService(profiles, priceProvider);
+  const quests = new QuestService(
+    new SqliteQuestRepository(database),
+    profiles,
+    new RuneScapeWikiQuestProvider({
+      httpClient,
+      apiUrl: config.wikiApiUrl,
+      pageUrl: config.wikiPageUrl,
+    }),
+  );
+  const tools = new CompanionToolService(profiles, priceProvider, quests);
   const server = createCompanionServer(tools);
   const transport = new StdioServerTransport();
 

@@ -4,6 +4,8 @@ import { describe, expect, it } from "vitest";
 import {
   CreatePlayerProfileToolInputSchema,
   ImportPlayerProfileToolInputSchema,
+  SetMultipleQuestStatusesToolInputSchema,
+  ToolEnvelopeSchema,
 } from "../src/schemas.js";
 import { publicToolError } from "../src/tool-service.js";
 
@@ -29,6 +31,33 @@ describe("MCP tool schemas", () => {
           goals: [],
           sessionCookie: "never accept this",
         },
+      }).success,
+    ).toBe(false);
+  });
+
+  it("rejects invalid bulk quest status input", () => {
+    expect(
+      SetMultipleQuestStatusesToolInputSchema.safeParse({
+        profileId: "00000000-0000-4000-8000-000000000001",
+        updates: [{ quest: "Plague's End", status: "done" }],
+      }).success,
+    ).toBe(false);
+  });
+
+  it("validates the common MCP output envelope", () => {
+    expect(
+      ToolEnvelopeSchema.safeParse({
+        data: { valid: true },
+        meta: {
+          generatedAt: "2026-07-23T12:00:00.000Z",
+          source: "fixture",
+        },
+      }).success,
+    ).toBe(true);
+    expect(
+      ToolEnvelopeSchema.safeParse({
+        data: {},
+        meta: { generatedAt: "not-a-date", source: "" },
       }).success,
     ).toBe(false);
   });

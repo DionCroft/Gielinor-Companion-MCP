@@ -3,13 +3,13 @@
 Each version must retain a working build. A version is complete only when its
 affected code is documented, typed, linted, tested, and built successfully.
 
-## 0.1 — Foundation (current)
+## 0.1 — Foundation (complete)
 
 Strict monorepo, shared schemas, SQLite profiles/cache, public Hiscores, XP
 calculations, Jagex ItemDB lookup, local stdio MCP, client examples, CI, and
 project policies.
 
-## 0.2 — Quest companion
+## 0.2 — Quest companion (current)
 
 Wiki-backed revision-aware quest sync, transactional validation, prerequisite
 graph and cycle detection, manual progress, available quests, missing

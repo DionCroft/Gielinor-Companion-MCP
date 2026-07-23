@@ -3,11 +3,24 @@ import {
   PlayerProfileSchema,
   PlayStyleSchema,
   ProfileExportSchema,
+  QuestStatusSchema,
   SkillIdSchema,
 } from "@gielinor/shared-types";
 import { z } from "zod";
 
 export const EmptyInputSchema = z.object({}).strict();
+
+export const ToolEnvelopeSchema = z
+  .object({
+    data: z.unknown(),
+    meta: z
+      .object({
+        generatedAt: z.string().datetime({ offset: true }),
+        source: z.string().min(1),
+      })
+      .strict(),
+  })
+  .strict();
 
 export const CreatePlayerProfileToolInputSchema = z
   .object({
@@ -67,5 +80,46 @@ export const GetItemPriceToolInputSchema = z
   .object({
     itemId: z.number().int().positive(),
     forceRefresh: z.boolean().optional(),
+  })
+  .strict();
+
+export const SearchQuestsToolInputSchema = z
+  .object({
+    query: z.string().trim().min(1).max(100),
+    limit: z.number().int().min(1).max(100).optional(),
+  })
+  .strict();
+
+export const QuestIdentifierInputSchema = z
+  .object({
+    quest: z.string().trim().min(1).max(200),
+  })
+  .strict();
+
+export const ProfileQuestInputSchema = z
+  .object({
+    profileId: z.string().uuid(),
+    quest: z.string().trim().min(1).max(200),
+  })
+  .strict();
+
+export const SetQuestStatusToolInputSchema = ProfileQuestInputSchema.extend({
+  status: QuestStatusSchema,
+}).strict();
+
+export const SetMultipleQuestStatusesToolInputSchema = z
+  .object({
+    profileId: z.string().uuid(),
+    updates: z
+      .array(
+        z
+          .object({
+            quest: z.string().trim().min(1).max(200),
+            status: QuestStatusSchema,
+          })
+          .strict(),
+      )
+      .min(1)
+      .max(500),
   })
   .strict();

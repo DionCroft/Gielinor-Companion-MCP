@@ -89,27 +89,183 @@ export const QuestRewardSchema = z
   .strict();
 export type QuestReward = z.infer<typeof QuestRewardSchema>;
 
+export const QuestStatusSchema = z.enum(["not-started", "in-progress", "completed"]);
+export type QuestStatus = z.infer<typeof QuestStatusSchema>;
+
+export const QuestPrerequisiteSchema = z
+  .object({
+    questId: z.string().min(1),
+    requiredStatus: z.enum(["started", "completed"]).default("completed"),
+  })
+  .strict();
+export type QuestPrerequisite = z.infer<typeof QuestPrerequisiteSchema>;
+
+export const QuestPrerequisiteGroupSchema = z
+  .object({
+    mode: z.enum(["all", "any"]),
+    quests: z.array(QuestPrerequisiteSchema).min(1),
+    description: z.string().min(1).optional(),
+  })
+  .strict();
+export type QuestPrerequisiteGroup = z.infer<typeof QuestPrerequisiteGroupSchema>;
+
 export const QuestSchema = z
   .object({
     id: z.string().min(1),
     name: z.string().min(1),
+    aliases: z.array(z.string().min(1)).default([]),
     members: z.boolean(),
     difficulty: z.string().min(1).optional(),
     length: z.string().min(1).optional(),
     questPointReward: nonNegativeInteger.optional(),
     prerequisiteQuestIds: z.array(z.string().min(1)),
+    prerequisiteGroups: z.array(QuestPrerequisiteGroupSchema).default([]),
     skillRequirements: z.array(SkillRequirementSchema),
+    questPointRequirement: nonNegativeInteger.optional(),
+    otherRequirements: z.array(z.string().min(1)).default([]),
     itemRequirements: z.array(QuestItemRequirementSchema),
     recommendedItems: z.array(QuestItemRequirementSchema),
     rewards: z.array(QuestRewardSchema),
     guideUrl: z.string().url().optional(),
+    sourcePageUrl: z.string().url().optional(),
     sourceName: z.string().min(1),
     sourceRevision: z.string().min(1).optional(),
     sourceUpdatedAt: isoDateTime.optional(),
+    contentHash: z.string().regex(/^[a-f0-9]{64}$/),
     lastCheckedAt: isoDateTime,
   })
   .strict();
 export type Quest = z.infer<typeof QuestSchema>;
+
+export const QuestDataSnapshotSchema = z
+  .object({
+    provider: z.string().min(1),
+    sourceUrl: z.string().url(),
+    sourceRevision: z.string().min(1),
+    retrievedAt: isoDateTime,
+    quests: z.array(QuestSchema).min(1),
+  })
+  .strict();
+export type QuestDataSnapshot = z.infer<typeof QuestDataSnapshotSchema>;
+
+export const QuestSyncResultSchema = z
+  .object({
+    provider: z.string().min(1),
+    sourceRevision: z.string().min(1),
+    checkedAt: isoDateTime,
+    total: nonNegativeInteger,
+    inserted: nonNegativeInteger,
+    updated: nonNegativeInteger,
+    unchanged: nonNegativeInteger,
+    removed: nonNegativeInteger,
+  })
+  .strict();
+export type QuestSyncResult = z.infer<typeof QuestSyncResultSchema>;
+
+export const QuestDataStatusSchema = z
+  .object({
+    state: z.enum(["never-synced", "ready", "failed"]),
+    provider: z.string().min(1).optional(),
+    sourceRevision: z.string().min(1).optional(),
+    lastAttemptAt: isoDateTime.optional(),
+    lastSuccessfulSyncAt: isoDateTime.optional(),
+    questCount: nonNegativeInteger,
+    lastErrorCode: z.string().min(1).optional(),
+    lastErrorMessage: z.string().min(1).optional(),
+  })
+  .strict();
+export type QuestDataStatus = z.infer<typeof QuestDataStatusSchema>;
+
+export const QuestAvailabilitySchema = z
+  .object({
+    quest: QuestSchema,
+    status: QuestStatusSchema,
+    manualRequirements: z.array(z.string()),
+    recommendationScore: z.number(),
+    recommendationReasons: z.array(z.string()),
+  })
+  .strict();
+export type QuestAvailability = z.infer<typeof QuestAvailabilitySchema>;
+
+export const MissingSkillRequirementSchema = z
+  .object({
+    skillId: SkillIdSchema,
+    currentLevel: z.number().int().min(1).max(126),
+    requiredLevel: z.number().int().min(1).max(120),
+    requiredByQuestIds: z.array(z.string().min(1)).min(1),
+  })
+  .strict();
+export type MissingSkillRequirement = z.infer<typeof MissingSkillRequirementSchema>;
+
+export const MissingQuestRequirementSchema = z
+  .object({
+    questId: z.string().min(1),
+    name: z.string().min(1),
+    currentStatus: QuestStatusSchema,
+    requiredStatus: z.enum(["started", "completed"]),
+  })
+  .strict();
+export type MissingQuestRequirement = z.infer<typeof MissingQuestRequirementSchema>;
+
+export const MissingQuestRequirementsSchema = z
+  .object({
+    targetQuestId: z.string().min(1),
+    quests: z.array(MissingQuestRequirementSchema),
+    skills: z.array(MissingSkillRequirementSchema),
+    manualRequirements: z.array(z.string()),
+  })
+  .strict();
+export type MissingQuestRequirements = z.infer<typeof MissingQuestRequirementsSchema>;
+
+export const QuestRouteStepSchema = z
+  .object({
+    order: z.number().int().positive(),
+    questId: z.string().min(1),
+    name: z.string().min(1),
+    currentStatus: QuestStatusSchema,
+    requiredStatus: z.enum(["started", "completed"]),
+    guideUrl: z.string().url().optional(),
+  })
+  .strict();
+export type QuestRouteStep = z.infer<typeof QuestRouteStepSchema>;
+
+export const QuestRouteAlternativeSchema = z
+  .object({
+    groupQuestId: z.string().min(1),
+    selectedQuestId: z.string().min(1),
+    alternativeQuestIds: z.array(z.string().min(1)),
+  })
+  .strict();
+export type QuestRouteAlternative = z.infer<typeof QuestRouteAlternativeSchema>;
+
+export const QuestRouteSchema = z
+  .object({
+    targetQuestId: z.string().min(1),
+    steps: z.array(QuestRouteStepSchema),
+    alternatives: z.array(QuestRouteAlternativeSchema),
+  })
+  .strict();
+export type QuestRoute = z.infer<typeof QuestRouteSchema>;
+
+export const QuestShoppingListItemSchema = z
+  .object({
+    name: z.string().min(1),
+    quantity: z.number().int().positive(),
+    itemId: z.number().int().positive().optional(),
+    alternatives: z.array(z.string().min(1)),
+    requiredByQuestIds: z.array(z.string().min(1)).min(1),
+  })
+  .strict();
+export type QuestShoppingListItem = z.infer<typeof QuestShoppingListItemSchema>;
+
+export const QuestShoppingListSchema = z
+  .object({
+    targetQuestId: z.string().min(1),
+    routeQuestIds: z.array(z.string().min(1)),
+    items: z.array(QuestShoppingListItemSchema),
+  })
+  .strict();
+export type QuestShoppingList = z.infer<typeof QuestShoppingListSchema>;
 
 export const RequirementSchema = z.discriminatedUnion("type", [
   z
