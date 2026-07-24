@@ -1,3 +1,4 @@
+export * from "./data-migrations.js";
 export * from "./errors.js";
 export * from "./grand-exchange-service.js";
 export * from "./levelling-planner-service.js";

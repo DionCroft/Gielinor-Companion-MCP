@@ -7,16 +7,18 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 Gielinor Companion MCP is a safe, model-independent foundation for deterministic
-RuneScape 3 planning. Version 0.8 adds an optional, consent-driven Alt1 app for
-local visible-text guidance alongside the hosted/local MCP servers, accessible
-Tauri/React desktop app, and optional Ollama/LM Studio conversations. It still
-works without AI, hosting, or Alt1 and never controls the game client.
+RuneScape 3 planning. Version 0.9 adds a typed provider plugin boundary,
+transactional migration tooling, cache-only offline routing, operational
+hardening, and contributor contracts alongside the hosted/local MCP servers,
+accessible Tauri/React desktop app, optional Ollama/LM Studio conversations, and
+optional Alt1 guidance. It never controls the game client.
 
 ## Release status
 
-**Current version: 0.8.0 — Optional Read-Only Overlay.** This is an early working
-release. The same 48 trusted tools remain available over local stdio and
-stateless Streamable HTTP; the separate overlay is disabled by default.
+**Current version: 0.9.0 — Extensibility and Hardening.** The same 48 trusted
+tools remain available over local stdio and stateless Streamable HTTP. Provider,
+profile, and database compatibility now have executable migration and contract
+tests.
 
 ## Features
 
@@ -35,6 +37,12 @@ stateless Streamable HTTP; the separate overlay is disabled by default.
   valuation plus JSON/CSV export and explicit freshness.
 - Persistent cache-first, stale-while-revalidate provider data.
 - Timeouts, bounded retries, response validation, provenance, and timestamps.
+- Typed provider plugins with capability metadata, deterministic priority,
+  validated fallback, disagreement preservation, offline eligibility, and
+  per-capability health tracking.
+- URL- and cache-key request coalescing, cache-only headless offline mode,
+  versioned data/profile migration chains, and transactional SQLite migration
+  planning with operational indexes.
 - RuneScape Wiki quest catalogue with revisions, content hashes, source links,
   aliases, and transactional rollback.
 - Prerequisite graph traversal, cycle detection, alternatives, available quests,
@@ -73,12 +81,15 @@ stateless Streamable HTTP; the separate overlay is disabled by default.
   fallback. It cannot generate gameplay input and transmits no captured data.
 - Fixture-based unit, component, native-command, integration, and Playwright
   journey tests; live provider tests are opt-in.
+- Failure-injection, database-lock, schema-compatibility, 1,000-quest,
+  2,000-profile, memory-bound, and hosted-load tests plus documented threat,
+  dependency, and accessibility audits.
 
 ## Architecture
 
 ```text
-Jagex public APIs ---- price/history cache
-RuneScape Wiki  ----- revision-aware quest/training/GE sync
+Jagex public APIs ---- provider plugin registry ---- price/history cache
+RuneScape Wiki  ----- priority / fallback / health -- quest/training/GE sync
                               |
                               v
 domain ports + core services ---- SQLite profiles/quests/training/prices
@@ -98,9 +109,10 @@ domain ports + core services ---- SQLite profiles/quests/training/prices
 visible main chat -- Alt1 read-only adapter -- local guidance pack
 ```
 
-Business rules are in `packages/core`. Provider parsing, SQLite, and MCP transport
-depend on those ports; the core never depends on a UI or model vendor. See
-[the architecture overview](docs/architecture/overview.md).
+Business rules are in `packages/core`. Provider parsing, SQLite, and MCP
+transport depend on those ports; the core never depends on a UI or model vendor.
+See [the architecture overview](docs/architecture/overview.md) and
+[provider plugin architecture](docs/architecture/provider-plugins.md).
 
 ## Requirements
 
@@ -195,7 +207,7 @@ discovers only models whose Ollama metadata advertises tool support. See the
 
 ### Standalone desktop
 
-Version 0.8 retains the complete no-AI dashboard and optional local AI.
+Version 0.9 retains the complete no-AI dashboard and optional local AI.
 Build and run it from source:
 
 ```sh
@@ -291,10 +303,13 @@ corepack pnpm test:ai
 corepack pnpm test:hosted
 corepack pnpm test:overlay
 corepack pnpm test:database
+corepack pnpm test:hardening
+corepack pnpm test:load
 corepack pnpm test:e2e
 corepack pnpm test:desktop
 corepack pnpm test:desktop:e2e
 corepack pnpm test:desktop:rust
+corepack pnpm profile:performance
 ```
 
 Optional live smoke tests make real public API requests and remain outside
@@ -347,6 +362,8 @@ Hosted transport adds no game-data provider; see
 [Version 0.7 hosted data behavior](docs/data-sources/version-0.7.md).
 The optional overlay adds only transient local visible-text observations; see
 [Version 0.8 overlay data behavior](docs/data-sources/version-0.8.md).
+Version 0.9 adds routing and migration behavior, not another public source; see
+[Version 0.9 data behavior](docs/data-sources/version-0.9.md).
 
 ## Privacy and safety
 
@@ -358,6 +375,10 @@ authenticator code, session cookie, or bank PIN. Hosted operators should read
 The optional Alt1 app is disabled by default, reads visible main-chat pixels only
 after explicit consent and connection, and cannot transmit captured data. Read
 [the overlay privacy and consent guide](docs/security/overlay-privacy.md).
+The reviewed boundaries are recorded in the
+[threat model](docs/security/threat-model.md),
+[security checklist](docs/security/audit-checklist.md), and
+[dependency audit](docs/security/dependency-audit.md).
 
 The project does not click, type, read client memory, intercept packets, trade,
 fight, skill, solve CAPTCHAs, or bypass anti-cheat systems. Read
@@ -374,7 +395,8 @@ optional read-only overlay, and hardening. Current limitations are explicit in
 
 Contributions are welcome under the [MIT License](LICENSE). Please read
 [CONTRIBUTING.md](CONTRIBUTING.md) and the
-[Code of Conduct](CODE_OF_CONDUCT.md).
+[Code of Conduct](CODE_OF_CONDUCT.md). Provider, MCP tool, and UI contributors
+have focused guides under [docs/development](docs/development).
 
 ## Unofficial-project disclaimer
 

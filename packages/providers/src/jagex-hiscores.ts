@@ -132,6 +132,7 @@ export class JagexHiscoresProvider implements PlayerStatsProvider {
         };
       },
       requestOptions.forceRefresh ?? false,
+      requestOptions.offline ?? false,
     );
 
     return PlayerStatsResultSchema.parse({

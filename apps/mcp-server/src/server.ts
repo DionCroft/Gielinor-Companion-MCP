@@ -55,7 +55,7 @@ async function run(operation: () => Promise<ToolEnvelope<unknown>>): Promise<Cal
 
 export function createCompanionServer(tools: CompanionToolService): McpServer {
   const server = new McpServer(
-    { name: "gielinor-companion-mcp", version: "0.8.0" },
+    { name: "gielinor-companion-mcp", version: "0.9.0" },
     {
       instructions:
         "Use these deterministic, read-only RuneScape 3 data and planning tools. " +

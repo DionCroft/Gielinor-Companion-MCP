@@ -80,6 +80,25 @@ describe("desktop application flows", () => {
     );
   });
 
+  it("exposes audited landmarks, focus navigation, and accessible button names", async () => {
+    render(<App bridge={new DemoCompanionBridge("returning")} />);
+
+    await screen.findByRole("heading", { name: /welcome back/i });
+    expect(screen.getByRole("main")).toHaveAttribute("id", "main-content");
+    expect(screen.getByRole("complementary", { name: "Primary navigation" })).toBeVisible();
+    expect(screen.getByRole("link", { name: "Skip to main content" })).toHaveAttribute(
+      "href",
+      "#main-content",
+    );
+    expect(screen.getByRole("button", { name: "Overview" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+    for (const button of screen.getAllByRole("button")) {
+      expect(button).toHaveAccessibleName();
+    }
+  });
+
   it("rejects a remote model endpoint without leaving local-only mode", async () => {
     const user = userEvent.setup();
     render(<App bridge={new DemoCompanionBridge("ai-ready")} />);

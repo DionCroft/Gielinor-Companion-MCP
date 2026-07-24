@@ -1,0 +1,41 @@
+name: Provider proposal
+description: Propose or report a public-data provider integration
+title: "[Provider]: "
+labels: ["provider"]
+body:
+  - type: input
+    id: source
+    attributes:
+      label: Public source
+      description: Link to the source documentation, terms, or API.
+    validations:
+      required: true
+  - type: dropdown
+    id: capability
+    attributes:
+      label: Capability
+      options:
+        - Player stats
+        - Current prices
+        - Price history
+        - Price catalogue
+        - Quest data
+        - Training data
+    validations:
+      required: true
+  - type: textarea
+    id: contract
+    attributes:
+      label: Response and reliability
+      description: Describe schema, authentication, limits, timestamps, provenance, and failure behavior.
+    validations:
+      required: true
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Safety
+      options:
+        - label: The source is public and requires no RuneScape credentials.
+          required: true
+        - label: The proposal adds no gameplay input, automation, memory reading, packet interception, or trading.
+          required: true

@@ -1,5 +1,7 @@
 import { CompanionError } from "@gielinor/core";
 
+import { InFlightRequestDeduplicator } from "./request-deduplicator.js";
+
 export type ResilientHttpOptions = {
   userAgent: string;
   timeoutMs?: number;
@@ -46,6 +48,7 @@ export class ResilientHttpClient {
   private readonly baseDelayMs: number;
   private readonly fetchImplementation: typeof fetch;
   private readonly sleep: (milliseconds: number) => Promise<void>;
+  private readonly requests = new InFlightRequestDeduplicator<Response>();
 
   public constructor(private readonly options: ResilientHttpOptions) {
     this.timeoutMs = options.timeoutMs ?? 10_000;
@@ -58,6 +61,11 @@ export class ResilientHttpClient {
   }
 
   public async get(url: URL): Promise<Response> {
+    const response = await this.requests.run(url.toString(), () => this.getUnshared(url));
+    return response.clone();
+  }
+
+  private async getUnshared(url: URL): Promise<Response> {
     let lastError: unknown;
 
     for (let attempt = 0; attempt <= this.retries; attempt += 1) {

@@ -17,14 +17,7 @@ import {
   SqliteQuestRepository,
   SqliteTrainingMethodRepository,
 } from "@gielinor/database";
-import {
-  JagexGrandExchangeProvider,
-  JagexHiscoresProvider,
-  ResilientHttpClient,
-  RuneScapeWikiQuestProvider,
-  RuneScapeWikiTrainingProvider,
-  loadProviderConfig,
-} from "@gielinor/providers";
+import { createDefaultProviderStack, loadProviderConfig } from "@gielinor/providers";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 
 import { createCompanionServer } from "./server.js";
@@ -36,45 +29,20 @@ async function main(): Promise<void> {
     process.env.GIELINOR_DB_PATH ?? join(homedir(), ".gielinor-companion", "gielinor.db");
   const database = openDatabase(databasePath);
   const cacheStore = new SqliteCacheStore(database);
-  const httpClient = new ResilientHttpClient({
-    userAgent: config.userAgent,
-    timeoutMs: config.timeoutMs,
-    retries: config.retries,
-  });
-  const statsProvider = new JagexHiscoresProvider({
-    httpClient,
-    cacheStore,
-    cachePolicy: config.hiscoresCache,
-    normalEndpoint: config.hiscoresUrl,
-  });
-  const priceProvider = new JagexGrandExchangeProvider({
-    httpClient,
-    cacheStore,
-    cachePolicy: config.geCache,
-    historyCachePolicy: config.geHistoryCache,
-    endpoint: config.geUrl,
-    graphEndpoint: config.geGraphUrl,
-    bulkEndpoint: config.geBulkUrl,
-  });
+  const providers = createDefaultProviderStack(config, cacheStore);
+  const statsProvider = providers.ports;
+  const priceProvider = providers.ports;
   const profiles = new ProfileService(new SqlitePlayerProfileRepository(database), statsProvider);
   const quests = new QuestService(
     new SqliteQuestRepository(database),
     profiles,
-    new RuneScapeWikiQuestProvider({
-      httpClient,
-      apiUrl: config.wikiApiUrl,
-      pageUrl: config.wikiPageUrl,
-    }),
+    providers.ports.quests,
   );
   const planner = new LevellingPlannerService(
     new SqliteTrainingMethodRepository(database),
     profiles,
     quests,
-    new RuneScapeWikiTrainingProvider({
-      httpClient,
-      apiUrl: config.wikiApiUrl,
-      pageUrl: config.wikiPageUrl,
-    }),
+    providers.ports.training,
   );
   const exchange = new GrandExchangeService(
     new SqlitePriceRepository(database),

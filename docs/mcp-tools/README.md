@@ -1,4 +1,4 @@
-# MCP tool reference — Version 0.8
+# MCP tool reference — Version 0.9
 
 All tools use strict JSON object inputs. Successful responses use:
 

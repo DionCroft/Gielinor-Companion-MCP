@@ -40,4 +40,30 @@ describe("ResilientHttpClient", () => {
       Partial<ProviderError>
     >({ code: "PROVIDER_TIMEOUT" });
   });
+
+  it("deduplicates concurrent requests and returns independently readable responses", async () => {
+    let calls = 0;
+    let release: (() => void) | undefined;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const client = new ResilientHttpClient({
+      userAgent: "test",
+      retries: 0,
+      fetchImplementation: async () => {
+        calls += 1;
+        await gate;
+        return new Response('{"ok":true}', { status: 200 });
+      },
+    });
+    const url = new URL("https://example.test/shared");
+    const first = client.get(url);
+    const second = client.get(url);
+    release?.();
+
+    const [left, right] = await Promise.all([first, second]);
+    expect(await left.json()).toEqual({ ok: true });
+    expect(await right.json()).toEqual({ ok: true });
+    expect(calls).toBe(1);
+  });
 });

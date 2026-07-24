@@ -1,3 +1,5 @@
+import { ProviderError } from "./http.js";
+
 export type CacheStatus = "miss" | "fresh" | "stale";
 
 export type CacheEntry<T> = {
@@ -48,9 +50,25 @@ export class StaleWhileRevalidateCache {
     policy: CachePolicy,
     loader: () => Promise<T>,
     forceRefresh = false,
+    offline = false,
   ): Promise<CachedLoadResult<T>> {
     const cached = await this.store.get<T>(key);
     const now = this.now();
+
+    if (offline) {
+      if (cached === null) {
+        throw new ProviderError(
+          "No retained provider data is available while offline",
+          "OFFLINE_CACHE_MISS",
+          false,
+        );
+      }
+      return {
+        value: cached.value,
+        status: cached.freshUntil > now ? "fresh" : "stale",
+        storedAt: cached.storedAt,
+      };
+    }
 
     if (!forceRefresh && cached !== null && cached.freshUntil > now) {
       return { value: cached.value, status: "fresh", storedAt: cached.storedAt };

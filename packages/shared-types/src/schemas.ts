@@ -706,6 +706,27 @@ export const ProfileExportSchema = z
   .strict();
 export type ProfileExport = z.infer<typeof ProfileExportSchema>;
 
+export const LegacyProfileExportV0Schema = z
+  .object({
+    schemaVersion: z.literal(0),
+    displayName: PlayerProfileSchema.shape.displayName,
+    gameMode: GameModeSchema.optional(),
+    availableGp: nonNegativeInteger.optional(),
+    preferredPlayStyle: PlayStyleSchema.optional(),
+    availableHoursPerDay: z.number().positive().max(24).optional(),
+    completedQuestIds: z.array(z.string().min(1)).optional(),
+    inProgressQuestIds: z.array(z.string().min(1)).optional(),
+    goals: z.array(ExportedPlayerGoalSchema).optional(),
+  })
+  .strict();
+export type LegacyProfileExportV0 = z.infer<typeof LegacyProfileExportV0Schema>;
+
+export const ImportableProfileExportSchema = z.union([
+  ProfileExportSchema,
+  LegacyProfileExportV0Schema,
+]);
+export type ImportableProfileExport = z.infer<typeof ImportableProfileExportSchema>;
+
 export const GameUpdateSchema = z
   .object({
     id: z.string().min(1),

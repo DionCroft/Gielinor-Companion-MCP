@@ -15,6 +15,7 @@ import {
 import { z } from "zod";
 
 import { NotFoundError } from "./errors.js";
+import { migrateProfileExport } from "./data-migrations.js";
 import type { PlayerProfileRepository, PlayerStatsProvider } from "./ports.js";
 
 export const CreatePlayerProfileInputSchema = z
@@ -179,7 +180,7 @@ export class ProfileService {
   }
 
   public async import(payload: unknown): Promise<PlayerProfile> {
-    const imported = ProfileExportSchema.parse(payload);
+    const imported = migrateProfileExport(payload);
     const profile = PlayerProfileSchema.parse({
       id: randomUUID(),
       displayName: imported.displayName,

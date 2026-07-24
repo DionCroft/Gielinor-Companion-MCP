@@ -62,6 +62,9 @@ export function Layout({
         .filter(Boolean)
         .join(" ")}
     >
+      <a className="skip-link" href="#main-content">
+        Skip to main content
+      </a>
       <aside className="sidebar" aria-label="Primary navigation">
         <div className="brand">
           <span className="brand-mark" aria-hidden="true">

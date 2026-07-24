@@ -222,6 +222,7 @@ export class JagexGrandExchangeProvider implements GrandExchangeDataProvider {
         });
       },
       requestOptions.forceRefresh ?? false,
+      requestOptions.offline ?? false,
     );
 
     return GrandExchangeItemSchema.parse({
@@ -400,6 +401,7 @@ export class JagexGrandExchangeProvider implements GrandExchangeDataProvider {
         return points;
       },
       requestOptions.forceRefresh ?? false,
+      requestOptions.offline ?? false,
     );
 
     const latestTimestamp = Date.parse(fullHistory.value.at(-1)?.timestamp ?? "");

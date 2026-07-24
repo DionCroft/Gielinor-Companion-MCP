@@ -10,7 +10,7 @@ const live = process.env.RUN_LIVE_API_TESTS === "1";
 describe.runIf(live)("live public provider smoke tests", () => {
   const httpClient = new ResilientHttpClient({
     userAgent:
-      "Gielinor-Companion-MCP-live-test/0.8.0 (https://github.com/DionCroft/Gielinor-Companion-MCP)",
+      "Gielinor-Companion-MCP-live-test/0.9.0 (https://github.com/DionCroft/Gielinor-Companion-MCP)",
   });
 
   it("reads a public Hiscores profile", async () => {
