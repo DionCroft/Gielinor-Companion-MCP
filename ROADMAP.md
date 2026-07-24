@@ -48,7 +48,7 @@ per-field consent, local redaction, manual completion confirmation,
 pause/disconnect/revoke, no network transmission, no generated gameplay input,
 and a manual no-Alt1 fallback.
 
-## 0.9 — Extensibility and hardening
+## 0.9 — Extensibility and hardening (complete)
 
 Provider plugin contract, more sources, migrations, offline behavior, profiling,
 failure/load tests, threat model, accessibility audit, and contributor tooling.

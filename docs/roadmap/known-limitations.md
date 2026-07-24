@@ -1,4 +1,4 @@
-# Version 0.8 known limitations
+# Version 0.9 known limitations
 
 - The optional Alt1 integration is Windows-only because Alt1 supports Windows.
   Manual text analysis and every core companion feature remain available
@@ -14,7 +14,7 @@
   can prevent recognition; manual paste remains the fallback.
 - OCR and keyword matches are advisory. Even high-confidence completion signals
   require confirmation and never update a profile or game state.
-- Guide packs are pasted locally in Version 0.8. There is no live
+- Guide packs are still pasted locally in Version 0.9. There is no live
   profile/MCP-to-overlay bridge, avoiding a network path for screen observations.
 - The repository builds the static overlay but does not publish a trusted
   hosting origin. Operators must serve the build themselves or use local
@@ -31,8 +31,8 @@
   XP, so the published plan GP range remains separate to avoid double-counting.
 - Hiscores cannot provide reliable quest completion, bank contents, game mode
   discovery, or private account data.
-- Profiles have no delete tool in 0.1; this avoids an unnecessary destructive MCP
-  operation before profile-management UI work.
+- Local profiles have no delete MCP tool; hosted account deletion remains a
+  separately authenticated HTTP lifecycle operation.
 - Hosted profiles use fixed bearer headers rather than OAuth. Anonymous public
   tools work with current ChatGPT and Claude custom connectors; private hosted
   profiles require a client that can configure an Authorization header.
@@ -49,8 +49,16 @@
 - Goals and ad-hoc shopping lists use installation-local UI storage/state;
   portable profile export covers schema-versioned profile goals and quest state,
   not those ad-hoc dashboard entries.
-- Offline mode disables explicit refresh controls and clearly uses retained
-  data. It is not an operating-system network firewall.
+- Desktop offline mode disables explicit refresh controls. Headless
+  `GIELINOR_OFFLINE=true` additionally restricts provider routing to retained
+  cache-capable reads. Neither is an operating-system network firewall.
+- Provider health is in-memory operational evidence and resets on process
+  restart. It is not a long-term uptime monitor or authority score.
+- Version 0.9 ships the plugin contract inside the monorepo; independently
+  installed dynamic plugin discovery is intentionally deferred until a signed
+  package trust policy exists.
+- Performance and hosted load thresholds are regression budgets on CI-class
+  hardware, not capacity guarantees for a particular deployment.
 - Local AI requires a separately installed, running Ollama or LM Studio server
   and a model capable of structured tool use. Model quality and hardware needs
   vary; the project does not download a model automatically.

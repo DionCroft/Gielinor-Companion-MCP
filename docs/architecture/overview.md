@@ -1,4 +1,4 @@
-# Version 0.8 architecture
+# Version 0.9 architecture
 
 ## Boundaries
 
@@ -143,14 +143,30 @@ and never write a caller-selected path.
 SQLite migration 1 creates `player_profiles` and `provider_cache`. Migration 2
 adds `quests`, `quest_aliases`, and `quest_sync_status`. Migration 3 adds
 `training_methods` and `training_sync_status`. Migration 4 adds `ge_items`,
-`ge_item_aliases`, `ge_price_history`, and `ge_sync_status`. Migrations are
-additive and do not rewrite earlier profile, quest, or training JSON. Domain
+`ge_item_aliases`, `ge_price_history`, and `ge_sync_status`. Migration 5 adds
+operational lookup/age indexes without rewriting data. Migrations are additive
+and do not rewrite earlier profile, quest, or training JSON. Domain
 objects are stored as validated JSON plus searchable metadata. The cache stores
 validated adapter results with fresh and stale deadlines. WAL mode and a busy
 timeout are enabled for file-backed databases.
 
-Profile export intentionally excludes local profile and goal UUIDs. Import creates
-new UUIDs and accepts only schema version 1.
+Profile export intentionally excludes local profile and goal UUIDs. Import
+creates new UUIDs, emits schema version 1, and can migrate the documented legacy
+version-0 fixture through a copied, validated migration chain.
+
+## Provider plugin boundary
+
+The application composition roots create a `ProviderRegistry`, register the
+built-in Jagex/Wiki plugin, and pass a `ProviderPortAdapter` to unchanged core
+services. Each capability carries source identity, version, integer priority,
+offline support, and a typed handler. Shared schemas validate successful
+results. Failed or malformed high-priority providers fall back in deterministic
+order; optional comparison mode retains each incompatible result.
+
+Health tracks per-capability attempts, latency, consecutive failures, and safe
+error codes. Offline routing skips network-only snapshot refresh and permits
+retained Hiscores/GE cache reads without starting HTTP. Identical in-flight HTTP
+URLs and cache refresh keys are independently coalesced.
 
 ## Desktop boundary
 

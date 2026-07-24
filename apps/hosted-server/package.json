@@ -1,6 +1,6 @@
 {
   "name": "@gielinor/hosted-server",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "description": "Production-oriented Streamable HTTP MCP service for Gielinor Companion.",
   "type": "module",
   "main": "./dist/index.js",

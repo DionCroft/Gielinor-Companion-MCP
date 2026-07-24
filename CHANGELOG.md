@@ -3,6 +3,41 @@
 All notable changes follow [Keep a Changelog](https://keepachangelog.com/) and
 semantic versioning.
 
+## [0.9.0] - 2026-07-24
+
+### Added
+
+- Typed provider plugin interface with capability metadata, deterministic
+  priority/fallback, disagreement records, offline eligibility, shared result
+  validation, and per-capability health.
+- Default provider composition factory and core-port adapter, allowing another
+  provider to register without modifying domain services.
+- Transactional SQLite migration planning/runner, schema version 5 operational
+  indexes, generic copied data migrations, and legacy-profile-to-v1 migration.
+- Cache-only offline reads, concurrent URL/cache-key request deduplication, and
+  stable offline cache errors.
+- Provider contract fixtures; fallback, priority, disagreement, failure,
+  migration rollback, database lock, schema compatibility, large graph/profile,
+  memory, and hosted load tests.
+- Performance profiler, configurable hosted load driver, contributor guides,
+  provider issue form, pull request template, threat model, security checklist,
+  dependency audit, and accessibility audit.
+
+### Changed
+
+- Local and hosted composition roots now consume the registry through existing
+  core ports.
+- Hosted readiness includes provider health observations.
+- The desktop gains a visible-on-focus skip link and an executable landmark/name
+  accessibility contract.
+- The locked MCP transitive Hono adapter is overridden to patched version 2.0.11.
+
+### Security
+
+- Node audit reports no known locked vulnerabilities after remediation.
+- RustSec audit is enforced in CI against the Tauri lockfile.
+- Failure and load tests verify no corrupted migration/cache/database state.
+
 ## [0.8.0] - 2026-07-23
 
 ### Added

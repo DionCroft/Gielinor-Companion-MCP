@@ -147,6 +147,6 @@ export function loadHostedConfig(
     ),
     userAgent:
       environment.GIELINOR_USER_AGENT ??
-      "Gielinor-Companion-MCP/0.8.0 (hosted; contact: operator-not-configured)",
+      "Gielinor-Companion-MCP/0.9.0 (hosted; contact: operator-not-configured)",
   };
 }

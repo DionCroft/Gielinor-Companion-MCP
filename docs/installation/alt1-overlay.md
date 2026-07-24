@@ -1,6 +1,7 @@
 # Optional Alt1 overlay
 
-The Version 0.8 overlay is a separate, optional RuneScape 3 web app. The local
+The overlay introduced in Version 0.8 is a separate, optional RuneScape 3 web
+app. The local
 MCP server, hosted server, desktop dashboard, quest planner, and every
 deterministic feature continue to work without Alt1.
 

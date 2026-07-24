@@ -6,6 +6,7 @@ const positiveInteger = z.coerce.number().int().positive();
 
 export type ProviderConfig = {
   userAgent: string;
+  offline: boolean;
   timeoutMs: number;
   retries: number;
   hiscoresUrl: string;
@@ -23,11 +24,23 @@ function envInteger(environment: NodeJS.ProcessEnv, name: string, fallback: numb
   return positiveInteger.parse(environment[name] ?? fallback);
 }
 
+function envBoolean(environment: NodeJS.ProcessEnv, name: string, fallback: boolean): boolean {
+  const value = environment[name];
+  if (value === undefined) {
+    return fallback;
+  }
+  return z
+    .enum(["true", "false", "1", "0", "yes", "no", "on", "off"])
+    .transform((entry) => ["true", "1", "yes", "on"].includes(entry))
+    .parse(value.toLowerCase());
+}
+
 export function loadProviderConfig(environment: NodeJS.ProcessEnv = process.env): ProviderConfig {
   return {
     userAgent:
       environment.GIELINOR_USER_AGENT ??
-      "Gielinor-Companion-MCP/0.8.0 (https://github.com/DionCroft/Gielinor-Companion-MCP)",
+      "Gielinor-Companion-MCP/0.9.0 (https://github.com/DionCroft/Gielinor-Companion-MCP)",
+    offline: envBoolean(environment, "GIELINOR_OFFLINE", false),
     timeoutMs: envInteger(environment, "GIELINOR_HTTP_TIMEOUT_MS", 10_000),
     retries: z.coerce
       .number()

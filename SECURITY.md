@@ -28,6 +28,12 @@ Unexpected internal errors are converted to stable public messages so MCP result
 do not expose local paths or provider internals. Local SQLite files should receive
 the same operating-system protections as other user data.
 
+Provider plugins are untrusted outward adapters. The registry applies shared
+result schemas, explicit priority, fallback diagnostics, disagreement
+preservation, offline eligibility, and health tracking before data reaches core
+services. Adding a plugin does not grant filesystem, credential, model, MCP, or
+gameplay-input capability.
+
 Optional Ollama and LM Studio support accepts only unauthenticated loopback
 endpoints. Runtime URL validation and the Tauri HTTP capability both reject
 remote hosts. The project must not request, store, or proxy model-provider API
@@ -64,3 +70,7 @@ or trading capabilities. See
 
 Dependencies and release artifacts must be reviewed. Desktop updates must be
 opt-in and must not silently install untrusted code.
+
+The maintained [threat model](docs/security/threat-model.md),
+[audit checklist](docs/security/audit-checklist.md), and
+[dependency audit](docs/security/dependency-audit.md) are release inputs.

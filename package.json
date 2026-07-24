@@ -1,6 +1,6 @@
 {
   "name": "gielinor-companion-mcp",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "private": true,
   "description": "An open-source, AI-compatible RuneScape 3 quest, levelling and Grand Exchange companion.",
   "type": "module",
@@ -20,6 +20,8 @@
     "test:hosted": "corepack pnpm build && vitest run apps/hosted-server/test",
     "test:overlay": "corepack pnpm --filter @gielinor/alt1-overlay test",
     "test:database": "corepack pnpm build && vitest run packages/database/test",
+    "test:hardening": "corepack pnpm build && vitest run packages/shared-types/test packages/providers/test/provider-plugin.test.ts packages/providers/test/cache.test.ts packages/core/test/data-migrations.test.ts packages/core/test/quest-service.test.ts packages/database/test apps/hosted-server/test/load.test.ts",
+    "test:load": "corepack pnpm build && vitest run packages/database/test/performance.test.ts apps/hosted-server/test/load.test.ts",
     "test:e2e": "corepack pnpm build && vitest run apps/mcp-server/test/quest-flow.e2e.test.ts apps/mcp-server/test/levelling-flow.e2e.test.ts apps/mcp-server/test/grand-exchange-flow.e2e.test.ts && corepack pnpm --filter @gielinor/desktop test:e2e",
     "test:desktop": "corepack pnpm --filter @gielinor/desktop test",
     "test:desktop:e2e": "corepack pnpm --filter @gielinor/desktop test:e2e",
@@ -43,7 +45,9 @@
     "refresh:prices": "corepack pnpm build && node scripts/refresh-price-data.mjs",
     "start:mcp": "node apps/mcp-server/dist/index.js",
     "start:hosted": "node apps/hosted-server/dist/index.js",
-    "overlay:dev": "corepack pnpm --filter @gielinor/alt1-overlay dev"
+    "overlay:dev": "corepack pnpm --filter @gielinor/alt1-overlay dev",
+    "profile:performance": "corepack pnpm build && node scripts/profile-performance.mjs",
+    "load:hosted": "node scripts/load-hosted.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^9.31.0",
@@ -54,6 +58,11 @@
     "typescript": "^5.8.3",
     "typescript-eslint": "^8.38.0",
     "vitest": "^3.2.4"
+  },
+  "pnpm": {
+    "overrides": {
+      "@hono/node-server": "2.0.11"
+    }
   },
   "license": "MIT"
 }

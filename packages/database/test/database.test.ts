@@ -18,7 +18,14 @@ import {
 } from "@gielinor/shared-types";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { backupDatabase, getDatabaseSchemaVersion, openDatabase } from "../src/connection.js";
+import {
+  applyDatabaseMigrations,
+  backupDatabase,
+  getDatabaseSchemaVersion,
+  openDatabase,
+  pendingDatabaseMigrations,
+  type DatabaseMigration,
+} from "../src/connection.js";
 import {
   SqliteCacheStore,
   SqlitePlayerProfileRepository,
@@ -128,7 +135,7 @@ describe("SQLite migrations and repositories", () => {
   it("applies migrations transactionally to a new database", () => {
     const database = openDatabase(":memory:");
     databases.push(database);
-    expect(getDatabaseSchemaVersion(database)).toBe(4);
+    expect(getDatabaseSchemaVersion(database)).toBe(5);
     expect(
       database
         .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'player_profiles'")
@@ -151,6 +158,38 @@ describe("SQLite migrations and repositories", () => {
         )
         .get(),
     ).toBeTruthy();
+    expect(
+      database
+        .prepare(
+          "SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'idx_provider_cache_stale_until'",
+        )
+        .get(),
+    ).toBeTruthy();
+  });
+
+  it("plans an upgrade and rolls back a failed migration atomically", () => {
+    const database = openDatabase(":memory:", { targetVersion: 4 });
+    databases.push(database);
+    expect(pendingDatabaseMigrations(database).map((migration) => migration.version)).toEqual([5]);
+    expect(applyDatabaseMigrations(database)).toEqual([5]);
+
+    const brokenMigration: DatabaseMigration = {
+      version: 6,
+      name: "injected-failure",
+      sql: `
+        CREATE TABLE migration_should_rollback (id INTEGER PRIMARY KEY);
+        INSERT INTO table_that_does_not_exist (id) VALUES (1);
+      `,
+    };
+    expect(() => applyDatabaseMigrations(database, [brokenMigration], 6)).toThrow();
+    expect(getDatabaseSchemaVersion(database)).toBe(5);
+    expect(
+      database
+        .prepare(
+          "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'migration_should_rollback'",
+        )
+        .get(),
+    ).toBeUndefined();
   });
 
   it("round-trips validated player profiles", async () => {
@@ -209,6 +248,31 @@ describe("SQLite migrations and repositories", () => {
     const backup = openDatabase(destination);
     databases.push(backup);
     expect(await new SqlitePlayerProfileRepository(backup).getById(profile.id)).toEqual(profile);
+  });
+
+  it("surfaces database lock failures without corrupting later writes", async () => {
+    const filename = join(tmpdir(), `gielinor-lock-${randomUUID()}.db`);
+    temporaryFiles.push(filename);
+    const first = openDatabase(filename, { busyTimeoutMs: 1 });
+    const second = openDatabase(filename, { busyTimeoutMs: 1 });
+    databases.push(first, second);
+    const repository = new SqlitePlayerProfileRepository(second);
+    const profile = PlayerProfileSchema.parse({
+      id: randomUUID(),
+      displayName: "LockTest",
+      gameMode: "normal",
+      skills: [],
+      completedQuestIds: [],
+      inProgressQuestIds: [],
+      goals: [],
+    });
+
+    first.exec("BEGIN IMMEDIATE");
+    await expect(repository.create(profile)).rejects.toMatchObject({
+      code: "DATABASE_WRITE_FAILED",
+    });
+    first.exec("ROLLBACK");
+    await expect(repository.create(profile)).resolves.toEqual(profile);
   });
 });
 

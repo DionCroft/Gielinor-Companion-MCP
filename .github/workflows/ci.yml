@@ -30,6 +30,9 @@ jobs:
       - name: Install locked dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Audit production Node dependencies
+        run: pnpm audit --audit-level high
+
       - name: Lint and format check
         run: pnpm lint
 
@@ -41,6 +44,9 @@ jobs:
 
       - name: Read-only overlay safety contract
         run: pnpm test:overlay
+
+      - name: Extensibility and hardening contracts
+        run: pnpm test:hardening
 
       - name: Build all current workspaces
         run: pnpm build
@@ -145,3 +151,17 @@ jobs:
 
       - name: Build Windows application
         run: pnpm --filter @gielinor/desktop exec tauri build --no-bundle
+
+  rust-security:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: rustsec/audit-check@v2.0.0
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          working-directory: apps/desktop/src-tauri

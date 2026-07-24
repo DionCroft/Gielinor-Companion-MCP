@@ -71,4 +71,21 @@ describe("ProfileService import and export", () => {
       }),
     ).rejects.toThrow();
   });
+
+  it("imports the documented legacy profile fixture through the migration chain", async () => {
+    const service = new ProfileService(new MemoryProfiles(), unusedStatsProvider);
+    const imported = await service.import({
+      schemaVersion: 0,
+      displayName: "FirstAcct",
+      completedQuestIds: ["cooks-assistant"],
+    });
+
+    expect(imported).toMatchObject({
+      displayName: "FirstAcct",
+      gameMode: "normal",
+      completedQuestIds: ["cooks-assistant"],
+      inProgressQuestIds: [],
+      goals: [],
+    });
+  });
 });

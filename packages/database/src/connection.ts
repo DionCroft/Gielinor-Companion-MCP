@@ -5,9 +5,16 @@ import Database from "better-sqlite3";
 
 export type DatabaseConnection = Database.Database;
 
-const MIGRATIONS: ReadonlyArray<{ version: number; sql: string }> = [
+export type DatabaseMigration = {
+  version: number;
+  name: string;
+  sql: string;
+};
+
+export const DATABASE_MIGRATIONS: readonly DatabaseMigration[] = [
   {
     version: 1,
+    name: "profiles-and-provider-cache",
     sql: `
       CREATE TABLE IF NOT EXISTS player_profiles (
         id TEXT PRIMARY KEY,
@@ -31,6 +38,7 @@ const MIGRATIONS: ReadonlyArray<{ version: number; sql: string }> = [
   },
   {
     version: 2,
+    name: "quest-catalogue",
     sql: `
       CREATE TABLE IF NOT EXISTS quests (
         id TEXT PRIMARY KEY,
@@ -69,6 +77,7 @@ const MIGRATIONS: ReadonlyArray<{ version: number; sql: string }> = [
   },
   {
     version: 3,
+    name: "training-methods",
     sql: `
       CREATE TABLE IF NOT EXISTS training_methods (
         id TEXT PRIMARY KEY,
@@ -101,6 +110,7 @@ const MIGRATIONS: ReadonlyArray<{ version: number; sql: string }> = [
   },
   {
     version: 4,
+    name: "grand-exchange-data",
     sql: `
       CREATE TABLE IF NOT EXISTS ge_items (
         item_id INTEGER PRIMARY KEY,
@@ -153,35 +163,121 @@ const MIGRATIONS: ReadonlyArray<{ version: number; sql: string }> = [
       );
     `,
   },
+  {
+    version: 5,
+    name: "operational-query-indexes",
+    sql: `
+      CREATE INDEX IF NOT EXISTS idx_player_profiles_updated_at
+        ON player_profiles(updated_at);
+
+      CREATE INDEX IF NOT EXISTS idx_provider_cache_stale_until
+        ON provider_cache(stale_until);
+
+      CREATE INDEX IF NOT EXISTS idx_quests_last_checked_at
+        ON quests(last_checked_at);
+
+      CREATE INDEX IF NOT EXISTS idx_training_methods_last_checked_at
+        ON training_methods(last_checked_at);
+
+      CREATE INDEX IF NOT EXISTS idx_ge_items_retrieved_at
+        ON ge_items(retrieved_at);
+
+      CREATE INDEX IF NOT EXISTS idx_ge_price_history_timestamp
+        ON ge_price_history(timestamp);
+    `,
+  },
 ];
 
-function migrate(database: DatabaseConnection): void {
-  const currentVersion = database.pragma("user_version", { simple: true }) as number;
-
-  for (const migration of MIGRATIONS) {
-    if (migration.version <= currentVersion) {
-      continue;
+export function pendingDatabaseMigrations(
+  database: DatabaseConnection,
+  migrations: readonly DatabaseMigration[] = DATABASE_MIGRATIONS,
+  targetVersion = migrations.at(-1)?.version ?? 0,
+): DatabaseMigration[] {
+  const currentVersion = getDatabaseSchemaVersion(database);
+  if (!Number.isSafeInteger(targetVersion) || targetVersion < currentVersion) {
+    throw new Error(
+      `Database migration target ${targetVersion} cannot be lower than current version ${currentVersion}`,
+    );
+  }
+  const ordered = [...migrations].sort((left, right) => left.version - right.version);
+  const versions = new Set<number>();
+  for (const migration of ordered) {
+    if (!Number.isSafeInteger(migration.version) || migration.version <= 0) {
+      throw new Error("Database migration versions must be positive safe integers");
     }
+    if (versions.has(migration.version)) {
+      throw new Error(`Duplicate database migration version ${migration.version}`);
+    }
+    versions.add(migration.version);
+  }
+  const pending = ordered.filter(
+    (migration) => migration.version > currentVersion && migration.version <= targetVersion,
+  );
+  let expected = currentVersion + 1;
+  for (const migration of pending) {
+    if (migration.version !== expected) {
+      throw new Error(`Missing database migration version ${expected} before ${migration.version}`);
+    }
+    expected += 1;
+  }
+  if (targetVersion >= expected) {
+    throw new Error(`Missing database migration version ${expected}`);
+  }
+  return pending;
+}
 
+export function applyDatabaseMigrations(
+  database: DatabaseConnection,
+  migrations: readonly DatabaseMigration[] = DATABASE_MIGRATIONS,
+  targetVersion = migrations.at(-1)?.version ?? 0,
+): number[] {
+  const applied: number[] = [];
+  for (const migration of pendingDatabaseMigrations(database, migrations, targetVersion)) {
     database.transaction(() => {
       database.exec(migration.sql);
       database.pragma(`user_version = ${migration.version}`);
     })();
+    applied.push(migration.version);
   }
+  return applied;
 }
 
-export function openDatabase(filename: string): DatabaseConnection {
+export type OpenDatabaseOptions = {
+  busyTimeoutMs?: number;
+  targetVersion?: number;
+  migrations?: readonly DatabaseMigration[];
+};
+
+export function openDatabase(
+  filename: string,
+  options: OpenDatabaseOptions = {},
+): DatabaseConnection {
   if (filename !== ":memory:") {
     mkdirSync(dirname(resolve(filename)), { recursive: true });
   }
 
   const database = new Database(filename);
   database.pragma("foreign_keys = ON");
-  database.pragma("busy_timeout = 5000");
+  const busyTimeoutMs = options.busyTimeoutMs ?? 5_000;
+  if (!Number.isSafeInteger(busyTimeoutMs) || busyTimeoutMs < 0 || busyTimeoutMs > 60_000) {
+    database.close();
+    throw new Error("SQLite busy timeout must be between 0 and 60000 milliseconds");
+  }
+  database.pragma(`busy_timeout = ${busyTimeoutMs}`);
   if (filename !== ":memory:") {
     database.pragma("journal_mode = WAL");
   }
-  migrate(database);
+  const migrations = options.migrations ?? DATABASE_MIGRATIONS;
+  try {
+    applyDatabaseMigrations(
+      database,
+      migrations,
+      options.targetVersion ?? migrations.at(-1)?.version ?? 0,
+    );
+  } catch (error) {
+    database.close();
+    throw error;
+  }
   return database;
 }
 

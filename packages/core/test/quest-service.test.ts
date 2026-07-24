@@ -189,6 +189,36 @@ describe("QuestService prerequisite planning", () => {
     });
   });
 
+  it("plans a large linear quest graph within the performance budget", async () => {
+    const size = 1_000;
+    const quests = Array.from({ length: size }, (_, index) =>
+      quest(`quest-${index}`, {
+        prerequisites:
+          index === 0
+            ? []
+            : [
+                {
+                  mode: "all",
+                  quests: [
+                    {
+                      questId: `quest-${index - 1}`,
+                      requiredStatus: "completed",
+                    },
+                  ],
+                },
+              ],
+      }),
+    );
+    const { service } = harness(quests);
+    const startedAt = performance.now();
+    const route = await service.createRoute(PROFILE_ID, `quest-${size - 1}`);
+
+    expect(route.steps).toHaveLength(size);
+    expect(route.steps[0]?.questId).toBe("quest-0");
+    expect(route.steps.at(-1)?.questId).toBe(`quest-${size - 1}`);
+    expect(performance.now() - startedAt).toBeLessThan(2_000);
+  });
+
   it("selects the shortest unsatisfied alternative and reports every option", async () => {
     const longStart = quest("long-start");
     const longFinish = quest("long-finish", {

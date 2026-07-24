@@ -2,10 +2,10 @@ import { z } from "zod";
 
 import {
   GameModeSchema,
+  ImportableProfileExportSchema,
   PlayerProfileSchema,
   PlayStyleSchema,
   PriceHistoryRangeSchema,
-  ProfileExportSchema,
   QuestStatusSchema,
   SkillIdSchema,
   TrainingStrategySchema,
@@ -60,7 +60,7 @@ export const UpdatePlayerPreferencesToolInputSchema = z
 
 export const ImportPlayerProfileToolInputSchema = z
   .object({
-    profile: ProfileExportSchema,
+    profile: ImportableProfileExportSchema,
   })
   .strict();
 

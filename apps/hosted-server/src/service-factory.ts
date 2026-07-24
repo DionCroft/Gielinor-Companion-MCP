@@ -7,8 +7,11 @@ import {
   LevellingPlannerService,
   ProfileService,
   QuestService,
+  type GrandExchangeDataProvider,
   type PlayerProfileRepository,
   type PlayerStatsProvider,
+  type QuestDataProvider,
+  type TrainingMethodProvider,
 } from "@gielinor/core";
 import {
   openDatabase,
@@ -21,12 +24,10 @@ import {
 } from "@gielinor/database";
 import { CompanionToolService } from "@gielinor/mcp-server/library";
 import {
-  JagexGrandExchangeProvider,
-  JagexHiscoresProvider,
-  ResilientHttpClient,
-  RuneScapeWikiQuestProvider,
-  RuneScapeWikiTrainingProvider,
+  createDefaultProviderStack,
   loadProviderConfig,
+  type ProviderHealth,
+  type ProviderRegistry,
 } from "@gielinor/providers";
 import { PlayerProfileSchema, type PlayerProfile } from "@gielinor/shared-types";
 import { z } from "zod";
@@ -75,17 +76,19 @@ export type HostedReadiness = {
     training: string;
     prices: string;
   };
+  providers: ProviderHealth[];
 };
 
 export class HostedServiceFactory {
   private readonly publicDatabase: DatabaseConnection;
+  private readonly providerRegistry: ProviderRegistry;
   private readonly statsProvider: PlayerStatsProvider;
-  private readonly priceProvider: JagexGrandExchangeProvider;
+  private readonly priceProvider: GrandExchangeDataProvider;
   private readonly questRepository: SqliteQuestRepository;
   private readonly trainingRepository: SqliteTrainingMethodRepository;
   private readonly priceRepository: SqlitePriceRepository;
-  private readonly questProvider: RuneScapeWikiQuestProvider;
-  private readonly trainingProvider: RuneScapeWikiTrainingProvider;
+  private readonly questProvider: QuestDataProvider;
+  private readonly trainingProvider: TrainingMethodProvider;
 
   public constructor(
     private readonly config: HostedConfig,
@@ -97,39 +100,15 @@ export class HostedServiceFactory {
     });
     this.publicDatabase = openDatabase(config.publicDatabasePath);
     const cacheStore = new SqliteCacheStore(this.publicDatabase);
-    const httpClient = new ResilientHttpClient({
-      userAgent: providerConfig.userAgent,
-      timeoutMs: providerConfig.timeoutMs,
-      retries: providerConfig.retries,
-    });
-    this.statsProvider = new JagexHiscoresProvider({
-      httpClient,
-      cacheStore,
-      cachePolicy: providerConfig.hiscoresCache,
-      normalEndpoint: providerConfig.hiscoresUrl,
-    });
-    this.priceProvider = new JagexGrandExchangeProvider({
-      httpClient,
-      cacheStore,
-      cachePolicy: providerConfig.geCache,
-      historyCachePolicy: providerConfig.geHistoryCache,
-      endpoint: providerConfig.geUrl,
-      graphEndpoint: providerConfig.geGraphUrl,
-      bulkEndpoint: providerConfig.geBulkUrl,
-    });
+    const providers = createDefaultProviderStack(providerConfig, cacheStore);
+    this.providerRegistry = providers.registry;
+    this.statsProvider = providers.ports;
+    this.priceProvider = providers.ports;
     this.questRepository = new SqliteQuestRepository(this.publicDatabase);
     this.trainingRepository = new SqliteTrainingMethodRepository(this.publicDatabase);
     this.priceRepository = new SqlitePriceRepository(this.publicDatabase);
-    this.questProvider = new RuneScapeWikiQuestProvider({
-      httpClient,
-      apiUrl: providerConfig.wikiApiUrl,
-      pageUrl: providerConfig.wikiPageUrl,
-    });
-    this.trainingProvider = new RuneScapeWikiTrainingProvider({
-      httpClient,
-      apiUrl: providerConfig.wikiApiUrl,
-      pageUrl: providerConfig.wikiPageUrl,
-    });
+    this.questProvider = providers.ports.quests;
+    this.trainingProvider = providers.ports.training;
   }
 
   public createSession(actor: HostedActor): HostedToolSession {
@@ -238,6 +217,7 @@ export class HostedServiceFactory {
         training: training.state,
         prices: prices.state,
       },
+      providers: this.providerRegistry.health.snapshot(),
     };
   }
 

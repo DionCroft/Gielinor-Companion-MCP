@@ -23,6 +23,7 @@ import type {
 
 export interface ProviderRequestOptions {
   forceRefresh?: boolean;
+  offline?: boolean;
 }
 
 export interface PlayerStatsProvider {
