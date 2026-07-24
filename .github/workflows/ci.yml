@@ -24,7 +24,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: pnpm
 
       - name: Install locked dependencies
@@ -65,11 +65,14 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: pnpm
 
       - name: Install locked dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Build workspace packages
+        run: pnpm build
 
       - name: Install Chromium
         run: pnpm --filter @gielinor/desktop exec playwright install --with-deps chromium
@@ -132,7 +135,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: pnpm
 
       - uses: dtolnay/rust-toolchain@stable
