@@ -31,12 +31,12 @@ volume where available, list/equipment valuation, charts, and freshness display.
 Accessible React/Tauri UI for profiles, skills, quests, levelling, GE, shopping
 lists, goals, settings, source health, and portable profile files.
 
-## 0.6 — Local AI providers (current)
+## 0.6 — Local AI providers (complete)
 
 Shared bounded tool-call runtime, Ollama and LM Studio adapters, multi-turn and
 parallel tool calls, model selection, timeouts, validation, and setup guidance.
 
-## 0.7 — Hosted MCP
+## 0.7 — Hosted MCP (current)
 
 Streamable HTTP service, optional authentication, isolated remote storage, rate
 limits, health checks, deployment/privacy guides, and client capability notes.

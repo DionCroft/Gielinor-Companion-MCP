@@ -1,4 +1,4 @@
-# Version 0.6 architecture
+# Version 0.7 architecture
 
 ## Boundaries
 
@@ -9,8 +9,10 @@ application services, and ports. `@gielinor/providers` implements public API
 adapters, resilient caching, and RuneScape Wiki quest/training adapters.
 `@gielinor/database` implements SQLite profile, cache, quest, training, GE
 catalogue/history, alias, and sync-status ports. `@gielinor/mcp-server` composes
-dependencies and exposes stdio tools. `@gielinor/desktop` is a Tauri/React client
-that reaches those same tools through a least-privilege native stdio bridge.
+dependencies and exposes stdio tools. `@gielinor/hosted-server` composes those
+same services behind stateless Streamable HTTP, policy enforcement, and isolated
+account storage. `@gielinor/desktop` is a Tauri/React client that reaches those
+same tools through a least-privilege native stdio bridge.
 `@gielinor/agent-runtime` is a model-independent orchestrator for optional local
 providers; it depends only on shared tool contracts and an injected executor.
 
@@ -20,6 +22,7 @@ Dependencies point inward:
 shared-types <- core <- providers
                     <- database
 shared-types/core/providers/database <- mcp-server
+                                      <- hosted-server <- remote MCP clients
                                       <- desktop bridge <- React views
 shared-types <- agent-runtime --------------------^
                     ^                     |
@@ -189,15 +192,45 @@ strings, remote hosts, redirects, and cloud API keys are not accepted.
 Conversations remain in memory. Only non-secret provider choice, endpoints,
 model name, timeout, and loop preferences are stored in local UI storage.
 
+## Hosted boundary
+
+`@gielinor/hosted-server` creates one MCP server and stateless
+`StreamableHTTPServerTransport` for each protocol request. This avoids
+cross-request session state while keeping MCP initialization, tool discovery,
+and tool-call responses standards-compliant. It imports the existing MCP server
+library and never re-registers or reimplements the 48 tool contracts.
+
+The HTTP boundary validates Host and any Origin before authentication. Production
+can require a trusted proxy's HTTPS indication; the direct listener should remain
+on loopback or a private container network. JSON bodies, protocol-message count,
+requests per minute, and tool calls per minute are independently bounded.
+Responses carry no-store and browser-hardening headers. Logs contain request
+metadata and actor class only, with no bodies, tokens, profile data, provider
+responses, paths, or stacks.
+
+Anonymous sessions use an unavailable profile repository. Authenticated tokens
+resolve through `control.db`, which stores only token digests and account state.
+The validated account UUID selects exactly one file below `accounts/`; quest,
+training, GE, and provider-cache repositories continue to use `public.db`.
+Consequently, a valid profile UUID from a different account still produces
+`NOT_FOUND`. Operator authentication can refresh shared datasets but cannot
+select private account storage.
+
+Account export reuses the strict schema-versioned profile export. Deletion first
+makes the token non-authenticating, removes only the three exact SQLite files for
+that account, and then deletes the control row. Failed file removal restores the
+active state rather than claiming success.
+
 ## Safety
 
 No layer communicates with a RuneScape client. Game-data provider URLs are
 public read-only services; optional model traffic remains on loopback. Profile
-mutations affect companion-local SQLite only. The MCP process writes protocol
-messages to stdout and diagnostics to stderr.
+mutations affect companion-owned local or hosted SQLite only. The stdio MCP
+process writes protocol messages to stdout and diagnostics to stderr; the hosted
+process writes privacy-preserving JSON operational events to stdout.
 
 ## Future extension
 
-The later hosted transport must compose these same services; it must not
+Later transports or overlays must compose these same services. They must not
 reimplement calculations, quest graph traversal, levelling selection, price
 analytics, valuation, or tool validation.

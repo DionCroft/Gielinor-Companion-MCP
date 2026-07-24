@@ -71,6 +71,47 @@ jobs:
       - name: Exercise desktop user journeys
         run: pnpm test:desktop:e2e
 
+  hosted-container:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate Compose configuration
+        run: docker compose --env-file .env.hosted.example config --quiet
+
+      - name: Build hosted image
+        run: docker build --tag gielinor-companion-mcp:ci .
+
+      - name: Exercise restricted hosted image
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --detach --name gielinor-hosted-ci \
+            --read-only \
+            --user 10001:10001 \
+            --cap-drop ALL \
+            --security-opt no-new-privileges \
+            --tmpfs /data:rw,noexec,nosuid,size=64m,uid=10001,gid=10001,mode=0700 \
+            --publish 127.0.0.1:3337:3333 \
+            --env GIELINOR_ALLOWED_HOSTS=127.0.0.1 \
+            --env GIELINOR_REQUIRE_HTTPS=false \
+            gielinor-companion-mcp:ci
+          trap 'docker rm --force gielinor-hosted-ci >/dev/null 2>&1 || true' EXIT
+          for attempt in $(seq 1 20); do
+            if curl --fail --silent http://127.0.0.1:3337/health/ready >/dev/null; then
+              break
+            fi
+            if [ "$attempt" -eq 20 ]; then
+              docker logs gielinor-hosted-ci
+              exit 1
+            fi
+            sleep 1
+          done
+          test "$(docker inspect gielinor-hosted-ci --format '{{.Config.User}}')" = "10001:10001"
+          test "$(docker inspect gielinor-hosted-ci --format '{{.HostConfig.ReadonlyRootfs}}')" = "true"
+
   desktop-native:
     runs-on: windows-latest
     timeout-minutes: 30

@@ -3,6 +3,39 @@
 All notable changes follow [Keep a Changelog](https://keepachangelog.com/) and
 semantic versioning.
 
+## [0.7.0] - 2026-07-23
+
+### Added
+
+- Stateless MCP Streamable HTTP service at `/mcp`, preserving the existing 48
+  tools and local stdio behavior.
+- Anonymous public tools, optional bearer-token accounts, per-account SQLite
+  profile isolation, shared public-data storage, and operator-only dataset
+  refreshes.
+- Account creation gate, profile/account export and import, immediate token
+  revocation, and account data deletion.
+- Liveness/readiness endpoints, bounded JSON bodies and protocol messages,
+  separate request/tool-call rate limits, strict configuration parsing, and
+  privacy-preserving structured logs.
+- Non-root read-only container, loopback-bound Compose configuration, Nginx TLS
+  reverse-proxy example, hosted deployment/privacy guides, and current
+  ChatGPT/Claude connection notes.
+- Remote protocol, authentication, authorization, cross-user isolation, account
+  lifecycle, rate/size limit, health, configuration, and deployment tests.
+
+### Security
+
+- Raw account and operator tokens are never stored or logged. Account access
+  tokens are looked up by SHA-256 digest and shown only once.
+- Host and Origin allowlists, optional trusted-proxy HTTPS enforcement, content
+  type checks, safe error envelopes, no-store responses, and strict time/size
+  budgets protect the public boundary.
+- Profile storage paths derive only from validated account UUIDs returned by the
+  control database. Anonymous/operator sessions cannot open profile storage.
+- Container defaults drop all Linux capabilities, prohibit privilege
+  escalation, use an unprivileged UID, and expose the application only on host
+  loopback in Compose.
+
 ## [0.6.0] - 2026-07-23
 
 ### Added

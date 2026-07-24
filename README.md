@@ -7,17 +7,16 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 Gielinor Companion MCP is a safe, model-independent foundation for deterministic
-RuneScape 3 planning. Version 0.6 adds optional local Ollama and LM Studio
-conversations to the accessible Tauri/React desktop application, public
-Hiscores, local profiles, quest routes, levelling plans, Grand Exchange
-analytics, and standards-based stdio MCP server. It still works without AI and
-never controls the game client.
+RuneScape 3 planning. Version 0.7 adds a production-oriented hosted Streamable
+HTTP MCP service with optional isolated profiles to the local stdio server,
+accessible Tauri/React desktop app, and optional Ollama/LM Studio conversations.
+It still works locally without AI or hosting and never controls the game client.
 
 ## Release status
 
-**Current version: 0.6.0 — Local AI Providers.** This is an early working
-release. Ollama and LM Studio can use the same 48 trusted tools through a bounded
-local runtime; hosted MCP remains Version 0.7 roadmap work.
+**Current version: 0.7.0 — Hosted MCP and Remote Access.** This is an early
+working release. The same 48 trusted tools are available over local stdio and
+stateless Streamable HTTP; optional private profiles use per-account storage.
 
 ## Features
 
@@ -61,6 +60,13 @@ local runtime; hosted MCP remains Version 0.7 roadmap work.
 - Desktop provider selection, loopback-only endpoints, connection testing,
   model selection, in-memory conversation reset, and visible trusted-tool
   activity. No-AI mode remains the default.
+- Stateless MCP Streamable HTTP service with anonymous public tools, optional
+  bearer-authenticated profiles, per-account SQLite isolation, operator-only
+  catalogue refreshes, strict host/Origin/TLS policy, request-size limits,
+  separate request/tool-call rate limits, liveness/readiness, and safe JSON logs.
+- Account export/import and deletion, a non-root read-only container,
+  loopback-bound Compose deployment, TLS reverse-proxy example, and current
+  ChatGPT/Claude capability guidance.
 - Fixture-based unit, component, native-command, integration, and Playwright
   journey tests; live provider tests are opt-in.
 
@@ -74,13 +80,16 @@ RuneScape Wiki  ----- revision-aware quest/training/GE sync
 domain ports + core services ---- SQLite profiles/quests/training/prices
                               |
                               v
-                MCP tool service ---- stdio MCP client
-                         |                    ^
-                         v                    |
-              Tauri command bridge ---- shared agent runtime
-                         |                    ^
-                         v                    |
-                    React desktop ---- Ollama / LM Studio
+                MCP tool service ----- stdio MCP client
+                    |        |                 ^
+                    |        v                 |
+                    |  hosted HTTP MCP         |
+                    |        |                 |
+                    v        v                 |
+              Tauri bridge  remote clients --- shared agent runtime
+                    |                          ^
+                    v                          |
+               React desktop -------- Ollama / LM Studio
 ```
 
 Business rules are in `packages/core`. Provider parsing, SQLite, and MCP transport
@@ -106,6 +115,13 @@ corepack pnpm start:mcp
 
 The last command starts an MCP stdio process and waits for a client. It does not
 provide a terminal chat prompt.
+
+For the hosted HTTP service, follow the
+[deployment guide](docs/installation/hosted.md), then run:
+
+```sh
+corepack pnpm start:hosted
+```
 
 Populate or refresh the local quest catalogue without an MCP client:
 
@@ -165,7 +181,7 @@ discovers only models whose Ollama metadata advertises tool support. See the
 
 ### Standalone desktop
 
-Version 0.6 includes both the complete no-AI dashboard and optional local AI.
+Version 0.7 retains the complete no-AI dashboard and optional local AI.
 Build and run it from source:
 
 ```sh
@@ -179,8 +195,18 @@ not committed. See the [desktop installation guide](docs/installation/desktop.md
 
 ### ChatGPT-compatible remote MCP
 
-Hosted Streamable HTTP transport is planned for 0.7. Version 0.6 exposes local
-stdio only and cannot be connected as a remote ChatGPT MCP app.
+Deploy the HTTPS service and use `https://your-host/mcp`. Current ChatGPT
+availability and the important V0.7 authentication limitation are documented in
+[the remote example](examples/chatgpt-remote/README.md). Public tools use no
+authentication; fixed bearer profile tokens are for clients that support custom
+headers.
+
+### Claude remote MCP
+
+Claude and Claude Desktop can use the anonymous HTTPS endpoint as a custom
+connector. Claude Code can additionally supply a private-profile bearer header.
+See the [Claude connector example](examples/claude-remote/README.md) and
+[Claude Code commands](examples/claude-code/README.md).
 
 ## MCP tools
 
@@ -248,6 +274,7 @@ corepack pnpm test:integration
 corepack pnpm test:mcp
 corepack pnpm test:providers
 corepack pnpm test:ai
+corepack pnpm test:hosted
 corepack pnpm test:database
 corepack pnpm test:e2e
 corepack pnpm test:desktop
@@ -301,12 +328,16 @@ The desktop and local model adapters do not introduce new RuneScape game-data
 providers; see the
 [Version 0.5 desktop source behavior](docs/data-sources/version-0.5.md) and
 [Version 0.6 local-AI data behavior](docs/data-sources/version-0.6.md).
+Hosted transport adds no game-data provider; see
+[Version 0.7 hosted data behavior](docs/data-sources/version-0.7.md).
 
 ## Privacy and safety
 
-Profiles are local by default. The application accepts a public display name and
-optional planning preferences only. Never enter an email address, password,
-authenticator code, token, session cookie, or bank PIN.
+Profiles are local by default. Optional hosted profiles require a random
+Gielinor bearer token and are isolated in per-account SQLite files; that token is
+not a Jagex credential. Never enter an email address, RuneScape password,
+authenticator code, session cookie, or bank PIN. Hosted operators should read
+[the privacy and account lifecycle guide](docs/security/hosted-privacy.md).
 
 The project does not click, type, read client memory, intercept packets, trade,
 fight, skill, solve CAPTCHAs, or bypass anti-cheat systems. Read
