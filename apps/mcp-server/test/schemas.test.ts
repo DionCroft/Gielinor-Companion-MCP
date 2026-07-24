@@ -4,9 +4,11 @@ import { describe, expect, it } from "vitest";
 import {
   CreatePlayerProfileToolInputSchema,
   CreateLevellingPlanToolInputSchema,
+  ExportPriceDataToolInputSchema,
   ImportPlayerProfileToolInputSchema,
   SetMultipleQuestStatusesToolInputSchema,
   ToolEnvelopeSchema,
+  ValueItemListToolInputSchema,
 } from "../src/schemas.js";
 import { publicToolError } from "../src/tool-service.js";
 
@@ -79,6 +81,26 @@ describe("MCP tool schemas", () => {
         targetLevel: 150,
         allowVirtualLevels: true,
         password: "never accept this",
+      }).success,
+    ).toBe(false);
+  });
+
+  it("bounds Grand Exchange valuations and exports", () => {
+    expect(
+      ValueItemListToolInputSchema.safeParse({
+        items: [{ item: "Abyssal whip", quantity: 2 }],
+      }).success,
+    ).toBe(true);
+    expect(
+      ValueItemListToolInputSchema.safeParse({
+        items: [{ item: 4151, quantity: 0 }],
+      }).success,
+    ).toBe(false);
+    expect(
+      ExportPriceDataToolInputSchema.safeParse({
+        items: [4151],
+        range: "365d",
+        format: "xlsx",
       }).success,
     ).toBe(false);
   });

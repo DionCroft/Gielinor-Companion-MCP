@@ -1,8 +1,14 @@
-# Version 0.3 known limitations
+# Version 0.4 known limitations
 
-- Item search, buy limits, price history, averages, volatility, and valuation
-  start in 0.4.
-- The current GE value is Jagex's guide price, not an instant high/low trade.
+- Public RS3 sources provide guide prices and daily history, not an instant
+  order book. Instant buy/high and sell/low prices are reported as unavailable.
+- Historical per-day volume is not published by the Jagex graph. The catalogue
+  includes only the latest daily volume where available.
+- Price history is loaded on demand per item. A newly synchronized catalogue
+  does not prefetch 180 days for all 7,000+ items.
+- Training materials can be repriced only when the caller supplies consumption
+  quantities. Wiki training rates do not reliably encode materials consumed per
+  XP, so the published plan GP range remains separate to avoid double-counting.
 - Hiscores cannot provide reliable quest completion, bank contents, game mode
   discovery, or private account data.
 - Profiles have no delete tool in 0.1; this avoids an unnecessary destructive MCP

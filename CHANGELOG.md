@@ -3,6 +3,36 @@
 All notable changes follow [Keep a Changelog](https://keepachangelog.com/) and
 semantic versioning.
 
+## [0.4.0] - 2026-07-23
+
+### Added
+
+- Searchable RS3 Grand Exchange catalogue with normalized aliases, current guide
+  prices, previous prices, buy limits, alchemy values, and daily volume where
+  the source publishes them.
+- Official Jagex 180-day guide-price history with range filtering, percentage
+  changes, moving averages, daily-return volatility, historical highs/lows,
+  statistical outliers, and chart-ready output.
+- Overflow-safe item-list, equipment, quest-shopping, and optional
+  training-material valuation.
+- JSON and spreadsheet-safe CSV price exports returned through MCP without
+  arbitrary filesystem writes.
+- Additive migration 4 for item catalogue, aliases, historical points, and safe
+  synchronization status.
+- Fourteen Grand Exchange MCP tools, bringing the local stdio surface to 48
+  tools.
+- Provider-contract, analytics, migration, MCP-schema, failure-path, export, and
+  end-to-end tests plus expanded opt-in live price smoke tests.
+
+### Security
+
+- Bulk snapshots are runtime-validated and transactionally applied; malformed,
+  duplicate, or suspiciously truncated results cannot replace retained data.
+- Quantity multiplication and totals reject unsafe integer overflow.
+- Public RS3 sources do not publish an instant order book, so unavailable
+  buy/sell high/low prices remain explicit and no guaranteed-profit claim is
+  generated.
+
 ## [0.3.0] - 2026-07-23
 
 ### Added

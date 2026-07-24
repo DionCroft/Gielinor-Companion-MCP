@@ -1,5 +1,6 @@
 import type {
   PlayerProfileRepository,
+  PriceRepository,
   QuestRepository,
   TrainingMethodRepository,
 } from "@gielinor/core";
@@ -7,21 +8,33 @@ import { CompanionError, NotFoundError } from "@gielinor/core";
 import type { CacheEntry, CacheStore } from "@gielinor/providers";
 import {
   PlayerProfileSchema,
+  PriceCatalogueItemSchema,
+  PriceDataSnapshotSchema,
+  PriceDataStatusSchema,
+  PricePointSchema,
+  PriceSyncResultSchema,
   QuestDataSnapshotSchema,
   QuestDataStatusSchema,
   QuestSchema,
   QuestSyncResultSchema,
   SkillIdSchema,
+  StoredPriceHistorySchema,
   TrainingDataSnapshotSchema,
   TrainingDataStatusSchema,
   TrainingMethodSchema,
   TrainingSyncResultSchema,
   type PlayerProfile,
+  type PriceCatalogueItem,
+  type PriceDataSnapshot,
+  type PriceDataStatus,
+  type PricePoint,
+  type PriceSyncResult,
   type Quest,
   type QuestDataSnapshot,
   type QuestDataStatus,
   type QuestSyncResult,
   type SkillId,
+  type StoredPriceHistory,
   type TrainingDataSnapshot,
   type TrainingDataStatus,
   type TrainingMethod,
@@ -82,6 +95,37 @@ type TrainingSyncStatusRow = {
   last_error_message: string | null;
 };
 
+type PriceItemRow = {
+  item_json: string;
+};
+
+type PriceItemHashRow = {
+  item_id: number;
+  content_hash: string;
+};
+
+type PriceSyncStatusRow = {
+  state: "ready" | "failed";
+  provider: string | null;
+  source_revision: string | null;
+  source_updated_at: string | null;
+  last_attempt_at: string;
+  last_successful_sync_at: string | null;
+  item_count: number;
+  last_error_code: string | null;
+  last_error_message: string | null;
+};
+
+type PriceHistoryRow = {
+  item_id: number;
+  timestamp: string;
+  price: number;
+  average_price: number | null;
+  volume: number | null;
+  retrieved_at: string;
+  source_name: string;
+};
+
 function parseProfile(row: ProfileRow): PlayerProfile {
   try {
     return PlayerProfileSchema.parse(JSON.parse(row.profile_json));
@@ -107,6 +151,16 @@ function parseTrainingMethod(row: TrainingMethodRow): TrainingMethod {
     return TrainingMethodSchema.parse(JSON.parse(row.method_json));
   } catch (error) {
     throw new CompanionError("Stored training method is invalid", "INVALID_STORED_DATA", {
+      cause: error,
+    });
+  }
+}
+
+function parsePriceItem(row: PriceItemRow): PriceCatalogueItem {
+  try {
+    return PriceCatalogueItemSchema.parse(JSON.parse(row.item_json));
+  } catch (error) {
+    throw new CompanionError("Stored Grand Exchange item is invalid", "INVALID_STORED_DATA", {
       cause: error,
     });
   }
@@ -690,5 +744,347 @@ export class SqliteTrainingMethodRepository implements TrainingMethodRepository 
            last_error_message = excluded.last_error_message`,
       )
       .run(attemptedAt, count, JSON.stringify(rows.map((row) => row.skill_id)), code, message);
+  }
+}
+
+export class SqlitePriceRepository implements PriceRepository {
+  public constructor(private readonly database: DatabaseConnection) {}
+
+  public async getByIdOrAlias(identifier: number | string): Promise<PriceCatalogueItem | null> {
+    const numeric =
+      typeof identifier === "number"
+        ? identifier
+        : /^\d+$/.test(identifier.trim())
+          ? Number(identifier.trim())
+          : undefined;
+    if (numeric !== undefined) {
+      if (!Number.isSafeInteger(numeric) || numeric <= 0) {
+        throw new CompanionError("Item ID must be a positive safe integer", "INVALID_ITEM_ID");
+      }
+      const row = this.database
+        .prepare("SELECT item_json FROM ge_items WHERE item_id = ?")
+        .get(numeric) as PriceItemRow | undefined;
+      return row === undefined ? null : parsePriceItem(row);
+    }
+
+    const rows = this.database
+      .prepare(
+        `SELECT DISTINCT i.item_json
+         FROM ge_item_aliases AS a
+         JOIN ge_items AS i ON i.item_id = a.item_id
+         WHERE a.alias_key = ?
+         ORDER BY i.item_id`,
+      )
+      .all(aliasKey(String(identifier))) as PriceItemRow[];
+    if (rows.length > 1) {
+      throw new CompanionError(
+        `Item name "${identifier}" is ambiguous; use an item ID`,
+        "AMBIGUOUS_ITEM_ALIAS",
+      );
+    }
+    return rows[0] === undefined ? null : parsePriceItem(rows[0]);
+  }
+
+  public async search(query: string, limit: number): Promise<PriceCatalogueItem[]> {
+    const trimmed = query.trim();
+    if (trimmed.length === 0) {
+      throw new CompanionError("Item search query cannot be empty", "INVALID_ITEM_QUERY");
+    }
+    if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
+      throw new CompanionError("Item search limit must be from 1 to 100", "INVALID_LIMIT");
+    }
+    const escapeLike = (value: string): string =>
+      value.replaceAll("\\", "\\\\").replaceAll("%", "\\%").replaceAll("_", "\\_");
+    const rawNeedle = `%${escapeLike(trimmed)}%`;
+    const aliasNeedle = `%${escapeLike(aliasKey(trimmed))}%`;
+    const rows = this.database
+      .prepare(
+        `SELECT DISTINCT i.item_json
+         FROM ge_items AS i
+         LEFT JOIN ge_item_aliases AS a ON a.item_id = i.item_id
+         WHERE i.name LIKE ? ESCAPE '\\' COLLATE NOCASE
+            OR a.alias LIKE ? ESCAPE '\\' COLLATE NOCASE
+            OR a.alias_key LIKE ? ESCAPE '\\'
+            OR CAST(i.item_id AS TEXT) = ?
+         ORDER BY
+           CASE WHEN i.name = ? COLLATE NOCASE THEN 0 ELSE 1 END,
+           i.name COLLATE NOCASE,
+           i.item_id
+         LIMIT ?`,
+      )
+      .all(rawNeedle, rawNeedle, aliasNeedle, trimmed, trimmed, limit) as PriceItemRow[];
+    return rows.map(parsePriceItem);
+  }
+
+  public async replaceSnapshot(snapshot: PriceDataSnapshot): Promise<PriceSyncResult> {
+    const validated = PriceDataSnapshotSchema.parse(snapshot);
+    const ids = new Set<number>();
+    for (const item of validated.items) {
+      if (ids.has(item.itemId)) {
+        throw new CompanionError(
+          `Price snapshot contains duplicate item ID ${item.itemId}`,
+          "INVALID_PRICE_SNAPSHOT",
+        );
+      }
+      ids.add(item.itemId);
+    }
+    const existingRows = this.database
+      .prepare("SELECT item_id, content_hash FROM ge_items")
+      .all() as PriceItemHashRow[];
+    if (
+      existingRows.length >= 1_000 &&
+      validated.items.length < Math.floor(existingRows.length * 0.8)
+    ) {
+      throw new CompanionError(
+        "Price refresh returned a suspiciously incomplete snapshot; previous data was retained",
+        "SUSPICIOUS_PRICE_SNAPSHOT",
+      );
+    }
+    const existing = new Map(existingRows.map((row) => [row.item_id, row.content_hash]));
+    let inserted = 0;
+    let updated = 0;
+    let unchanged = 0;
+    const removed = existingRows.filter((row) => !ids.has(row.item_id)).length;
+
+    this.database.transaction(() => {
+      const upsert = this.database.prepare(
+        `INSERT INTO ge_items
+           (item_id, name, item_json, content_hash, price_timestamp, source_revision, retrieved_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(item_id) DO UPDATE SET
+           name = excluded.name,
+           item_json = excluded.item_json,
+           content_hash = excluded.content_hash,
+           price_timestamp = excluded.price_timestamp,
+           source_revision = excluded.source_revision,
+           retrieved_at = excluded.retrieved_at`,
+      );
+      for (const item of validated.items) {
+        const previousHash = existing.get(item.itemId);
+        if (previousHash === undefined) {
+          inserted += 1;
+        } else if (previousHash === item.contentHash) {
+          unchanged += 1;
+        } else {
+          updated += 1;
+        }
+        upsert.run(
+          item.itemId,
+          item.name,
+          JSON.stringify(item),
+          item.contentHash,
+          item.timestamp,
+          validated.sourceRevision,
+          item.retrievedAt,
+        );
+      }
+      if (removed > 0) {
+        const placeholders = [...ids].map(() => "?").join(",");
+        this.database
+          .prepare(`DELETE FROM ge_items WHERE item_id NOT IN (${placeholders})`)
+          .run(...ids);
+      }
+
+      this.database.prepare("DELETE FROM ge_item_aliases").run();
+      const insertAlias = this.database.prepare(
+        `INSERT INTO ge_item_aliases (alias_key, alias, item_id)
+         VALUES (?, ?, ?)
+         ON CONFLICT(alias_key, item_id) DO NOTHING`,
+      );
+      for (const item of validated.items) {
+        const aliases = new Map<string, string>();
+        for (const alias of [item.name, ...item.aliases]) {
+          aliases.set(aliasKey(alias), alias);
+        }
+        for (const [key, alias] of aliases) {
+          insertAlias.run(key, alias, item.itemId);
+        }
+      }
+
+      this.database
+        .prepare(
+          `INSERT INTO ge_sync_status
+             (singleton_id, state, provider, source_revision, source_updated_at,
+              last_attempt_at, last_successful_sync_at, item_count,
+              last_error_code, last_error_message)
+           VALUES (1, 'ready', ?, ?, ?, ?, ?, ?, NULL, NULL)
+           ON CONFLICT(singleton_id) DO UPDATE SET
+             state = 'ready',
+             provider = excluded.provider,
+             source_revision = excluded.source_revision,
+             source_updated_at = excluded.source_updated_at,
+             last_attempt_at = excluded.last_attempt_at,
+             last_successful_sync_at = excluded.last_successful_sync_at,
+             item_count = excluded.item_count,
+             last_error_code = NULL,
+             last_error_message = NULL`,
+        )
+        .run(
+          validated.provider,
+          validated.sourceRevision,
+          validated.sourceUpdatedAt,
+          validated.retrievedAt,
+          validated.retrievedAt,
+          validated.items.length,
+        );
+    })();
+
+    return PriceSyncResultSchema.parse({
+      provider: validated.provider,
+      sourceRevision: validated.sourceRevision,
+      checkedAt: validated.retrievedAt,
+      total: validated.items.length,
+      inserted,
+      updated,
+      unchanged,
+      removed,
+    });
+  }
+
+  public async getDataStatus(): Promise<PriceDataStatus> {
+    const row = this.database
+      .prepare(
+        `SELECT state, provider, source_revision, source_updated_at, last_attempt_at,
+                last_successful_sync_at, item_count, last_error_code, last_error_message
+         FROM ge_sync_status
+         WHERE singleton_id = 1`,
+      )
+      .get() as PriceSyncStatusRow | undefined;
+    const history = this.database
+      .prepare(
+        `SELECT COUNT(DISTINCT item_id) AS item_count,
+                COUNT(*) AS point_count,
+                MAX(timestamp) AS newest_at
+         FROM ge_price_history`,
+      )
+      .get() as { item_count: number; point_count: number; newest_at: string | null };
+    if (row === undefined) {
+      return PriceDataStatusSchema.parse({
+        state: "never-synced",
+        itemCount: 0,
+        historyItemCount: history.item_count,
+        historyPointCount: history.point_count,
+        ...(history.newest_at === null ? {} : { newestHistoryAt: history.newest_at }),
+      });
+    }
+    return PriceDataStatusSchema.parse({
+      state: row.state,
+      ...(row.provider === null ? {} : { provider: row.provider }),
+      ...(row.source_revision === null ? {} : { sourceRevision: row.source_revision }),
+      ...(row.source_updated_at === null ? {} : { sourceUpdatedAt: row.source_updated_at }),
+      lastAttemptAt: row.last_attempt_at,
+      ...(row.last_successful_sync_at === null
+        ? {}
+        : { lastSuccessfulSyncAt: row.last_successful_sync_at }),
+      itemCount: row.item_count,
+      historyItemCount: history.item_count,
+      historyPointCount: history.point_count,
+      ...(history.newest_at === null ? {} : { newestHistoryAt: history.newest_at }),
+      ...(row.last_error_code === null ? {} : { lastErrorCode: row.last_error_code }),
+      ...(row.last_error_message === null ? {} : { lastErrorMessage: row.last_error_message }),
+    });
+  }
+
+  public async recordSyncFailure(
+    code: string,
+    message: string,
+    attemptedAt: string,
+  ): Promise<void> {
+    const count = (
+      this.database.prepare("SELECT COUNT(*) AS count FROM ge_items").get() as { count: number }
+    ).count;
+    this.database
+      .prepare(
+        `INSERT INTO ge_sync_status
+           (singleton_id, state, last_attempt_at, item_count, last_error_code, last_error_message)
+         VALUES (1, 'failed', ?, ?, ?, ?)
+         ON CONFLICT(singleton_id) DO UPDATE SET
+           state = 'failed',
+           last_attempt_at = excluded.last_attempt_at,
+           item_count = excluded.item_count,
+           last_error_code = excluded.last_error_code,
+           last_error_message = excluded.last_error_message`,
+      )
+      .run(attemptedAt, count, code, message);
+  }
+
+  public async getPriceHistory(itemId: number): Promise<StoredPriceHistory | null> {
+    const rows = this.database
+      .prepare(
+        `SELECT item_id, timestamp, price, average_price, volume, retrieved_at, source_name
+         FROM ge_price_history
+         WHERE item_id = ?
+         ORDER BY timestamp`,
+      )
+      .all(itemId) as PriceHistoryRow[];
+    if (rows.length === 0) {
+      return null;
+    }
+    const latestRetrieval = rows.reduce((latest, row) =>
+      row.retrieved_at > latest.retrieved_at ? row : latest,
+    );
+    return StoredPriceHistorySchema.parse({
+      itemId,
+      points: rows.map((row) =>
+        PricePointSchema.parse({
+          timestamp: row.timestamp,
+          price: row.price,
+          ...(row.average_price === null ? {} : { averagePrice: row.average_price }),
+          ...(row.volume === null ? {} : { volume: row.volume }),
+        }),
+      ),
+      retrievedAt: latestRetrieval.retrieved_at,
+      sourceName: latestRetrieval.source_name,
+    });
+  }
+
+  public async replacePriceHistory(
+    itemId: number,
+    points: PricePoint[],
+    retrievedAt: string,
+    sourceName: string,
+  ): Promise<StoredPriceHistory> {
+    if (!Number.isSafeInteger(itemId) || itemId <= 0) {
+      throw new CompanionError("Item ID must be a positive safe integer", "INVALID_ITEM_ID");
+    }
+    const validatedPoints = points.map((point) => PricePointSchema.parse(point));
+    const timestamps = new Set<string>();
+    for (const point of validatedPoints) {
+      if (timestamps.has(point.timestamp)) {
+        throw new CompanionError(
+          `Price history contains duplicate timestamp ${point.timestamp}`,
+          "INVALID_PRICE_HISTORY",
+        );
+      }
+      timestamps.add(point.timestamp);
+    }
+    const validated = StoredPriceHistorySchema.parse({
+      itemId,
+      points: [...validatedPoints].sort((left, right) =>
+        left.timestamp.localeCompare(right.timestamp),
+      ),
+      retrievedAt,
+      sourceName,
+    });
+    this.database.transaction(() => {
+      this.database.prepare("DELETE FROM ge_price_history WHERE item_id = ?").run(itemId);
+      const insert = this.database.prepare(
+        `INSERT INTO ge_price_history
+           (item_id, timestamp, price, average_price, volume, retrieved_at, source_name)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      );
+      for (const point of validated.points) {
+        insert.run(
+          itemId,
+          point.timestamp,
+          point.price,
+          point.averagePrice ?? null,
+          point.volume ?? null,
+          validated.retrievedAt,
+          validated.sourceName,
+        );
+      }
+    })();
+    return validated;
   }
 }

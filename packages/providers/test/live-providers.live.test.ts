@@ -10,7 +10,7 @@ const live = process.env.RUN_LIVE_API_TESTS === "1";
 describe.runIf(live)("live public provider smoke tests", () => {
   const httpClient = new ResilientHttpClient({
     userAgent:
-      "Gielinor-Companion-MCP-live-test/0.3.0 (https://github.com/DionCroft/Gielinor-Companion-MCP)",
+      "Gielinor-Companion-MCP-live-test/0.4.0 (https://github.com/DionCroft/Gielinor-Companion-MCP)",
   });
 
   it("reads a public Hiscores profile", async () => {
@@ -28,5 +28,23 @@ describe.runIf(live)("live public provider smoke tests", () => {
     }).getCurrentPrice(4151);
     expect(result.name).toBe("Abyssal whip");
     expect(result.currentPrice).toBeGreaterThan(0);
+  });
+
+  it("reads the RS3 ItemDB graph and validated catalogue", async () => {
+    const provider = new JagexGrandExchangeProvider({
+      httpClient,
+      cacheStore: new MemoryCacheStore(),
+    });
+    const history = await provider.getPriceHistory(4151, "30d");
+    expect(history.length).toBeGreaterThan(20);
+    expect(history.map((point) => point.timestamp)).toEqual(
+      [...history].map((point) => point.timestamp).sort(),
+    );
+    const snapshot = await provider.fetchSnapshot();
+    expect(snapshot.items.length).toBeGreaterThan(7_000);
+    expect(snapshot.items.find((item) => item.itemId === 4151)).toMatchObject({
+      name: "Abyssal whip",
+      buyLimit: 10,
+    });
   });
 });

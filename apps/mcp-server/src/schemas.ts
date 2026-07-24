@@ -3,6 +3,7 @@ import {
   PlayerProfileSchema,
   PlayStyleSchema,
   ProfileExportSchema,
+  PriceHistoryRangeSchema,
   QuestStatusSchema,
   SkillIdSchema,
   TrainingStrategySchema,
@@ -81,6 +82,77 @@ export const GetSkillProgressToolInputSchema = z
 export const GetItemPriceToolInputSchema = z
   .object({
     itemId: z.number().int().positive(),
+    forceRefresh: z.boolean().optional(),
+  })
+  .strict();
+
+export const ItemIdentifierSchema = z.union([
+  z.number().int().positive(),
+  z.string().trim().min(1).max(200),
+]);
+
+export const SearchItemsToolInputSchema = z
+  .object({
+    query: z.string().trim().min(1).max(100),
+    limit: z.number().int().min(1).max(100).optional(),
+  })
+  .strict();
+
+export const ItemIdentifierInputSchema = z
+  .object({
+    item: ItemIdentifierSchema,
+  })
+  .strict();
+
+export const ItemPriceHistoryToolInputSchema = ItemIdentifierInputSchema.extend({
+  range: PriceHistoryRangeSchema.optional(),
+  forceRefresh: z.boolean().optional(),
+}).strict();
+
+export const CompareItemPricesToolInputSchema = z
+  .object({
+    items: z.array(ItemIdentifierSchema).min(1).max(20),
+    range: PriceHistoryRangeSchema.optional(),
+  })
+  .strict();
+
+export const ValuationItemSchema = z
+  .object({
+    item: ItemIdentifierSchema,
+    quantity: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
+  })
+  .strict();
+
+export const ValueItemListToolInputSchema = z
+  .object({
+    items: z.array(ValuationItemSchema).min(1).max(500),
+  })
+  .strict();
+
+export const ValueEquipmentSetupToolInputSchema = z
+  .object({
+    items: z
+      .array(
+        ValuationItemSchema.extend({
+          slot: z.string().trim().min(1).max(100),
+        }).strict(),
+      )
+      .min(1)
+      .max(100),
+  })
+  .strict();
+
+export const RefreshPriceDataToolInputSchema = z
+  .object({
+    itemIds: z.array(z.number().int().positive()).max(20).optional(),
+  })
+  .strict();
+
+export const ExportPriceDataToolInputSchema = z
+  .object({
+    items: z.array(ItemIdentifierSchema).min(1).max(20),
+    range: PriceHistoryRangeSchema.optional(),
+    format: z.enum(["json", "csv"]),
     forceRefresh: z.boolean().optional(),
   })
   .strict();
@@ -169,6 +241,10 @@ export const CreateLevellingPlanToolInputSchema = z
 
 export const CreateWeeklyGoalPlanToolInputSchema = CreateLevellingPlanToolInputSchema.extend({
   weeks: z.number().int().min(1).max(520).optional(),
+}).strict();
+
+export const CalculateTrainingCostToolInputSchema = CreateLevellingPlanToolInputSchema.extend({
+  materials: z.array(ValuationItemSchema).max(500).optional(),
 }).strict();
 
 export const CompareQuestXpRewardsToolInputSchema = z

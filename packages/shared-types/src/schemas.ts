@@ -490,14 +490,26 @@ export const GrandExchangeItemSchema = z
   .object({
     itemId: z.number().int().positive(),
     name: z.string().min(1),
+    aliases: z.array(z.string().min(1)).optional(),
+    description: z.string().min(1).optional(),
+    members: z.boolean().optional(),
     currentPrice: nonNegativeInteger.optional(),
+    previousPrice: nonNegativeInteger.optional(),
     highPrice: nonNegativeInteger.optional(),
     lowPrice: nonNegativeInteger.optional(),
     buyLimit: nonNegativeInteger.optional(),
     alchemyValue: nonNegativeInteger.optional(),
+    lowAlchemyValue: nonNegativeInteger.optional(),
+    storeValue: nonNegativeInteger.optional(),
     volume: nonNegativeInteger.optional(),
     timestamp: isoDateTime.optional(),
     sourceName: z.string().min(1),
+    sourceUrl: z.string().url().optional(),
+    retrievedAt: isoDateTime.optional(),
+    contentHash: z
+      .string()
+      .regex(/^[a-f0-9]{64}$/)
+      .optional(),
     cacheStatus: z.enum(["miss", "fresh", "stale"]).optional(),
     cacheStoredAt: isoDateTime.optional(),
   })
@@ -508,6 +520,7 @@ export const PricePointSchema = z
   .object({
     timestamp: isoDateTime,
     price: nonNegativeInteger,
+    averagePrice: nonNegativeInteger.optional(),
     volume: nonNegativeInteger.optional(),
   })
   .strict();
@@ -515,6 +528,145 @@ export type PricePoint = z.infer<typeof PricePointSchema>;
 
 export const PriceHistoryRangeSchema = z.enum(["24h", "7d", "30d", "90d", "180d"]);
 export type PriceHistoryRange = z.infer<typeof PriceHistoryRangeSchema>;
+
+export const PriceCatalogueItemSchema = GrandExchangeItemSchema.extend({
+  aliases: z.array(z.string().min(1)),
+  timestamp: isoDateTime,
+  sourceUrl: z.string().url(),
+  retrievedAt: isoDateTime,
+  contentHash: z.string().regex(/^[a-f0-9]{64}$/),
+}).strict();
+export type PriceCatalogueItem = z.infer<typeof PriceCatalogueItemSchema>;
+
+export const PriceDataSnapshotSchema = z
+  .object({
+    provider: z.string().min(1),
+    sourceRevision: z.string().min(1),
+    sourceUpdatedAt: isoDateTime,
+    retrievedAt: isoDateTime,
+    items: z.array(PriceCatalogueItemSchema).min(1),
+  })
+  .strict();
+export type PriceDataSnapshot = z.infer<typeof PriceDataSnapshotSchema>;
+
+export const PriceSyncResultSchema = z
+  .object({
+    provider: z.string().min(1),
+    sourceRevision: z.string().min(1),
+    checkedAt: isoDateTime,
+    total: nonNegativeInteger,
+    inserted: nonNegativeInteger,
+    updated: nonNegativeInteger,
+    unchanged: nonNegativeInteger,
+    removed: nonNegativeInteger,
+  })
+  .strict();
+export type PriceSyncResult = z.infer<typeof PriceSyncResultSchema>;
+
+export const PriceDataStatusSchema = z
+  .object({
+    state: z.enum(["never-synced", "ready", "failed"]),
+    provider: z.string().min(1).optional(),
+    sourceRevision: z.string().min(1).optional(),
+    sourceUpdatedAt: isoDateTime.optional(),
+    lastAttemptAt: isoDateTime.optional(),
+    lastSuccessfulSyncAt: isoDateTime.optional(),
+    itemCount: nonNegativeInteger,
+    historyItemCount: nonNegativeInteger,
+    historyPointCount: nonNegativeInteger,
+    newestHistoryAt: isoDateTime.optional(),
+    lastErrorCode: z.string().min(1).optional(),
+    lastErrorMessage: z.string().min(1).optional(),
+  })
+  .strict();
+export type PriceDataStatus = z.infer<typeof PriceDataStatusSchema>;
+
+export const StoredPriceHistorySchema = z
+  .object({
+    itemId: z.number().int().positive(),
+    points: z.array(PricePointSchema),
+    retrievedAt: isoDateTime,
+    sourceName: z.string().min(1),
+  })
+  .strict();
+export type StoredPriceHistory = z.infer<typeof StoredPriceHistorySchema>;
+
+export const PriceFreshnessSchema = z
+  .object({
+    state: z.enum(["fresh", "stale", "unknown"]),
+    timestamp: isoDateTime.optional(),
+    ageSeconds: nonNegativeInteger.optional(),
+  })
+  .strict();
+export type PriceFreshness = z.infer<typeof PriceFreshnessSchema>;
+
+export const PriceOutlierSchema = z
+  .object({
+    timestamp: isoDateTime,
+    price: nonNegativeInteger,
+    zScore: z.number().finite(),
+    direction: z.enum(["high", "low"]),
+  })
+  .strict();
+export type PriceOutlier = z.infer<typeof PriceOutlierSchema>;
+
+export const ItemPriceSummarySchema = z
+  .object({
+    itemId: z.number().int().positive(),
+    name: z.string().min(1),
+    range: PriceHistoryRangeSchema,
+    currentPrice: nonNegativeInteger.optional(),
+    firstHistoricalPrice: nonNegativeInteger.optional(),
+    latestHistoricalPrice: nonNegativeInteger.optional(),
+    historicalHigh: nonNegativeInteger.optional(),
+    historicalLow: nonNegativeInteger.optional(),
+    percentageChange: z.number().finite().optional(),
+    movingAverages: z
+      .object({
+        days7: z.number().nonnegative().finite().optional(),
+        days30: z.number().nonnegative().finite().optional(),
+        days90: z.number().nonnegative().finite().optional(),
+      })
+      .strict(),
+    volatilityPercent: z.number().nonnegative().finite().optional(),
+    outliers: z.array(PriceOutlierSchema),
+    priceFreshness: PriceFreshnessSchema,
+    historyFreshness: PriceFreshnessSchema,
+    cacheStatus: z.enum(["miss", "fresh", "stale"]),
+    chart: z.array(PricePointSchema),
+    unavailableFields: z.array(z.string().min(1)),
+    warnings: z.array(z.string().min(1)),
+  })
+  .strict();
+export type ItemPriceSummary = z.infer<typeof ItemPriceSummarySchema>;
+
+export const ValuationLineSchema = z
+  .object({
+    itemId: z.number().int().positive().optional(),
+    requestedName: z.string().min(1).optional(),
+    name: z.string().min(1),
+    quantity: z.number().int().positive(),
+    unitPrice: nonNegativeInteger.optional(),
+    totalPrice: nonNegativeInteger.optional(),
+    priceTimestamp: isoDateTime.optional(),
+    freshness: PriceFreshnessSchema,
+    missingReason: z.string().min(1).optional(),
+  })
+  .strict();
+export type ValuationLine = z.infer<typeof ValuationLineSchema>;
+
+export const ItemListValuationSchema = z
+  .object({
+    items: z.array(ValuationLineSchema),
+    totalValue: nonNegativeInteger,
+    pricedItemCount: nonNegativeInteger,
+    unpricedItemCount: nonNegativeInteger,
+    complete: z.boolean(),
+    valuedAt: isoDateTime,
+    warnings: z.array(z.string().min(1)),
+  })
+  .strict();
+export type ItemListValuation = z.infer<typeof ItemListValuationSchema>;
 
 export const DataSourceSchema = z
   .object({

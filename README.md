@@ -7,18 +7,20 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 Gielinor Companion MCP is a safe, model-independent foundation for deterministic
-RuneScape 3 planning. Version 0.3 provides public Hiscores, local player profiles,
+RuneScape 3 planning. Version 0.4 provides public Hiscores, local player profiles,
 authoritative standard and Invention XP calculations, revision-aware quest and
-training data, multi-stage levelling plans, current Jagex Grand Exchange guide
-prices, and a standards-based stdio MCP server. It never controls the game client.
+training data, multi-stage levelling plans, searchable Grand Exchange data and
+historical price analytics, and a standards-based stdio MCP server. It never
+controls the game client.
 
 ## Release status
 
-**Current version: 0.3.0 — Levelling Planner.** This is an early working release.
+**Current version: 0.4.0 — Grand Exchange Intelligence.** This is an early
+working release.
 The desktop interface, local Ollama/LM Studio chat runtime, and hosted MCP are
 roadmap work and are not represented as complete.
 
-There are no interface screenshots yet because 0.3 remains a headless MCP release.
+There are no interface screenshots yet because 0.4 remains a headless MCP release.
 
 ## Features
 
@@ -28,7 +30,13 @@ There are no interface screenshots yet because 0.3 remains a headless MCP releas
 - Public normal, Ironman, and Hardcore Ironman Hiscores adapters.
 - Exact standard levels 1–126 and Invention levels 1–150, true skill caps,
   virtual targets, and current level 99/110/120 boundaries.
-- Jagex ItemDB current guide-price lookup by item ID.
+- Searchable 7,000+ item RS3 catalogue with aliases, current guide prices, buy
+  limits, alchemy values, and daily volume where published.
+- Jagex 180-day price history with percentage change, moving averages,
+  daily-return volatility, statistical outliers, historical highs/lows, and
+  chart-ready points.
+- Overflow-safe inventory, equipment, quest-shopping, and training-material
+  valuation plus JSON/CSV export and explicit freshness.
 - Persistent cache-first, stale-while-revalidate provider data.
 - Timeouts, bounded retries, response validation, provenance, and timestamps.
 - RuneScape Wiki quest catalogue with revisions, content hashes, source links,
@@ -42,18 +50,18 @@ There are no interface screenshots yet because 0.3 remains a headless MCP releas
   available GP, daily play time, target dates, quest gates, Ironman checks, and
   explicit missing-data behavior.
 - Quest-XP reward comparison and weekly goal schedules.
-- Thirty-four local MCP tools over stdio.
+- Forty-eight local MCP tools over stdio.
 - Portable, strict, schema-versioned profile import/export.
 - Fixture-based unit and integration tests; live provider tests are opt-in.
 
 ## Architecture
 
 ```text
-Jagex public APIs ---- provider cache
-RuneScape Wiki  ----- revision-aware quest/training sync
+Jagex public APIs ---- price/history cache
+RuneScape Wiki  ----- revision-aware quest/training/GE sync
                               |
                               v
-domain ports + core services ---- SQLite profiles/quests/training
+domain ports + core services ---- SQLite profiles/quests/training/prices
                               |
                               v
                 MCP tool service ---- stdio MCP client
@@ -93,6 +101,12 @@ Populate or refresh training methods:
 corepack pnpm refresh:training
 ```
 
+Populate or refresh the searchable Grand Exchange catalogue:
+
+```sh
+corepack pnpm refresh:prices
+```
+
 Each versioned refresh command creates its one-time sibling database backup when
 needed and verifies that profile rows remain unchanged.
 
@@ -124,18 +138,18 @@ does not contain LM Studio-specific behavior.
 
 ### Ollama
 
-The shared Ollama agent runtime is planned for 0.6. Version 0.3 does not claim
+The shared Ollama agent runtime is planned for 0.6. Version 0.4 does not claim
 direct Ollama tool-loop support. An MCP-capable third-party Ollama host may launch
 the same stdio command, but is outside this release's tested surface.
 
 ### Standalone desktop
 
 The Tauri desktop application and non-AI dashboard are planned for 0.5. They are
-not included in the headless 0.3 release.
+not included in the headless 0.4 release.
 
 ### ChatGPT-compatible remote MCP
 
-Hosted Streamable HTTP transport is planned for 0.7. Version 0.3 exposes local
+Hosted Streamable HTTP transport is planned for 0.7. Version 0.4 exposes local
 stdio only and cannot be connected as a remote ChatGPT MCP app.
 
 ## MCP tools
@@ -151,6 +165,20 @@ stdio only and cannot be connected as a remote ChatGPT MCP app.
 - `calculate_xp_remaining`
 - `get_skill_progress`
 - `get_item_price`
+- `search_items`
+- `get_item_details`
+- `get_item_price_history`
+- `get_item_buy_limit`
+- `get_item_alchemy_value`
+- `get_item_price_summary`
+- `compare_item_prices`
+- `value_item_list`
+- `value_equipment_setup`
+- `calculate_quest_shopping_cost`
+- `calculate_training_cost`
+- `export_price_data`
+- `refresh_price_data`
+- `get_price_data_status`
 - `search_quests`
 - `get_quest`
 - `get_quest_requirements`
@@ -202,6 +230,7 @@ corepack pnpm test:live:hiscores
 corepack pnpm test:live:itemdb
 corepack pnpm test:live:wiki
 corepack pnpm test:live:training
+corepack pnpm test:live:prices
 ```
 
 Normal CI never requires live services. See [CONTRIBUTING.md](CONTRIBUTING.md).
@@ -211,6 +240,11 @@ Normal CI never requires live services. See [CONTRIBUTING.md](CONTRIBUTING.md).
 - **Player stats:** Jagex public Hiscores. Default fresh period: 15 minutes.
 - **Current item guide price:** Jagex Grand Exchange ItemDB. Default fresh period:
   5 minutes.
+- **Search catalogue, limits, alchemy, and volume:** RuneScape Wiki Grand
+  Exchange Market Watch bulk dump, stamped with Jagex's update time and refreshed
+  on demand.
+- **Historical guide prices:** official Jagex ItemDB graph, cached for 6 hours
+  and retained as stale fallback for up to 7 days.
 - **XP thresholds and skill caps:** authoritative RuneScape Wiki
   `Experience/Table` revision 37100263. Standard thresholds are generated from
   the game formula; the distinct Invention curve is stored exactly.
@@ -225,7 +259,8 @@ record may be served temporarily while refresh happens; malformed responses neve
 replace it. Prices are guide values, can be delayed, and are not guaranteed trade
 prices. See the [Version 0.1](docs/data-sources/version-0.1.md) and
 [Version 0.2](docs/data-sources/version-0.2.md), and
-[Version 0.3](docs/data-sources/version-0.3.md) data-source notes.
+[Version 0.3](docs/data-sources/version-0.3.md), and
+[Version 0.4](docs/data-sources/version-0.4.md) data-source notes.
 
 ## Privacy and safety
 

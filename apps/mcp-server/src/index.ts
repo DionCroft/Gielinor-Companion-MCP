@@ -3,10 +3,16 @@
 import { homedir } from "node:os";
 import { join } from "node:path";
 
-import { LevellingPlannerService, ProfileService, QuestService } from "@gielinor/core";
+import {
+  GrandExchangeService,
+  LevellingPlannerService,
+  ProfileService,
+  QuestService,
+} from "@gielinor/core";
 import {
   openDatabase,
   SqliteCacheStore,
+  SqlitePriceRepository,
   SqlitePlayerProfileRepository,
   SqliteQuestRepository,
   SqliteTrainingMethodRepository,
@@ -45,7 +51,10 @@ async function main(): Promise<void> {
     httpClient,
     cacheStore,
     cachePolicy: config.geCache,
+    historyCachePolicy: config.geHistoryCache,
     endpoint: config.geUrl,
+    graphEndpoint: config.geGraphUrl,
+    bulkEndpoint: config.geBulkUrl,
   });
   const profiles = new ProfileService(new SqlitePlayerProfileRepository(database), statsProvider);
   const quests = new QuestService(
@@ -67,7 +76,13 @@ async function main(): Promise<void> {
       pageUrl: config.wikiPageUrl,
     }),
   );
-  const tools = new CompanionToolService(profiles, priceProvider, quests, planner);
+  const exchange = new GrandExchangeService(
+    new SqlitePriceRepository(database),
+    priceProvider,
+    quests,
+    planner,
+  );
+  const tools = new CompanionToolService(profiles, priceProvider, quests, planner, exchange);
   const server = createCompanionServer(tools);
   const transport = new StdioServerTransport();
 

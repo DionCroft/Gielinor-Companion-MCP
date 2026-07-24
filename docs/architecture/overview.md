@@ -1,14 +1,15 @@
-# Version 0.3 architecture
+# Version 0.4 architecture
 
 ## Boundaries
 
 `@gielinor/shared-types` owns domain Zod schemas and stable vocabulary.
-`@gielinor/core` owns deterministic XP, quest-graph, and levelling-planner rules,
+`@gielinor/core` owns deterministic XP, quest-graph, levelling-planner, and
+price-analytics rules,
 application services, and ports. `@gielinor/providers` implements public API
 adapters, resilient caching, and RuneScape Wiki quest/training adapters.
-`@gielinor/database` implements SQLite profile, cache, quest, training, alias,
-and sync-status ports. `@gielinor/mcp-server` composes dependencies and exposes
-stdio tools.
+`@gielinor/database` implements SQLite profile, cache, quest, training, GE
+catalogue/history, alias, and sync-status ports. `@gielinor/mcp-server` composes
+dependencies and exposes stdio tools.
 
 Dependencies point inward:
 
@@ -93,15 +94,41 @@ plan applies GP budget, hours/day, target-date, true-cap/virtual, quest,
 membership, skill, and Ironman constraints. It retains uncertainty notes and
 never infers inventory or equipment ownership.
 
+## Grand Exchange synchronization and analytics
+
+`JagexGrandExchangeProvider` validates three distinct public contracts. The
+official Jagex detail endpoint retains the backward-compatible single-ID lookup;
+the RuneScape Wiki Grand Exchange Market Watch dump supplies the searchable
+catalogue, Jagex timestamp, limits, alchemy values, and latest daily volume; the
+official Jagex graph supplies up to 180 ordered daily guide-price points and its
+published 30-day average.
+
+`GrandExchangeService` computes range changes, 7/30/90-point moving averages,
+population standard deviation of daily percentage returns, historical
+highs/lows, and 2.5-standard-deviation outliers. These calculations are pure and
+recalculable. They never reinterpret a guide price as an instant trade.
+
+Catalogue candidates are completely validated before one transaction. An
+existing catalogue rejects a replacement below 80% of its size, and the live
+provider independently rejects fewer than 1,000 items. History is cached for six
+hours; on a provider failure, validated history no more than seven days old may
+be returned with an explicit stale warning.
+
+Valuation resolves IDs or aliases, aggregates duplicates, protects every
+multiplication and sum against unsafe integer overflow, preserves unpriced
+lines, and reports completeness. CSV/JSON exports are returned as MCP content
+and never write a caller-selected path.
+
 ## Local data
 
 SQLite migration 1 creates `player_profiles` and `provider_cache`. Migration 2
 adds `quests`, `quest_aliases`, and `quest_sync_status`. Migration 3 adds
-`training_methods` and `training_sync_status`. Migrations are additive and do not
-rewrite earlier profile or quest JSON. Domain objects are stored as validated
-JSON plus searchable metadata. The cache stores validated adapter results with
-fresh and stale deadlines. WAL mode and a busy timeout are enabled for
-file-backed databases.
+`training_methods` and `training_sync_status`. Migration 4 adds `ge_items`,
+`ge_item_aliases`, `ge_price_history`, and `ge_sync_status`. Migrations are
+additive and do not rewrite earlier profile, quest, or training JSON. Domain
+objects are stored as validated JSON plus searchable metadata. The cache stores
+validated adapter results with fresh and stale deadlines. WAL mode and a busy
+timeout are enabled for file-backed databases.
 
 Profile export intentionally excludes local profile and goal UUIDs. Import creates
 new UUIDs and accepts only schema version 1.
@@ -114,6 +141,6 @@ writes protocol messages to stdout and diagnostics to stderr.
 
 ## Future extension
 
-Price history arrives in Version 0.4. Hosted transport, agent runtimes, and UIs
-must compose the same services; they must not reimplement calculations, quest
-graph traversal, or levelling selection.
+The Version 0.5 desktop UI, later hosted transport, and agent runtimes must
+compose these same services; they must not reimplement calculations, quest graph
+traversal, levelling selection, price analytics, or valuation.
