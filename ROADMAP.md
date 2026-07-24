@@ -36,15 +36,17 @@ lists, goals, settings, source health, and portable profile files.
 Shared bounded tool-call runtime, Ollama and LM Studio adapters, multi-turn and
 parallel tool calls, model selection, timeouts, validation, and setup guidance.
 
-## 0.7 — Hosted MCP (current)
+## 0.7 — Hosted MCP (complete)
 
 Streamable HTTP service, optional authentication, isolated remote storage, rate
 limits, health checks, deployment/privacy guides, and client capability notes.
 
-## 0.8 — Optional read-only overlay
+## 0.8 — Optional read-only overlay (complete)
 
-Only if technically and policy compliant: consent-driven visible-screen/Alt1
-information with manual confirmation and no generated gameplay input.
+Policy-reviewed, disabled-by-default Alt1 visible-main-chat guidance with
+per-field consent, local redaction, manual completion confirmation,
+pause/disconnect/revoke, no network transmission, no generated gameplay input,
+and a manual no-Alt1 fallback.
 
 ## 0.9 — Extensibility and hardening
 

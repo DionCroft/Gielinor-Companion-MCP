@@ -1,6 +1,6 @@
 # Hosted MCP deployment
 
-Version 0.7 exposes the same 48 validated companion tools over stateless MCP
+The hosted service exposes the same 48 validated companion tools over stateless MCP
 Streamable HTTP at `/mcp`. The service also exposes liveness, readiness, and
 optional private-profile account endpoints. Local stdio and the desktop app
 continue to work without this service.
@@ -65,14 +65,14 @@ For a direct container deployment, mount durable storage at `/data` and keep the
 application port private:
 
 ```sh
-docker build -t gielinor-companion-mcp:0.7.0 .
+docker build -t gielinor-companion-mcp:0.8.0 .
 docker run --rm \
   --read-only \
   --user 10001:10001 \
   --mount type=volume,src=gielinor-data,dst=/data \
   --publish 127.0.0.1:3333:3333 \
   --env-file .env.hosted \
-  gielinor-companion-mcp:0.7.0
+  gielinor-companion-mcp:0.8.0
 ```
 
 ## Health

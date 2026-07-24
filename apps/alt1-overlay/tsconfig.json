@@ -1,0 +1,13 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "allowSyntheticDefaultImports": true,
+    "declaration": false,
+    "declarationMap": false,
+    "noEmit": true,
+    "types": ["vite/client", "node"]
+  },
+  "include": ["src/**/*.ts", "test/**/*.ts", "vite.config.ts"]
+}

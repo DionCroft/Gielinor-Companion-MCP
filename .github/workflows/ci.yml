@@ -39,6 +39,9 @@ jobs:
       - name: Unit and integration tests
         run: pnpm test
 
+      - name: Read-only overlay safety contract
+        run: pnpm test:overlay
+
       - name: Build all current workspaces
         run: pnpm build
 

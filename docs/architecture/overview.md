@@ -1,4 +1,4 @@
-# Version 0.7 architecture
+# Version 0.8 architecture
 
 ## Boundaries
 
@@ -15,6 +15,9 @@ account storage. `@gielinor/desktop` is a Tauri/React client that reaches those
 same tools through a least-privilege native stdio bridge.
 `@gielinor/agent-runtime` is a model-independent orchestrator for optional local
 providers; it depends only on shared tool contracts and an injected executor.
+`@gielinor/alt1-overlay` is an optional static outward adapter. It reads only
+consented visible-main-chat pixels through Alt1 and has no dependency on, or
+authority over, the trusted core.
 
 Dependencies point inward:
 
@@ -28,6 +31,11 @@ shared-types <- agent-runtime --------------------^
                     ^                     |
                     |                     v
              Ollama / LM Studio    trusted tool executor
+
+guidance pack -> alt1-overlay <- visible main-chat pixels
+                       |
+                       v
+             local read-only guidance
 ```
 
 The database package also implements the provider package's cache-storage
@@ -221,16 +229,45 @@ makes the token non-authenticating, removes only the three exact SQLite files fo
 that account, and then deletes the control row. Failed file removal restores the
 active state rather than claiming success.
 
+## Optional overlay boundary
+
+`@gielinor/alt1-overlay` is a browser-only static app with no network client.
+Its CSP denies all outgoing connections. The audited Alt1 JavaScript dependency
+is pinned to 0.1.3, and the capture controller requires Alt1 1.6.0 or later.
+The app manifest declares only `pixel,overlay`; it contains no activators or
+request handlers.
+
+Consent is stateful but capture is not implicit. Every field begins off, policy
+acknowledgement enables only selected categories, and a separate Connect action
+starts reads. Capability, permission, runtime version, and RuneScape linkage are
+checked before each capture. Pause, disconnect, permission loss, or revoke
+clears the reader binding and named overlay group.
+
+The Alt1 driver uses the upstream `ChatBoxReader` to locate and OCR visible main
+chat. Raw pixels and lines remain transient. Before analysis, control characters
+and timestamps are removed; player/private-chat-shaped lines are rejected; URLs,
+emails, addresses, and long identifiers are redacted; output is bounded. The
+analyser matches only a local schema-versioned guide pack and labels every
+result by source and confidence.
+
+Completion messages are always probable signals. Confirmation creates only an
+in-memory `local-confirmation-only` record and cannot invoke an MCP tool, change
+a companion profile, or affect RuneScape. Manual pasted-text mode uses the same
+pipeline and preserves a complete fallback when Alt1 is absent.
+
 ## Safety
 
-No layer communicates with a RuneScape client. Game-data provider URLs are
-public read-only services; optional model traffic remains on loopback. Profile
-mutations affect companion-owned local or hosted SQLite only. The stdio MCP
-process writes protocol messages to stdout and diagnostics to stderr; the hosted
-process writes privacy-preserving JSON operational events to stdout.
+No layer sends commands to a RuneScape client. The optional overlay can observe
+only visible pixels through Alt1 after consent and can draw only unclickable
+guidance; it cannot click, type, read memory, intercept packets, or transmit
+captured data. Game-data provider URLs are public read-only services; optional
+model traffic remains on loopback. Profile mutations affect companion-owned
+local or hosted SQLite only. The stdio MCP process writes protocol messages to
+stdout and diagnostics to stderr; the hosted process writes privacy-preserving
+JSON operational events to stdout.
 
 ## Future extension
 
-Later transports or overlays must compose these same services. They must not
-reimplement calculations, quest graph traversal, levelling selection, price
-analytics, valuation, or tool validation.
+Later transports or overlay bridges must preserve these boundaries. They must
+not reimplement calculations, quest graph traversal, levelling selection, price
+analytics, valuation, tool validation, or add gameplay input.

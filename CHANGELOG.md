@@ -3,6 +3,37 @@
 All notable changes follow [Keep a Changelog](https://keepachangelog.com/) and
 semantic versioning.
 
+## [0.8.0] - 2026-07-23
+
+### Added
+
+- Optional standalone Alt1 app for local, visible-main-chat quest guidance.
+- Explicit policy acknowledgement, per-field visibility, separate enable/connect
+  actions, pause, disconnect, and complete revoke.
+- Schema-versioned local guidance packs, source-labelled redacted observations,
+  confidence scores, matched guide steps, and optional unclickable annotations.
+- Manual pasted-text fallback that works without Alt1.
+- Runtime compatibility/permission checks and safe handling for malformed
+  captures, unsupported screens, permission loss, and reconnects.
+- Install/uninstall, privacy, policy, data-source, and completion documentation.
+- Twenty-seven deterministic tests covering consent, UI flow, field visibility,
+  redaction, false positives, manual confirmation, permissions, events,
+  compatibility, removal, CSP, and no-input guarantees.
+
+### Security
+
+- Capture is disabled by default and requires explicit consent followed by a
+  separate Connect action.
+- The production content-security policy sets `connect-src 'none'`; raw pixels
+  and OCR text are never stored or transmitted.
+- Player/private-chat-shaped lines, links, emails, addresses, and long
+  identifiers are rejected or redacted before display.
+- The Alt1 adapter declares only `pixel,overlay`, pins library version `0.1.3`,
+  requires Alt1 1.6.0+, and exposes no input, memory, packet, process, socket, or
+  trading capability.
+- Probable quest completions require manual confirmation and cannot mutate a
+  companion profile or RuneScape state.
+
 ## [0.7.0] - 2026-07-23
 
 ### Added
