@@ -7,16 +7,16 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 Gielinor Companion MCP is a safe, model-independent foundation for deterministic
-RuneScape 3 planning. Version 0.7 adds a production-oriented hosted Streamable
-HTTP MCP service with optional isolated profiles to the local stdio server,
-accessible Tauri/React desktop app, and optional Ollama/LM Studio conversations.
-It still works locally without AI or hosting and never controls the game client.
+RuneScape 3 planning. Version 0.8 adds an optional, consent-driven Alt1 app for
+local visible-text guidance alongside the hosted/local MCP servers, accessible
+Tauri/React desktop app, and optional Ollama/LM Studio conversations. It still
+works without AI, hosting, or Alt1 and never controls the game client.
 
 ## Release status
 
-**Current version: 0.7.0 — Hosted MCP and Remote Access.** This is an early
-working release. The same 48 trusted tools are available over local stdio and
-stateless Streamable HTTP; optional private profiles use per-account storage.
+**Current version: 0.8.0 — Optional Read-Only Overlay.** This is an early working
+release. The same 48 trusted tools remain available over local stdio and
+stateless Streamable HTTP; the separate overlay is disabled by default.
 
 ## Features
 
@@ -67,6 +67,10 @@ stateless Streamable HTTP; optional private profiles use per-account storage.
 - Account export/import and deletion, a non-root read-only container,
   loopback-bound Compose deployment, TLS reverse-proxy example, and current
   ChatGPT/Claude capability guidance.
+- Optional Alt1 1.6+ static app with explicit consent, per-field visibility,
+  local visible-main-chat OCR, source-labelled guide suggestions, manual
+  completion confirmation, pause/disconnect/revoke, and a no-Alt1 manual
+  fallback. It cannot generate gameplay input and transmits no captured data.
 - Fixture-based unit, component, native-command, integration, and Playwright
   journey tests; live provider tests are opt-in.
 
@@ -90,6 +94,8 @@ domain ports + core services ---- SQLite profiles/quests/training/prices
                     |                          ^
                     v                          |
                React desktop -------- Ollama / LM Studio
+
+visible main chat -- Alt1 read-only adapter -- local guidance pack
 ```
 
 Business rules are in `packages/core`. Provider parsing, SQLite, and MCP transport
@@ -103,6 +109,7 @@ depend on those ports; the core never depends on a UI or model vendor. See
 - A C++ build toolchain only if a prebuilt `better-sqlite3` binary is unavailable
 - Rust 1.85 or later and platform Tauri prerequisites only for desktop source
   builds
+- Alt1 Toolkit 1.6.0+ on Windows only when using the optional overlay
 
 ## Quick start
 
@@ -121,6 +128,13 @@ For the hosted HTTP service, follow the
 
 ```sh
 corepack pnpm start:hosted
+```
+
+For the optional read-only overlay, follow the
+[Alt1 installation and consent guide](docs/installation/alt1-overlay.md):
+
+```sh
+corepack pnpm --filter @gielinor/alt1-overlay build
 ```
 
 Populate or refresh the local quest catalogue without an MCP client:
@@ -181,7 +195,7 @@ discovers only models whose Ollama metadata advertises tool support. See the
 
 ### Standalone desktop
 
-Version 0.7 retains the complete no-AI dashboard and optional local AI.
+Version 0.8 retains the complete no-AI dashboard and optional local AI.
 Build and run it from source:
 
 ```sh
@@ -196,7 +210,7 @@ not committed. See the [desktop installation guide](docs/installation/desktop.md
 ### ChatGPT-compatible remote MCP
 
 Deploy the HTTPS service and use `https://your-host/mcp`. Current ChatGPT
-availability and the important V0.7 authentication limitation are documented in
+availability and the fixed-bearer authentication limitation are documented in
 [the remote example](examples/chatgpt-remote/README.md). Public tools use no
 authentication; fixed bearer profile tokens are for clients that support custom
 headers.
@@ -275,6 +289,7 @@ corepack pnpm test:mcp
 corepack pnpm test:providers
 corepack pnpm test:ai
 corepack pnpm test:hosted
+corepack pnpm test:overlay
 corepack pnpm test:database
 corepack pnpm test:e2e
 corepack pnpm test:desktop
@@ -330,6 +345,8 @@ providers; see the
 [Version 0.6 local-AI data behavior](docs/data-sources/version-0.6.md).
 Hosted transport adds no game-data provider; see
 [Version 0.7 hosted data behavior](docs/data-sources/version-0.7.md).
+The optional overlay adds only transient local visible-text observations; see
+[Version 0.8 overlay data behavior](docs/data-sources/version-0.8.md).
 
 ## Privacy and safety
 
@@ -338,6 +355,9 @@ Gielinor bearer token and are isolated in per-account SQLite files; that token i
 not a Jagex credential. Never enter an email address, RuneScape password,
 authenticator code, session cookie, or bank PIN. Hosted operators should read
 [the privacy and account lifecycle guide](docs/security/hosted-privacy.md).
+The optional Alt1 app is disabled by default, reads visible main-chat pixels only
+after explicit consent and connection, and cannot transmit captured data. Read
+[the overlay privacy and consent guide](docs/security/overlay-privacy.md).
 
 The project does not click, type, read client memory, intercept packets, trade,
 fight, skill, solve CAPTCHAs, or bypass anti-cheat systems. Read
@@ -347,7 +367,7 @@ fight, skill, solve CAPTCHAs, or bypass anti-cheat systems. Read
 
 [ROADMAP.md](ROADMAP.md) describes the versioned route through quest planning,
 levelling plans, GE history, desktop/no-AI use, local model adapters, hosted MCP,
-and hardening. Current limitations are explicit in
+optional read-only overlay, and hardening. Current limitations are explicit in
 [docs/roadmap/known-limitations.md](docs/roadmap/known-limitations.md).
 
 ## Contributing and licence

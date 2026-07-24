@@ -54,9 +54,13 @@ automation, automated Grand Exchange trades, item buying/selling, client-memory
 reading, packet interception, credential capture, CAPTCHA solving, or anti-cheat
 bypasses.
 
-Any future screen-reading or Alt1 bridge must be optional, consent-driven,
-read-only, limited to information visible to the player, incapable of generating
-gameplay input, and separable from core operation.
+The optional Alt1 app is separately installed, disabled by default,
+consent-driven, and separable from core operation. It reads only visible
+main-chat pixels after a second Connect action, retains no raw capture, denies
+outgoing network connections, and can draw only unclickable guidance. Its
+adapter must never gain generated input, process/client-memory, packet, socket,
+or trading capabilities. See
+[overlay privacy and consent](docs/security/overlay-privacy.md).
 
 Dependencies and release artifacts must be reviewed. Desktop updates must be
 opt-in and must not silently install untrusted code.

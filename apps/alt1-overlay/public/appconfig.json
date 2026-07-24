@@ -1,0 +1,16 @@
+{
+  "appName": "Gielinor Companion",
+  "description": "Optional local-only read-only quest guidance for RuneScape 3.",
+  "appUrl": "./index.html",
+  "configUrl": "./appconfig.json",
+  "iconUrl": "./icon.svg",
+  "defaultWidth": 420,
+  "defaultHeight": 640,
+  "minWidth": 360,
+  "minHeight": 520,
+  "maxWidth": 900,
+  "maxHeight": 1200,
+  "requestHandlers": [],
+  "activators": [],
+  "permissions": "pixel,overlay"
+}

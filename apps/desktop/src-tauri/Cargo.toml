@@ -1,6 +1,6 @@
 [package]
 name = "gielinor-companion-desktop"
-version = "0.7.0"
+version = "0.8.0"
 description = "Read-only RuneScape 3 companion desktop shell"
 authors = ["Gielinor Companion contributors"]
 edition = "2021"

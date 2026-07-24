@@ -1,0 +1,23 @@
+{
+  "name": "@gielinor/alt1-overlay",
+  "version": "0.8.0",
+  "private": true,
+  "description": "Optional consent-based, read-only Alt1 guidance overlay for RuneScape 3.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit -p tsconfig.json && vite build",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit -p tsconfig.json --pretty false"
+  },
+  "dependencies": {
+    "alt1": "0.1.3",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "jsdom": "29.1.1",
+    "typescript": "^5.8.3",
+    "vite": "8.1.5",
+    "vitest": "^3.2.4"
+  }
+}

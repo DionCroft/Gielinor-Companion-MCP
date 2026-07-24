@@ -186,7 +186,7 @@ export function UpdatesView() {
         </span>
         <div>
           <p className="eyebrow">Installed release</p>
-          <h2>Version 0.7.0</h2>
+          <h2>Version 0.8.0</h2>
           <p>The bounded Ollama and LM Studio local-AI release.</p>
         </div>
         <StatusPill state="success">Current source build</StatusPill>
@@ -331,7 +331,7 @@ export function AboutView() {
             <i />
           </span>
           <div>
-            <p className="eyebrow">Version 0.7.0</p>
+            <p className="eyebrow">Version 0.8.0</p>
             <h2>Built for informed play—not automated play.</h2>
             <p>
               Gielinor Companion brings public player progress, quest dependencies, training methods

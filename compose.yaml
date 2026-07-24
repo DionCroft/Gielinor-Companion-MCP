@@ -3,7 +3,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: gielinor-companion-mcp:0.7.0
+    image: gielinor-companion-mcp:0.8.0
     restart: unless-stopped
     init: true
     read_only: true
@@ -21,7 +21,7 @@ services:
       GIELINOR_REQUIRE_HTTPS: ${GIELINOR_REQUIRE_HTTPS:-false}
       GIELINOR_ACCOUNT_CREATION_ENABLED: ${GIELINOR_ACCOUNT_CREATION_ENABLED:-false}
       GIELINOR_OPERATOR_TOKEN: ${GIELINOR_OPERATOR_TOKEN:-}
-      GIELINOR_USER_AGENT: ${GIELINOR_USER_AGENT:-Gielinor-Companion-MCP/0.7.0}
+      GIELINOR_USER_AGENT: ${GIELINOR_USER_AGENT:-Gielinor-Companion-MCP/0.8.0}
     volumes:
       - gielinor-data:/data
     tmpfs:

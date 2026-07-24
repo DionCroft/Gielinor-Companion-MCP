@@ -1,4 +1,24 @@
-# Version 0.7 known limitations
+# Version 0.8 known limitations
+
+- The optional Alt1 integration is Windows-only because Alt1 supports Windows.
+  Manual text analysis and every core companion feature remain available
+  without it.
+- Alt1 and Gielinor Companion are unofficial community software. The overlay was
+  reviewed against current Jagex/Alt1 policies, but policy can change and no
+  official approval is implied.
+- The app pins `alt1` 0.1.3 and requires Alt1 1.6.0 or later. The upstream
+  image-recognition API describes itself as changeable, so compatibility must be
+  rechecked when upgrading.
+- Automatic capture is limited to visible main-chat OCR. Dialogue elsewhere,
+  hidden chat, unsupported layouts, filters, UI scaling, and font/game updates
+  can prevent recognition; manual paste remains the fallback.
+- OCR and keyword matches are advisory. Even high-confidence completion signals
+  require confirmation and never update a profile or game state.
+- Guide packs are pasted locally in Version 0.8. There is no live
+  profile/MCP-to-overlay bridge, avoiding a network path for screen observations.
+- The repository builds the static overlay but does not publish a trusted
+  hosting origin. Operators must serve the build themselves or use local
+  development mode.
 
 - Public RS3 sources provide guide prices and daily history, not an instant
   order book. Instant buy/high and sell/low prices are reported as unavailable.

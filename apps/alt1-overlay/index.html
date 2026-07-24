@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'"
+    />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="referrer" content="no-referrer" />
+    <title>Gielinor Companion Overlay</title>
+    <link rel="icon" href="./icon.svg" />
+  </head>
+  <body>
+    <main class="shell">
+      <header class="hero">
+        <img src="./icon.svg" alt="" width="42" height="42" />
+        <div>
+          <p class="eyebrow">VERSION 0.8 · READ ONLY</p>
+          <h1>Gielinor Companion</h1>
+          <p>Local guidance from visible RuneScape text. Advice only—nothing controls the game.</p>
+        </div>
+      </header>
+
+      <section class="status-panel" aria-live="polite">
+        <span id="status-indicator" class="status-dot"></span>
+        <div>
+          <strong id="status-title">Overlay disabled</strong>
+          <p id="status-detail">No screen pixels are being read.</p>
+        </div>
+      </section>
+
+      <section class="card" aria-labelledby="consent-title">
+        <div class="section-heading">
+          <span>1</span>
+          <div>
+            <h2 id="consent-title">Choose visible fields</h2>
+            <p>All processing stays in this app. Raw captured text is never saved.</p>
+          </div>
+        </div>
+        <fieldset>
+          <legend>What may appear in guidance?</legend>
+          <label class="check-row">
+            <input id="field-quest" type="checkbox" />
+            <span
+              ><strong>Quest text</strong
+              ><small>Objectives, journal notices and step keywords</small></span
+            >
+          </label>
+          <label class="check-row">
+            <input id="field-dialogue" type="checkbox" />
+            <span
+              ><strong>Visible dialogue</strong
+              ><small>Dialogue-like text found in the main chat area</small></span
+            >
+          </label>
+          <label class="check-row">
+            <input id="field-completion" type="checkbox" />
+            <span
+              ><strong>Probable completion</strong
+              ><small>Always asks you to confirm; never changes the game</small></span
+            >
+          </label>
+        </fieldset>
+        <label class="check-row policy">
+          <input id="policy-consent" type="checkbox" />
+          <span>
+            I understand this optional community app is not endorsed by Jagex, reads only visible
+            pixels after permission, and never clicks, types or automates play.
+          </span>
+        </label>
+        <div class="button-row">
+          <button id="grant-consent" class="primary" type="button">Enable selected fields</button>
+          <button id="revoke-consent" class="danger" type="button">Revoke and clear</button>
+        </div>
+      </section>
+
+      <section class="card" aria-labelledby="guide-title">
+        <div class="section-heading">
+          <span>2</span>
+          <div>
+            <h2 id="guide-title">Load a guidance pack</h2>
+            <p>Paste a companion-generated pack, or edit the safe starter locally.</p>
+          </div>
+        </div>
+        <label for="guidance-pack">Guidance pack JSON</label>
+        <textarea id="guidance-pack" rows="9" spellcheck="false"></textarea>
+        <button id="load-guide" type="button">Validate guidance pack</button>
+        <p id="guide-status" class="inline-status" aria-live="polite"></p>
+      </section>
+
+      <section class="card" aria-labelledby="capture-title">
+        <div class="section-heading">
+          <span>3</span>
+          <div>
+            <h2 id="capture-title">Start when ready</h2>
+            <p>Connect reads the visible main chat region only. Pause or disconnect at any time.</p>
+          </div>
+        </div>
+        <div class="button-row">
+          <button id="connect-overlay" class="primary" type="button">
+            Connect read-only overlay
+          </button>
+          <button id="pause-overlay" type="button">Pause</button>
+          <button id="disconnect-overlay" type="button">Disconnect</button>
+        </div>
+      </section>
+
+      <section class="card" aria-labelledby="manual-title">
+        <div class="section-heading">
+          <span>↳</span>
+          <div>
+            <h2 id="manual-title">Manual fallback</h2>
+            <p>Works without Alt1. Paste only the text you want analysed.</p>
+          </div>
+        </div>
+        <label for="manual-text">Quest or dialogue text</label>
+        <textarea id="manual-text" rows="4" maxlength="1000"></textarea>
+        <button id="analyse-manual" type="button">Analyse locally</button>
+      </section>
+
+      <section class="card" aria-labelledby="signals-title">
+        <div class="section-heading">
+          <span>4</span>
+          <div>
+            <h2 id="signals-title">Read-only guidance</h2>
+            <p>Source and confidence are always shown.</p>
+          </div>
+        </div>
+        <div id="signal-list" class="signal-list">
+          <p class="empty-state">No guidance yet.</p>
+        </div>
+      </section>
+
+      <footer>
+        <p>
+          Gielinor Companion is an independent community project and is not affiliated with Jagex.
+        </p>
+      </footer>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

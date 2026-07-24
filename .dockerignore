@@ -3,6 +3,7 @@
 .agents
 .codex
 apps/desktop
+apps/alt1-overlay
 packages/agent-runtime
 docs
 examples

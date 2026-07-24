@@ -1,6 +1,6 @@
 # ChatGPT remote MCP
 
-Deploy Version 0.7 behind HTTPS, then use this endpoint:
+Deploy the current hosted service behind HTTPS, then use this endpoint:
 
 ```text
 https://mcp.example.com/mcp
@@ -12,7 +12,7 @@ draft, and have an administrator publish it when appropriate. Current
 availability, plan requirements, and workspace controls can change; verify the
 [official ChatGPT developer-mode guidance](https://help.openai.com/en/articles/12584461-developer-mode-and-full-mcp-connectors-in-chatgpt-beta).
 
-Version 0.7 account tokens are fixed bearer headers, not OAuth. ChatGPT's custom
+Hosted account tokens are fixed bearer headers, not OAuth. ChatGPT's custom
 app setup should therefore use the anonymous public tool surface. Do not paste a
 Gielinor bearer token into a conversation. Authenticated profiles are supported
 by MCP clients that can configure an Authorization header, such as Claude Code.
