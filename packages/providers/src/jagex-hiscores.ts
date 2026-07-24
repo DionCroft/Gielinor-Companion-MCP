@@ -2,9 +2,7 @@ import type { PlayerStatsProvider, ProviderRequestOptions } from "@gielinor/core
 import {
   GameModeSchema,
   PlayerProfileSchema,
-  PlayerSkillSchema,
   PlayerStatsResultSchema,
-  SKILL_IDS,
   type GameMode,
   type PlayerSkill,
   type PlayerStatsResult,
@@ -17,6 +15,7 @@ import {
   type CacheStore,
 } from "./cache.js";
 import { ProviderError, type ResilientHttpClient } from "./http.js";
+import { parseHiscoresCsv } from "./jagex-hiscores-parser.js";
 
 const DEFAULT_ENDPOINTS: Readonly<Record<Exclude<GameMode, "unknown">, string>> = {
   normal: "https://secure.runescape.com/m=hiscore/index_lite.ws",
@@ -39,52 +38,17 @@ export type JagexHiscoresOptions = {
   now?: () => number;
 };
 
-function parseInteger(value: string | undefined, field: string): number {
-  if (value === undefined || !/^-?\d+$/.test(value)) {
-    throw new ProviderError(
-      `Jagex Hiscores returned a malformed ${field} value`,
-      "MALFORMED_PROVIDER_RESPONSE",
-      false,
-    );
-  }
-  return Number(value);
-}
-
 export function parseHiscoresResponse(body: string): PlayerSkill[] {
-  const lines = body.trim().split(/\r?\n/);
-  if (lines.length < SKILL_IDS.length + 1) {
+  try {
+    return parseHiscoresCsv(body);
+  } catch (error) {
     throw new ProviderError(
-      "Jagex Hiscores returned fewer skill rows than expected",
+      error instanceof Error ? error.message : "Jagex Hiscores returned malformed skill data",
       "MALFORMED_PROVIDER_RESPONSE",
       false,
+      { cause: error },
     );
   }
-
-  return SKILL_IDS.map((skillId, index) => {
-    const columns = lines[index + 1]?.split(",");
-    if (columns === undefined || columns.length !== 3) {
-      throw new ProviderError(
-        `Jagex Hiscores returned a malformed row for ${skillId}`,
-        "MALFORMED_PROVIDER_RESPONSE",
-        false,
-      );
-    }
-
-    const rank = parseInteger(columns[0], "rank");
-    const level = parseInteger(columns[1], "level");
-    const experience = parseInteger(columns[2], "experience");
-
-    try {
-      return PlayerSkillSchema.parse({ skillId, rank, level, experience });
-    } catch (error) {
-      throw new ProviderError(
-        `Jagex Hiscores returned invalid values for ${skillId}`,
-        "MALFORMED_PROVIDER_RESPONSE",
-        false,
-        { cause: error },
-      );
-    }
-  });
 }
 
 export class JagexHiscoresProvider implements PlayerStatsProvider {

@@ -4,6 +4,7 @@ import { defineConfig } from "vite";
 const host = process.env.TAURI_DEV_HOST;
 
 export default defineConfig({
+  base: "./",
   plugins: [react()],
   clearScreen: false,
   server: {
@@ -20,6 +21,31 @@ export default defineConfig({
           },
     watch: {
       ignored: ["**/src-tauri/**"],
+    },
+    proxy: {
+      "/__gielinor/hiscores/normal": {
+        target: "https://secure.runescape.com",
+        changeOrigin: true,
+        secure: true,
+        rewrite: (path) => path.replace("/__gielinor/hiscores/normal", "/m=hiscore/index_lite.ws"),
+      },
+      "/__gielinor/hiscores/ironman": {
+        target: "https://secure.runescape.com",
+        changeOrigin: true,
+        secure: true,
+        rewrite: (path) =>
+          path.replace("/__gielinor/hiscores/ironman", "/m=hiscore_ironman/index_lite.ws"),
+      },
+      "/__gielinor/hiscores/hardcore-ironman": {
+        target: "https://secure.runescape.com",
+        changeOrigin: true,
+        secure: true,
+        rewrite: (path) =>
+          path.replace(
+            "/__gielinor/hiscores/hardcore-ironman",
+            "/m=hiscore_hardcore_ironman/index_lite.ws",
+          ),
+      },
     },
   },
   envPrefix: ["VITE_", "TAURI_"],

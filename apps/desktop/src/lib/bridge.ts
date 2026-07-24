@@ -4,7 +4,9 @@ import {
   type JsonTransportRequest,
   type JsonTransportResponse,
 } from "@gielinor/agent-runtime";
+import { parseHiscoresCsv } from "@gielinor/providers/jagex-hiscores-parser";
 import { SKILL_IDS, type PlayerProfile, type ProfileExport } from "@gielinor/shared-types";
+import { invoke, isTauri } from "@tauri-apps/api/core";
 
 import type {
   CompanionBridge,
@@ -20,13 +22,28 @@ import type {
   Valuation,
 } from "../types.js";
 
-declare global {
-  interface Window {
-    __TAURI_INTERNALS__?: unknown;
-  }
-}
-
 const NOW = "2026-07-23T12:00:00.000Z";
+const LIVE_BROWSER_FIXTURE = "live";
+
+async function readLiveBrowserSkills(
+  displayName: string,
+  gameMode: PlayerProfile["gameMode"],
+): Promise<PlayerProfile["skills"]> {
+  const effectiveMode = gameMode === "unknown" ? "normal" : gameMode;
+  const parameters = new URLSearchParams({ player: displayName });
+  const response = await fetch(`/__gielinor/hiscores/${effectiveMode}?${parameters.toString()}`, {
+    headers: { accept: "text/plain" },
+  });
+  if (!response.ok) {
+    if (response.status === 404) {
+      throw new Error(
+        `${displayName} was not found on the ${effectiveMode.replaceAll("-", " ")} Hiscores.`,
+      );
+    }
+    throw new Error(`Jagex public Hiscores returned HTTP ${response.status}.`);
+  }
+  return parseHiscoresCsv(await response.text());
+}
 
 function envelope<T>(data: T, source = "browser preview fixture"): ToolEnvelope<T> {
   return { data, meta: { generatedAt: NOW, source } };
@@ -142,7 +159,6 @@ function priceSummary(item: PriceItem): PriceSummary {
 
 export class TauriCompanionBridge implements CompanionBridge {
   public async runtimeStatus(): Promise<RuntimeStatus> {
-    const { invoke } = await import("@tauri-apps/api/core");
     return invoke<RuntimeStatus>("desktop_runtime_status");
   }
 
@@ -150,7 +166,6 @@ export class TauriCompanionBridge implements CompanionBridge {
     tool: string,
     arguments_: Record<string, unknown>,
   ): Promise<ToolEnvelope<T>> {
-    const { invoke } = await import("@tauri-apps/api/core");
     return invoke<ToolEnvelope<T>>("call_companion_tool", {
       tool,
       arguments: arguments_,
@@ -241,6 +256,14 @@ export class DemoCompanionBridge implements CompanionBridge {
   }
 
   public async runtimeStatus(): Promise<RuntimeStatus> {
+    if (this.fixture === LIVE_BROWSER_FIXTURE) {
+      return {
+        ready: true,
+        mode: "browser-preview",
+        message:
+          "Local browser development uses live public Hiscores. Planning catalogues remain deterministic preview data.",
+      };
+    }
     return {
       ready: true,
       mode: "browser-preview",
@@ -379,6 +402,7 @@ export class DemoCompanionBridge implements CompanionBridge {
   ): Promise<ToolEnvelope<T>> {
     this.providerGuard(tool);
     let result: unknown;
+    let source = "browser preview fixture";
     switch (tool) {
       case "list_player_profiles":
         result = this.profiles;
@@ -406,7 +430,19 @@ export class DemoCompanionBridge implements CompanionBridge {
         if (profile === undefined) {
           throw new Error("Player profile was not found");
         }
-        const refreshed = { ...demoProfile(), id: profile.id, displayName: profile.displayName };
+        const skills =
+          this.fixture === LIVE_BROWSER_FIXTURE
+            ? await readLiveBrowserSkills(profile.displayName, profile.gameMode)
+            : demoProfile().skills;
+        const refreshed: PlayerProfile = {
+          ...profile,
+          skills,
+          lastHiscoresRefresh:
+            this.fixture === LIVE_BROWSER_FIXTURE ? new Date().toISOString() : NOW,
+        };
+        if (this.fixture === LIVE_BROWSER_FIXTURE) {
+          source = "Jagex public Hiscores via the local development proxy";
+        }
         this.profiles = this.profiles.map((candidate) =>
           candidate.id === profile.id ? refreshed : candidate,
         );
@@ -652,14 +688,16 @@ export class DemoCompanionBridge implements CompanionBridge {
       default:
         throw new Error(`The browser preview does not implement ${tool}`);
     }
-    return envelope(result as T);
+    return envelope(result as T, source);
   }
 }
 
 export function createDefaultBridge(): CompanionBridge {
-  if (window.__TAURI_INTERNALS__ !== undefined) {
+  if (isTauri()) {
     return new TauriCompanionBridge();
   }
-  const fixture = new URLSearchParams(window.location.search).get("fixture") ?? "first-run";
+  const fixture =
+    new URLSearchParams(window.location.search).get("fixture") ??
+    (import.meta.env.DEV ? LIVE_BROWSER_FIXTURE : "first-run");
   return new DemoCompanionBridge(fixture);
 }

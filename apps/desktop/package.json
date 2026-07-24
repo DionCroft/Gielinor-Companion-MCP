@@ -21,6 +21,7 @@
   },
   "dependencies": {
     "@gielinor/agent-runtime": "workspace:*",
+    "@gielinor/providers": "workspace:*",
     "@gielinor/shared-types": "workspace:*",
     "@tauri-apps/api": "2.11.1",
     "@tauri-apps/plugin-http": "^2.0.0",
