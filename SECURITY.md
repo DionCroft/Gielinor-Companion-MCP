@@ -2,7 +2,8 @@
 
 ## Supported versions
 
-Until 1.0, security fixes target the latest released minor version.
+Security fixes target the latest stable `1.x` release. Prerelease `0.x`
+branches are retained for history and do not receive routine fixes.
 
 ## Report a vulnerability
 
@@ -74,3 +75,8 @@ opt-in and must not silently install untrusted code.
 The maintained [threat model](docs/security/threat-model.md),
 [audit checklist](docs/security/audit-checklist.md), and
 [dependency audit](docs/security/dependency-audit.md) are release inputs.
+Stable releases also publish SHA-256 checksums, SPDX JSON SBOMs, and GitHub
+artifact attestations. Desktop signing/notarization is used when the maintainer
+configures the platform certificates; unsigned artifacts remain explicitly
+identified. See [release integrity](docs/security/release-integrity.md) and the
+[privacy policy](PRIVACY.md).

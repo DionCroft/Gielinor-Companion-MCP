@@ -22,3 +22,4 @@ apps/desktop/src-tauri/icons/Square*Logo.png
 apps/desktop/src-tauri/icons/StoreLogo.png
 apps/desktop/test-results/
 apps/desktop/playwright-report/
+release/

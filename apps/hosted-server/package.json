@@ -1,6 +1,6 @@
 {
   "name": "@gielinor/hosted-server",
-  "version": "0.9.0",
+  "version": "1.0.0",
   "description": "Production-oriented Streamable HTTP MCP service for Gielinor Companion.",
   "type": "module",
   "main": "./dist/index.js",
@@ -9,7 +9,8 @@
     "gielinor-companion-hosted": "./dist/index.js"
   },
   "files": [
-    "dist"
+    "dist",
+    "LICENSE"
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
@@ -28,6 +29,15 @@
   },
   "engines": {
     "node": ">=20"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/DionCroft/Gielinor-Companion-MCP.git",
+    "directory": "apps/hosted-server"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
   },
   "license": "MIT"
 }

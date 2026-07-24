@@ -326,7 +326,7 @@ export function createHostedHttpServer(
         return;
       }
       if (request.method === "GET" && (path === "/health" || path === "/health/live")) {
-        writeJson(response, 200, { status: "ok", version: "0.9.0" });
+        writeJson(response, 200, { status: "ok", version: "1.0.0" });
         return;
       }
       if (request.method === "GET" && path === "/health/ready") {
@@ -335,7 +335,7 @@ export function createHostedHttpServer(
         }
         writeJson(response, 200, {
           status: "ready",
-          version: "0.9.0",
+          version: "1.0.0",
           ...(await services.readiness()),
         });
         return;

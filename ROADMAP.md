@@ -53,8 +53,18 @@ and a manual no-Alt1 fallback.
 Provider plugin contract, more sources, migrations, offline behavior, profiling,
 failure/load tests, threat model, accessibility audit, and contributor tooling.
 
-## 1.0 — Stable public release
+## 1.0 — Stable public release (complete)
 
 Stable MCP/profile contracts, migration guarantees, installers, npm package,
 complete documentation, verifiable release artifacts where practical, security
 and accessibility reviews, and release material.
+
+## Post-1.0 candidates
+
+- OAuth/OIDC for private hosted profiles.
+- Signed dynamic provider discovery with an explicit package trust policy.
+- Maintainer certificate-backed Authenticode, Apple notarization, and a signed
+  rollback-capable updater.
+- Distributed rate limits and operational telemetry for multi-replica hosting.
+- Broader manual assistive-technology testing and independently exercised
+  installer matrices.

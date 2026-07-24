@@ -1,6 +1,7 @@
 {
   "name": "@gielinor/shared-types",
-  "version": "0.9.0",
+  "version": "1.0.0",
+  "description": "Stable schemas and tool contracts for Gielinor Companion.",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -20,5 +21,15 @@
   "dependencies": {
     "zod": "^3.25.76"
   },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/DionCroft/Gielinor-Companion-MCP.git",
+    "directory": "packages/shared-types"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "sideEffects": false,
   "license": "MIT"
 }

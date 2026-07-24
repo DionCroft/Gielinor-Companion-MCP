@@ -1,6 +1,7 @@
 {
   "name": "@gielinor/database",
-  "version": "0.9.0",
+  "version": "1.0.0",
+  "description": "SQLite persistence and forward-only migrations for Gielinor Companion.",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -22,6 +23,15 @@
     "@gielinor/providers": "workspace:*",
     "@gielinor/shared-types": "workspace:*",
     "better-sqlite3": "^12.2.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/DionCroft/Gielinor-Companion-MCP.git",
+    "directory": "packages/database"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
   },
   "license": "MIT"
 }

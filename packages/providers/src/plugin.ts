@@ -34,6 +34,8 @@ export const PROVIDER_CAPABILITIES = [
   "training-snapshot",
 ] as const;
 
+export const PROVIDER_PLUGIN_API_VERSION = 1;
+
 export type ProviderCapability = (typeof PROVIDER_CAPABILITIES)[number];
 export type ProviderOfflineSupport = "none" | "cache" | "full";
 
@@ -76,6 +78,7 @@ export type AnyProviderCapabilityRegistration = {
 }[ProviderCapability];
 
 export type ProviderPlugin = {
+  apiVersion: typeof PROVIDER_PLUGIN_API_VERSION;
   id: string;
   name: string;
   version: string;
@@ -289,6 +292,13 @@ export class ProviderRegistry {
   public constructor(public readonly health = new ProviderHealthTracker()) {}
 
   public register(plugin: ProviderPlugin): void {
+    if (plugin.apiVersion !== PROVIDER_PLUGIN_API_VERSION) {
+      throw new ProviderError(
+        `Provider plugin API version ${String(plugin.apiVersion)} is not supported`,
+        "UNSUPPORTED_PROVIDER_PLUGIN_API",
+        false,
+      );
+    }
     if (!/^[a-z0-9][a-z0-9.-]{1,99}$/.test(plugin.id)) {
       throw new ProviderError("Provider plugin ID is invalid", "INVALID_PROVIDER_PLUGIN", false);
     }

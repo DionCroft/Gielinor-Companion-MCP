@@ -7,9 +7,11 @@ inspection, or automated trading.
 
 ## Plugin contract
 
-Implement `ProviderPlugin` from `@gielinor/providers`. Each capability declares:
+Implement provider plugin API version `1` from `@gielinor/providers`. Every
+plugin declares the API version before its capabilities:
 
 - a globally unique lowercase plugin ID and plugin version;
+- `apiVersion: PROVIDER_PLUGIN_API_VERSION`;
 - one or more typed capabilities;
 - an integer priority (higher values are tried first);
 - `none`, `cache`, or `full` offline support;
@@ -17,9 +19,10 @@ Implement `ProviderPlugin` from `@gielinor/providers`. Each capability declares:
 - a handler returning the shared capability result schema.
 
 ```ts
-import type { ProviderPlugin } from "@gielinor/providers";
+import { PROVIDER_PLUGIN_API_VERSION, type ProviderPlugin } from "@gielinor/providers";
 
 export const examplePrices: ProviderPlugin = {
+  apiVersion: PROVIDER_PLUGIN_API_VERSION,
   id: "community.example-prices",
   name: "Example public prices",
   version: "1.0.0",
@@ -52,10 +55,15 @@ No core service, MCP tool, profile schema, or repository needs to change.
 
 ## Capabilities
 
-Version 0.9 defines `player-stats`, `current-price`, `price-history`,
+Provider API v1 defines `player-stats`, `current-price`, `price-history`,
 `price-snapshot`, `quest-snapshot`, and `training-snapshot`. Requests and
 results are mapped by `ProviderCapabilityRequestMap` and
 `ProviderCapabilityResultMap`.
+
+The registry rejects an unsupported API version before it registers any
+capability or health state. Within API v1, compatible additions must remain
+optional. Removing a capability or changing request/result semantics requires a
+new provider API major version and migration guidance.
 
 The registry validates every successful result with the shared Zod schema.
 Malformed results count as failures and fall through to the next provider.

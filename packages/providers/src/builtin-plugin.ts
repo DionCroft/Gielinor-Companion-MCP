@@ -5,7 +5,11 @@ import type {
   TrainingMethodProvider,
 } from "@gielinor/core";
 
-import type { AnyProviderCapabilityRegistration, ProviderPlugin } from "./plugin.js";
+import {
+  PROVIDER_PLUGIN_API_VERSION,
+  type AnyProviderCapabilityRegistration,
+  type ProviderPlugin,
+} from "./plugin.js";
 
 export type BuiltinProviderPluginOptions = {
   stats: PlayerStatsProvider;
@@ -74,9 +78,10 @@ export function createBuiltinProviderPlugin(options: BuiltinProviderPluginOption
     },
   ];
   return {
+    apiVersion: PROVIDER_PLUGIN_API_VERSION,
     id: "gielinor.builtin-public-data",
     name: "Gielinor built-in public data providers",
-    version: "0.9.0",
+    version: "1.0.0",
     capabilities,
   };
 }

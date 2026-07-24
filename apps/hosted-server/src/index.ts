@@ -14,7 +14,7 @@ async function main(): Promise<void> {
       event: "hosted_server_started",
       host: address.host,
       port: address.port,
-      version: "0.9.0",
+      version: "1.0.0",
     })}\n`,
   );
 

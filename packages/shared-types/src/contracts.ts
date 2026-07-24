@@ -1,7 +1,8 @@
-export const MCP_TOOL_CONTRACT_VERSION = "0.9";
+export const MCP_TOOL_CONTRACT_VERSION = "1.0";
+export const MCP_TOOL_SCHEMA_STABILITY = "stable";
 export const PROFILE_EXPORT_SCHEMA_VERSION = 1;
 
-export const MCP_TOOL_NAMES_V0_9 = [
+export const MCP_TOOL_NAMES_V1 = Object.freeze([
   "create_player_profile",
   "get_player_profile",
   "list_player_profiles",
@@ -50,4 +51,10 @@ export const MCP_TOOL_NAMES_V0_9 = [
   "compare_quest_xp_rewards",
   "refresh_training_data",
   "get_training_data_status",
-] as const;
+] as const);
+
+/**
+ * @deprecated Use MCP_TOOL_NAMES_V1. Retained so Version 0.9 consumers can
+ * compare their prerelease snapshot without changing imports.
+ */
+export const MCP_TOOL_NAMES_V0_9 = MCP_TOOL_NAMES_V1;
