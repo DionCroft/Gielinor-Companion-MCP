@@ -3,6 +3,37 @@
 All notable changes follow [Keep a Changelog](https://keepachangelog.com/) and
 semantic versioning.
 
+## [0.6.0] - 2026-07-23
+
+### Added
+
+- Model-independent `@gielinor/agent-runtime` with Ollama and LM Studio
+  adapters, shared JSON tool schemas, multi-turn and parallel tool calls,
+  conversation state, and deterministic tool execution.
+- Capability-aware Ollama model discovery and OpenAI-compatible LM Studio model
+  discovery.
+- Desktop provider/endpoint/model configuration, connection testing, request
+  timeout and tool-loop controls, conversation reset, and live trusted-tool
+  activity.
+- Deterministic tests for single, sequential, and parallel calls; invalid
+  arguments; unknown tools; timeouts; loop limits; provider/model outages;
+  partial and malformed responses; tool failures; and conversation state.
+- Optional Ollama and LM Studio live adapter smoke commands and local setup
+  documentation.
+
+### Security
+
+- Local model endpoints are restricted twice: runtime URL validation accepts
+  only loopback addresses, and Tauri's native HTTP capability allows only
+  `localhost`, `127.0.0.1`, and `::1`.
+- The model can invoke only the existing 48 trusted tools. Shared Zod schemas
+  validate inputs before execution and generic tool envelopes before a result
+  reaches the model.
+- Overall timeouts, one-megabyte requests/results, two-megabyte provider
+  responses, eight calls per turn, and ten loops maximum bound resource use.
+- Invalid or failed tool calls are returned as explicit error results and never
+  represented as successful companion data.
+
 ## [0.5.0] - 2026-07-23
 
 ### Added

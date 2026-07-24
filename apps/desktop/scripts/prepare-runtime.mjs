@@ -22,7 +22,12 @@ if (host === undefined) {
   throw new Error("Could not determine the Rust host target");
 }
 
-rmSync(runtimeDirectory, { recursive: true, force: true });
+rmSync(runtimeDirectory, {
+  recursive: true,
+  force: true,
+  maxRetries: 10,
+  retryDelay: 250,
+});
 mkdirSync(runtimeDirectory, { recursive: true });
 mkdirSync(binariesDirectory, { recursive: true });
 
@@ -70,7 +75,12 @@ for (const moduleFormat of ["cjs", "esm"]) {
       moduleFormat,
       "examples",
     ),
-    { recursive: true, force: true },
+    {
+      recursive: true,
+      force: true,
+      maxRetries: 10,
+      retryDelay: 250,
+    },
   );
 }
 

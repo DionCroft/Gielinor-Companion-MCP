@@ -11,6 +11,7 @@ import {
   type ViewId,
 } from "./state/app-state.js";
 import type { CompanionBridge, DesktopProfile } from "./types.js";
+import { AiProvidersView } from "./views/AiProvidersView.js";
 import { FirstRunView } from "./views/FirstRunView.js";
 import { DashboardView, ProfilesView, SkillsView } from "./views/OverviewViews.js";
 import {
@@ -20,13 +21,7 @@ import {
   QuestPlannerView,
   ShoppingListsView,
 } from "./views/PlanningViews.js";
-import {
-  AboutView,
-  AiProvidersView,
-  DataStatusView,
-  SettingsView,
-  UpdatesView,
-} from "./views/SystemViews.js";
+import { AboutView, DataStatusView, SettingsView, UpdatesView } from "./views/SystemViews.js";
 
 function activeContent(
   state: AppState,
@@ -79,7 +74,7 @@ function activeContent(
         onOffline={(offlineMode) => dispatch({ type: "set-offline", offlineMode })}
       />
     ),
-    "ai-providers": <AiProvidersView />,
+    "ai-providers": <AiProvidersView bridge={bridge} profile={profile} />,
     about: <AboutView />,
   };
   return views[state.activeView];

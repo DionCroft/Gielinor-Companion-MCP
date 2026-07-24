@@ -3,5 +3,15 @@
   "identifier": "main-capability",
   "description": "Least-privilege capability for the main local companion window.",
   "windows": ["main"],
-  "permissions": ["core:default"]
+  "permissions": [
+    "core:default",
+    {
+      "identifier": "http:default",
+      "allow": [
+        { "url": "http://127.0.0.1:*" },
+        { "url": "http://localhost:*" },
+        { "url": "http://[::1]:*" }
+      ]
+    }
+  ]
 }

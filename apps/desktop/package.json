@@ -1,10 +1,11 @@
 {
   "name": "@gielinor/desktop",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "private": true,
   "description": "Tauri and React desktop companion with a deterministic no-AI dashboard.",
   "type": "module",
   "scripts": {
+    "predev": "corepack pnpm --filter @gielinor/agent-runtime build",
     "dev": "vite",
     "build": "tsc -b && vite build",
     "build:web": "tsc -b && vite build",
@@ -18,8 +19,10 @@
     "tauri:build": "corepack pnpm prepare:runtime && tauri build"
   },
   "dependencies": {
+    "@gielinor/agent-runtime": "workspace:*",
     "@gielinor/shared-types": "workspace:*",
     "@tauri-apps/api": "2.11.1",
+    "@tauri-apps/plugin-http": "^2.0.0",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "zod": "^3.25.76"

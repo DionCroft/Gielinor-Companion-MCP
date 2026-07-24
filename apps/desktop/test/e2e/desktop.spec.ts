@@ -83,3 +83,41 @@ test("settings and goals survive a reload", async ({ page }) => {
   await page.getByRole("button", { name: "Goals" }).click();
   await expect(page.getByText("Reach level 99")).toBeVisible();
 });
+
+test("Ollama discovery and trusted local tool conversation work", async ({ page }) => {
+  await page.goto("/?fixture=ai-ready");
+  await page.getByRole("button", { name: "AI providers" }).click();
+  await page.getByRole("radio", { name: /Ollama/i }).check();
+  await page.getByRole("button", { name: /test and discover models/i }).click();
+  await expect(page.getByLabel("Installed model", { exact: true })).toHaveValue("llama3.2:3b");
+  await page.getByLabel("Installed model", { exact: true }).selectOption("qwen3:8b");
+  await page.getByLabel("Question").fill("What is the guide price of an abyssal whip?");
+  await page.getByRole("button", { name: "Ask local model" }).click();
+  await expect(page.getByText(/validated local catalogue lists an Abyssal whip/i)).toBeVisible();
+  await expect(page.getByText("search_items")).toBeVisible();
+  await expect(page.getByText("succeeded")).toBeVisible();
+  await page.getByRole("button", { name: "Reset conversation" }).click();
+  await expect(page.getByText(/ask a RuneScape planning question/i)).toBeVisible();
+});
+
+test("LM Studio model discovery works with the local OpenAI-compatible adapter", async ({
+  page,
+}) => {
+  await page.goto("/?fixture=ai-ready");
+  await page.getByRole("button", { name: "AI providers" }).click();
+  await page.getByRole("radio", { name: /LM Studio/i }).check();
+  await page.getByRole("button", { name: /test and discover models/i }).click();
+  await expect(page.getByLabel("Installed model", { exact: true })).toHaveValue(
+    "local/llama-3.2-3b",
+  );
+  await expect(page.getByText(/2 local models discovered/i)).toBeVisible();
+});
+
+test("local AI provider failures are actionable", async ({ page }) => {
+  await page.goto("/?fixture=ai-provider-error");
+  await page.getByRole("button", { name: "AI providers" }).click();
+  await page.getByRole("radio", { name: /Ollama/i }).check();
+  await page.getByRole("button", { name: /test and discover models/i }).click();
+  await expect(page.getByRole("alert")).toContainText(/HTTP 503/i);
+  await expect(page.getByText("Not connected")).toBeVisible();
+});

@@ -26,12 +26,12 @@ weekly schedules.
 Item search, historical data, moving averages, percentage changes, volatility,
 volume where available, list/equipment valuation, charts, and freshness display.
 
-## 0.5 — Standalone desktop and no-AI dashboard (current)
+## 0.5 — Standalone desktop and no-AI dashboard (complete)
 
 Accessible React/Tauri UI for profiles, skills, quests, levelling, GE, shopping
 lists, goals, settings, source health, and portable profile files.
 
-## 0.6 — Local AI providers
+## 0.6 — Local AI providers (current)
 
 Shared bounded tool-call runtime, Ollama and LM Studio adapters, multi-turn and
 parallel tool calls, model selection, timeouts, validation, and setup guidance.

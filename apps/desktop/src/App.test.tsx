@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 
 import { App } from "./App.js";
 import { DemoCompanionBridge } from "./lib/bridge.js";
+import { loadLocalAiSettings } from "./views/AiProvidersView.js";
 
 describe("desktop application flows", () => {
   it("completes first-run setup without an AI provider", async () => {
@@ -42,5 +43,79 @@ describe("desktop application flows", () => {
 
     expect(await screen.findByText(/offline mode is active/i)).toBeVisible();
     expect(screen.getByText("7,310")).toBeVisible();
+  });
+
+  it("discovers an Ollama model and answers through a validated tool call", async () => {
+    const user = userEvent.setup();
+    render(<App bridge={new DemoCompanionBridge("ai-ready")} />);
+
+    await user.click(await screen.findByRole("button", { name: "AI providers" }));
+    await user.click(screen.getByRole("radio", { name: /Ollama/i }));
+    await user.click(screen.getByRole("button", { name: /test and discover models/i }));
+
+    expect(await screen.findByRole("option", { name: "qwen3:8b" })).toBeVisible();
+    await user.type(
+      screen.getByLabelText("Question"),
+      "What is the guide price of an abyssal whip?",
+    );
+    await user.click(screen.getByRole("button", { name: "Ask local model" }));
+
+    expect(
+      await screen.findByText(/validated local catalogue lists an Abyssal whip/i),
+    ).toBeVisible();
+    expect(screen.getByText("search_items")).toBeVisible();
+    expect(screen.getByText("succeeded")).toBeVisible();
+  });
+
+  it("shows an actionable local provider failure", async () => {
+    const user = userEvent.setup();
+    render(<App bridge={new DemoCompanionBridge("ai-provider-error")} />);
+
+    await user.click(await screen.findByRole("button", { name: "AI providers" }));
+    await user.click(screen.getByRole("radio", { name: /LM Studio/i }));
+    await user.click(screen.getByRole("button", { name: /test and discover models/i }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      /rejected the request with HTTP 503/i,
+    );
+  });
+
+  it("rejects a remote model endpoint without leaving local-only mode", async () => {
+    const user = userEvent.setup();
+    render(<App bridge={new DemoCompanionBridge("ai-ready")} />);
+
+    await user.click(await screen.findByRole("button", { name: "AI providers" }));
+    await user.click(screen.getByRole("radio", { name: /Ollama/i }));
+    const endpoint = screen.getByLabelText("Local provider endpoint");
+    await user.clear(endpoint);
+    await user.type(endpoint, "https://models.example.com");
+    await user.click(screen.getByRole("button", { name: /test and discover models/i }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/only loopback HTTP endpoints/i);
+    expect(screen.getByRole("switch", { name: "Local-only privacy mode" })).toBeChecked();
+  });
+
+  it("repairs malformed persisted local-AI bounds", () => {
+    localStorage.setItem(
+      "gielinor-companion-local-ai-v1",
+      JSON.stringify({
+        providerId: "remote-cloud",
+        endpoints: { ollama: 42, "lm-studio": null },
+        model: 123,
+        timeoutMs: 500_000,
+        maxToolLoops: 99,
+      }),
+    );
+
+    expect(loadLocalAiSettings()).toEqual({
+      providerId: "none",
+      endpoints: {
+        ollama: "http://127.0.0.1:11434",
+        "lm-studio": "http://127.0.0.1:1234",
+      },
+      model: "",
+      timeoutMs: 30_000,
+      maxToolLoops: 4,
+    });
   });
 });

@@ -27,7 +27,7 @@ export function loadProviderConfig(environment: NodeJS.ProcessEnv = process.env)
   return {
     userAgent:
       environment.GIELINOR_USER_AGENT ??
-      "Gielinor-Companion-MCP/0.5.0 (https://github.com/DionCroft/Gielinor-Companion-MCP)",
+      "Gielinor-Companion-MCP/0.6.0 (https://github.com/DionCroft/Gielinor-Companion-MCP)",
     timeoutMs: envInteger(environment, "GIELINOR_HTTP_TIMEOUT_MS", 10_000),
     retries: z.coerce
       .number()
