@@ -9,6 +9,14 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./jagex-hiscores": {
+      "types": "./dist/jagex-hiscores.d.ts",
+      "import": "./dist/jagex-hiscores.js"
+    },
+    "./jagex-hiscores-parser": {
+      "types": "./dist/jagex-hiscores-parser.d.ts",
+      "import": "./dist/jagex-hiscores-parser.js"
     }
   },
   "files": [
