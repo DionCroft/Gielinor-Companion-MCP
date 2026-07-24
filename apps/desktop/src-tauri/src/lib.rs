@@ -143,6 +143,18 @@ fn resolve_runtime(app: &AppHandle) -> Result<RuntimeCommand, BridgeError> {
         }
     }
 
+    #[cfg(debug_assertions)]
+    {
+        let entry = development_entry();
+        if entry.is_file() {
+            return Ok(RuntimeCommand {
+                executable: PathBuf::from(if cfg!(windows) { "node.exe" } else { "node" }),
+                entry,
+                mode: "development",
+            });
+        }
+    }
+
     if let Ok(resource_dir) = app.path().resource_dir() {
         let entry = resource_dir.join("runtime/dist/index.js");
         if let Some(executable) = bundled_executable().filter(|_| entry.is_file()) {
@@ -154,7 +166,9 @@ fn resolve_runtime(app: &AppHandle) -> Result<RuntimeCommand, BridgeError> {
         }
     }
 
+    #[cfg(not(debug_assertions))]
     let entry = development_entry();
+    #[cfg(not(debug_assertions))]
     if entry.is_file() {
         return Ok(RuntimeCommand {
             executable: PathBuf::from(if cfg!(windows) { "node.exe" } else { "node" }),
@@ -395,6 +409,22 @@ mod tests {
             ["http://127.0.0.1:*", "http://localhost:*", "http://[::1]:*"]
         );
         assert!(allowed.iter().all(|url| !url.contains("https://")));
+    }
+
+    #[test]
+    fn webview_security_does_not_break_schema_validation_startup() {
+        let config: Value = serde_json::from_str(include_str!("../tauri.conf.json")).unwrap();
+        let security = &config["app"]["security"];
+
+        assert_eq!(security["freezePrototype"], false);
+        assert!(security["csp"]
+            .as_str()
+            .unwrap()
+            .contains("script-src 'self'"));
+        assert!(security["devCsp"]
+            .as_str()
+            .unwrap()
+            .contains("script-src 'self' 'unsafe-inline'"));
     }
 
     #[test]

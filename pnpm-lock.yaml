@@ -63,6 +63,9 @@ importers:
       '@gielinor/agent-runtime':
         specifier: workspace:*
         version: link:../../packages/agent-runtime
+      '@gielinor/providers':
+        specifier: workspace:*
+        version: link:../../packages/providers
       '@gielinor/shared-types':
         specifier: workspace:*
         version: link:../../packages/shared-types

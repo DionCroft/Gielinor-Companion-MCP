@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 test("first-run creates a local normal profile", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/?fixture=first-run");
   await expect(page.getByRole("heading", { name: /plan with confidence/i })).toBeVisible();
   await page.getByLabel(/runescape display name/i).fill("Local Hero");
   await page.getByRole("button", { name: /continue to companion/i }).click();
