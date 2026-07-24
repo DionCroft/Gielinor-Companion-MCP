@@ -1,6 +1,6 @@
 # Security audit checklist
 
-Reviewed for Version 0.9 on 2026-07-24.
+Reviewed for Version 1.0 on 2026-07-24.
 
 - [x] No gameplay input, credential, client-memory, packet, or trade automation.
 - [x] External responses use timeouts, success checks, runtime validation,
@@ -20,8 +20,13 @@ Reviewed for Version 0.9 on 2026-07-24.
 - [x] Node production dependencies have no known advisory after the explicit
       Hono 2.0.11 override.
 - [x] RustSec audit is enforced in CI against the Tauri lockfile.
-- [ ] Release artifact signing is deferred to Version 1.0 and requires an
-      operator certificate.
+- [x] Release automation produces checksums, SPDX JSON SBOMs, and GitHub
+      artifact attestations.
+- [x] Desktop signing/notarization inputs are supported without embedding
+      credentials; unsigned artifacts are identified when certificates are not
+      configured.
+- [x] Stable MCP, profile, provider, and database contracts have executable
+      compatibility/upgrade tests.
 
-Any unchecked item blocks the corresponding release claim; signing does not
-block unsigned development builds.
+Any unchecked item blocks the corresponding release claim. Maintainer
+certificate availability does not block a clearly labelled unsigned artifact.

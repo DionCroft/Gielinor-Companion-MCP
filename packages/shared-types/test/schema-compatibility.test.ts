@@ -2,15 +2,15 @@ import { describe, expect, it } from "vitest";
 
 import {
   ImportableProfileExportSchema,
-  MCP_TOOL_NAMES_V0_9,
+  MCP_TOOL_NAMES_V1,
   PROFILE_EXPORT_SCHEMA_VERSION,
   ProfileExportSchema,
 } from "../src/index.js";
 import { COMPANION_TOOL_DEFINITIONS } from "../src/tool-definitions.js";
 
-describe("Version 0.9 public schema compatibility", () => {
+describe("Version 1 public schema compatibility", () => {
   it("preserves the complete MCP tool-name contract", () => {
-    expect(Object.keys(COMPANION_TOOL_DEFINITIONS)).toEqual(MCP_TOOL_NAMES_V0_9);
+    expect(Object.keys(COMPANION_TOOL_DEFINITIONS)).toEqual(MCP_TOOL_NAMES_V1);
     for (const definition of Object.values(COMPANION_TOOL_DEFINITIONS)) {
       expect(definition.description.length).toBeGreaterThan(10);
       expect(definition.inputSchema.safeParse({})).toHaveProperty("success");

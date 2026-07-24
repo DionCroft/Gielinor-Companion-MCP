@@ -11,3 +11,5 @@ apps/desktop/src-tauri/binaries
 apps/desktop/src-tauri/gen/schemas
 apps/desktop/test-results
 apps/desktop/playwright-report
+release
+data/contracts/mcp-tools-v1.json

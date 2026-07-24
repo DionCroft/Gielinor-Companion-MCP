@@ -43,7 +43,7 @@ function testConfig(directory: string, overrides: Partial<HostedConfig> = {}): H
     toolCallsPerMinute: 100,
     requestTimeoutMs: 10_000,
     shutdownTimeoutMs: 1_000,
-    userAgent: "Gielinor-Hosted-Test/0.9.0",
+    userAgent: "Gielinor-Hosted-Test/1.0.0",
     ...overrides,
   };
 }
@@ -100,7 +100,7 @@ describe("hosted Streamable HTTP service", () => {
     const live = await fetch(`${running.url}/health/live`);
     expect(live.status).toBe(200);
     expect(live.headers.get("x-content-type-options")).toBe("nosniff");
-    await expect(live.json()).resolves.toMatchObject({ status: "ok", version: "0.9.0" });
+    await expect(live.json()).resolves.toMatchObject({ status: "ok", version: "1.0.0" });
 
     const ready = await fetch(`${running.url}/health/ready`);
     expect(ready.status).toBe(200);

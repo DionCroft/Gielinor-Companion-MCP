@@ -1,6 +1,6 @@
 {
   "name": "@gielinor/agent-runtime",
-  "version": "0.9.0",
+  "version": "1.0.0",
   "description": "Bounded, model-independent local AI runtime for Gielinor Companion.",
   "type": "module",
   "main": "./dist/index.js",
@@ -26,5 +26,15 @@
   "engines": {
     "node": ">=20"
   },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/DionCroft/Gielinor-Companion-MCP.git",
+    "directory": "packages/agent-runtime"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "sideEffects": false,
   "license": "MIT"
 }

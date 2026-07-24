@@ -1,4 +1,4 @@
-# Version 0.9 known limitations
+# Version 1.0 known limitations
 
 - The optional Alt1 integration is Windows-only because Alt1 supports Windows.
   Manual text analysis and every core companion feature remain available
@@ -14,7 +14,7 @@
   can prevent recognition; manual paste remains the fallback.
 - OCR and keyword matches are advisory. Even high-confidence completion signals
   require confirmation and never update a profile or game state.
-- Guide packs are still pasted locally in Version 0.9. There is no live
+- Guide packs are pasted locally in Version 1.0. There is no live
   profile/MCP-to-overlay bridge, avoiding a network path for screen observations.
 - The repository builds the static overlay but does not publish a trusted
   hosting origin. Operators must serve the build themselves or use local
@@ -33,9 +33,10 @@
   discovery, or private account data.
 - Local profiles have no delete MCP tool; hosted account deletion remains a
   separately authenticated HTTP lifecycle operation.
-- Hosted profiles use fixed bearer headers rather than OAuth. Anonymous public
-  tools work with current ChatGPT and Claude custom connectors; private hosted
-  profiles require a client that can configure an Authorization header.
+- Hosted private profiles use fixed bearer headers rather than OAuth. ChatGPT
+  connects only to a public remote MCP endpoint and cannot use the local stdio
+  server; use anonymous public tools there. Private profiles require a client
+  that can configure an Authorization header.
 - In-memory rate limits are per service instance. Multi-replica deployments need
   an external gateway/distributed limiter before horizontal scaling.
 - The hosted Node process does not terminate TLS. Operators must keep its port
@@ -44,8 +45,10 @@
   or snapshots retained by an operator.
 - Fresh hosted databases report public catalogues as `never-synced` until an
   operator invokes the restricted refresh tools.
-- The desktop source and unsigned installer build are verified, but this
-  development release does not publish signed/notarized binaries.
+- Release automation builds Windows, macOS, and Linux installers and verifies
+  their checksums and attestations. Platform signing/notarization depends on
+  maintainer-owned certificates; artifacts are otherwise explicitly unsigned.
+  Updates are manual and opt-in.
 - Goals and ad-hoc shopping lists use installation-local UI storage/state;
   portable profile export covers schema-versioned profile goals and quest state,
   not those ad-hoc dashboard entries.
@@ -54,7 +57,7 @@
   cache-capable reads. Neither is an operating-system network firewall.
 - Provider health is in-memory operational evidence and resets on process
   restart. It is not a long-term uptime monitor or authority score.
-- Version 0.9 ships the plugin contract inside the monorepo; independently
+- Version 1.0 ships provider API v1 inside the monorepo; independently
   installed dynamic plugin discovery is intentionally deferred until a signed
   package trust policy exists.
 - Performance and hosted load thresholds are regression budgets on CI-class
@@ -63,7 +66,7 @@
   and a model capable of structured tool use. Model quality and hardware needs
   vary; the project does not download a model automatically.
 - Only loopback model servers without API authentication are supported in
-  Version 0.6. LAN and hosted model endpoints are intentionally rejected by
+  Version 1.0. LAN and hosted model endpoints are intentionally rejected by
   local-only privacy mode.
 - Ollama discovery filters its explicit capability metadata. LM Studio's
   OpenAI-compatible model list does not consistently expose tool capability, so

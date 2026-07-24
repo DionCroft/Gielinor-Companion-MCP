@@ -3,6 +3,43 @@
 All notable changes follow [Keep a Changelog](https://keepachangelog.com/) and
 semantic versioning.
 
+## [1.0.0] - 2026-07-24
+
+### Added
+
+- Stable MCP contract `1.0` with an exact 48-tool snapshot, strict schemas, and
+  a generated machine-readable JSON manifest.
+- Stable profile export schema v1, provider plugin API v1, and documented
+  forward-only SQLite migration policy through schema v5.
+- Public npm package metadata for seven reusable workspaces, per-package MIT
+  licences, deterministic archive packing, and a clean-install protocol smoke
+  test.
+- Complete local MCP, desktop, Claude Desktop, Claude Code, LM Studio, Ollama,
+  hosted, and current ChatGPT remote-MCP installation guides.
+- Stable release workflow for Windows MSI/NSIS, macOS DMG, Linux AppImage/DEB,
+  npm archives, GHCR image, SPDX SBOM, SHA-256 checksums, and GitHub artifact
+  attestations.
+- Privacy policy, release-integrity guide, example workflows, release notes,
+  real deterministic desktop screenshots, accessibility review, and final
+  release report.
+
+### Changed
+
+- All project, package, desktop, hosted, container, and User-Agent release
+  versions are now `1.0.0`.
+- Native CI now compiles and tests the desktop command boundary on Windows,
+  macOS, and Linux.
+- Provider plugins must declare API version 1; unsupported versions fail before
+  partial registration.
+
+### Security
+
+- The locked Node dependency audit reports no known vulnerabilities.
+- Release artifacts use checksums, SBOMs, and keyless provenance; platform
+  signing is supported only through maintainer-controlled secrets.
+- Clean package, migration, stable-contract, restricted-container, and native
+  installer gates passed without adding gameplay control or credentials.
+
 ## [0.9.0] - 2026-07-24
 
 ### Added

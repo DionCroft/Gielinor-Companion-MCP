@@ -186,36 +186,36 @@ export function UpdatesView() {
         </span>
         <div>
           <p className="eyebrow">Installed release</p>
-          <h2>Version 0.9.0</h2>
-          <p>The bounded Ollama and LM Studio local-AI release.</p>
+          <h2>Version 1.0.0</h2>
+          <p>The first stable, local-first Gielinor Companion release.</p>
         </div>
         <StatusPill state="success">Current source build</StatusPill>
       </section>
       <section className="surface-card release-notes">
         <p className="eyebrow">What is included</p>
-        <h2>Local AI milestone</h2>
+        <h2>Stable release</h2>
         <ul className="feature-list">
           <li>
             <Icon name="check" />
-            Model discovery, connection testing and provider selection
+            Stable 48-tool MCP, profile export and provider contracts
           </li>
           <li>
             <Icon name="check" />
-            Multi-turn trusted tool use with bounded loops and timeouts
+            Quest, levelling and Grand Exchange planning in no-AI mode
           </li>
           <li>
             <Icon name="check" />
-            Bundled deterministic MCP runtime and offline cached mode
+            Optional bounded Ollama and LM Studio trusted-tool conversations
           </li>
           <li>
             <Icon name="check" />
-            Windows packaging with macOS and Linux source targets
+            Checksummed desktop, npm and container release pipeline
           </li>
         </ul>
       </section>
       <InlineAlert tone="info">
-        Signed update feeds arrive with the stable release pipeline. This source build does not
-        download or execute updates by itself.
+        Updates remain an explicit user action. Verify release checksums before installing; the
+        application never downloads or executes an update silently.
       </InlineAlert>
     </div>
   );
@@ -331,7 +331,7 @@ export function AboutView() {
             <i />
           </span>
           <div>
-            <p className="eyebrow">Version 0.9.0</p>
+            <p className="eyebrow">Version 1.0.0</p>
             <h2>Built for informed play—not automated play.</h2>
             <p>
               Gielinor Companion brings public player progress, quest dependencies, training methods

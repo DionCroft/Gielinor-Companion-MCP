@@ -7,18 +7,23 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 Gielinor Companion MCP is a safe, model-independent foundation for deterministic
-RuneScape 3 planning. Version 0.9 adds a typed provider plugin boundary,
-transactional migration tooling, cache-only offline routing, operational
-hardening, and contributor contracts alongside the hosted/local MCP servers,
-accessible Tauri/React desktop app, optional Ollama/LM Studio conversations, and
-optional Alt1 guidance. It never controls the game client.
+RuneScape 3 planning. Version 1.0 stabilizes the 48-tool MCP surface, portable
+profile format, database migrations, and provider plugin API. It combines
+hosted/local MCP servers, an accessible Tauri/React no-AI desktop, optional
+Ollama/LM Studio conversations, and optional Alt1 guidance. It never controls
+the game client.
 
 ## Release status
 
-**Current version: 0.9.0 — Extensibility and Hardening.** The same 48 trusted
-tools remain available over local stdio and stateless Streamable HTTP. Provider,
-profile, and database compatibility now have executable migration and contract
-tests.
+**Current version: 1.0.0 — Stable Public Release.** The same 48 trusted tools are
+available over local stdio and stateless Streamable HTTP. Public JSON contracts,
+profile migration fixtures, clean npm installation, forward-only database
+upgrades, cross-platform desktop builds, checksums, SBOMs, and provenance
+attestations are release gates.
+
+Read the [1.0.0 release notes](docs/releases/v1.0.0.md),
+[completion record](docs/releases/v1.0-completion.md), and
+[28-part final report](docs/releases/v1.0-final-report.md).
 
 ## Features
 
@@ -84,6 +89,10 @@ tests.
 - Failure-injection, database-lock, schema-compatibility, 1,000-quest,
   2,000-profile, memory-bound, and hosted-load tests plus documented threat,
   dependency, and accessibility audits.
+- Stable generated MCP contract manifest, provider API v1, profile schema v1,
+  database schema v5, public npm package manifests, clean packed-install smoke
+  test, cross-platform release workflow, SPDX SBOM, SHA-256 checksums, and
+  keyless GitHub provenance attestations.
 
 ## Architecture
 
@@ -114,6 +123,15 @@ transport depend on those ports; the core never depends on a UI or model vendor.
 See [the architecture overview](docs/architecture/overview.md) and
 [provider plugin architecture](docs/architecture/provider-plugins.md).
 
+## Desktop preview
+
+| Dashboard                                                  | Quest route                                            | Grand Exchange                                                 |
+| ---------------------------------------------------------- | ------------------------------------------------------ | -------------------------------------------------------------- |
+| ![Gielinor Companion dashboard](docs/images/dashboard.png) | ![Quest dependency route](docs/images/quest-route.png) | ![Grand Exchange history view](docs/images/grand-exchange.png) |
+
+The screenshots use deterministic fictional fixtures and contain no personal
+profile data or copyrighted RuneScape assets.
+
 ## Requirements
 
 - Node.js 20 or later
@@ -134,6 +152,10 @@ corepack pnpm start:mcp
 
 The last command starts an MCP stdio process and waits for a client. It does not
 provide a terminal chat prompt.
+
+The [installation index](docs/installation/README.md) covers source, release
+archives, every supported client, desktop installers, hosted deployment, and
+release verification.
 
 For the hosted HTTP service, follow the
 [deployment guide](docs/installation/hosted.md), then run:
@@ -183,12 +205,14 @@ and run `corepack pnpm build` first.
 ### Claude Desktop
 
 Merge [the example configuration](examples/claude-desktop/claude_desktop_config.json)
-into Claude Desktop's MCP configuration, then fully restart Claude Desktop.
+into Claude Desktop's MCP configuration, then fully restart Claude Desktop. See
+the [Claude Desktop guide](docs/installation/claude-desktop.md).
 
 ### Claude Code
 
 Use the tested stdio command documented in
-[examples/claude-code/README.md](examples/claude-code/README.md).
+[examples/claude-code/README.md](examples/claude-code/README.md) and the
+[complete Claude Code guide](docs/installation/claude-code.md).
 
 ### LM Studio
 
@@ -196,18 +220,18 @@ Add [the LM Studio example](examples/lm-studio/mcp.json) to LM Studio's MCP
 configuration. LM Studio model support for tool use varies; the MCP server itself
 does not contain LM Studio-specific behavior. For the standalone desktop's
 direct local provider, start LM Studio's Local Server, then follow the
-[local AI setup guide](docs/installation/local-ai.md).
+[LM Studio guide](docs/installation/lm-studio.md).
 
 ### Ollama
 
 Install a tool-capable model, keep Ollama running at its default loopback
 endpoint, then choose **AI providers → Ollama** in the desktop app. The app
 discovers only models whose Ollama metadata advertises tool support. See the
-[local AI setup guide](docs/installation/local-ai.md).
+[Ollama guide](docs/installation/ollama.md).
 
 ### Standalone desktop
 
-Version 0.9 retains the complete no-AI dashboard and optional local AI.
+Version 1.0 retains the complete no-AI dashboard and optional local AI.
 Build and run it from source:
 
 ```sh
@@ -225,7 +249,7 @@ Deploy the HTTPS service and use `https://your-host/mcp`. Current ChatGPT
 availability and the fixed-bearer authentication limitation are documented in
 [the remote example](examples/chatgpt-remote/README.md). Public tools use no
 authentication; fixed bearer profile tokens are for clients that support custom
-headers.
+headers. See the current [ChatGPT guide](docs/installation/chatgpt.md).
 
 ### Claude remote MCP
 
@@ -287,6 +311,8 @@ See the [Claude connector example](examples/claude-remote/README.md) and
 
 Every result is JSON and includes generation/source metadata. Full contracts,
 examples, and error cases are in [the MCP tool reference](docs/mcp-tools/README.md).
+The machine-readable stable surface is
+[`data/contracts/mcp-tools-v1.json`](data/contracts/mcp-tools-v1.json).
 
 ## Development
 
@@ -304,12 +330,17 @@ corepack pnpm test:hosted
 corepack pnpm test:overlay
 corepack pnpm test:database
 corepack pnpm test:hardening
+corepack pnpm test:release
 corepack pnpm test:load
 corepack pnpm test:e2e
 corepack pnpm test:desktop
 corepack pnpm test:desktop:e2e
 corepack pnpm test:desktop:rust
 corepack pnpm profile:performance
+corepack pnpm verify:contracts
+corepack pnpm verify:docs
+corepack pnpm smoke:clean-install
+corepack pnpm pack:release
 ```
 
 Optional live smoke tests make real public API requests and remain outside
@@ -364,6 +395,8 @@ The optional overlay adds only transient local visible-text observations; see
 [Version 0.8 overlay data behavior](docs/data-sources/version-0.8.md).
 Version 0.9 adds routing and migration behavior, not another public source; see
 [Version 0.9 data behavior](docs/data-sources/version-0.9.md).
+Version 1.0 stabilizes those contracts without adding a source; see
+[Version 1.0 data behavior](docs/data-sources/version-1.0.md).
 
 ## Privacy and safety
 
@@ -378,7 +411,11 @@ after explicit consent and connection, and cannot transmit captured data. Read
 The reviewed boundaries are recorded in the
 [threat model](docs/security/threat-model.md),
 [security checklist](docs/security/audit-checklist.md), and
-[dependency audit](docs/security/dependency-audit.md).
+[dependency audit](docs/security/dependency-audit.md). The full local/hosted data
+policy is [PRIVACY.md](PRIVACY.md), and release verification is documented in
+[release integrity](docs/security/release-integrity.md). The stable
+[accessibility review](docs/audits/accessibility-v1.0.md) and
+[performance record](docs/performance/v1.0.md) are release evidence.
 
 The project does not click, type, read client memory, intercept packets, trade,
 fight, skill, solve CAPTCHAs, or bypass anti-cheat systems. Read
@@ -386,9 +423,8 @@ fight, skill, solve CAPTCHAs, or bypass anti-cheat systems. Read
 
 ## Roadmap
 
-[ROADMAP.md](ROADMAP.md) describes the versioned route through quest planning,
-levelling plans, GE history, desktop/no-AI use, local model adapters, hosted MCP,
-optional read-only overlay, and hardening. Current limitations are explicit in
+[ROADMAP.md](ROADMAP.md) records the completed route through the stable public
+release and post-1.0 candidates. Current limitations are explicit in
 [docs/roadmap/known-limitations.md](docs/roadmap/known-limitations.md).
 
 ## Contributing and licence

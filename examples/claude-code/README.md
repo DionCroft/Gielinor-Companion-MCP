@@ -32,3 +32,5 @@ claude mcp add --transport http \
 Run `claude mcp get gielinor-private` and `/mcp` to verify the connection. The
 current syntax and safer environment-variable configuration options are in the
 [official Claude Code MCP guide](https://code.claude.com/docs/en/mcp).
+
+See [the complete project guide](../../docs/installation/claude-code.md).

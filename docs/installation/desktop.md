@@ -1,6 +1,6 @@
 # Desktop installation and source builds
 
-Version 0.6 is a local-first Tauri application with a complete no-AI mode and
+Version 1.0 is a local-first Tauri application with a complete no-AI mode and
 optional loopback-only Ollama or LM Studio support. It accepts only public
 RuneScape display names and optional planning preferences. It never needs game
 credentials or a model-provider API key.
@@ -16,25 +16,37 @@ corepack pnpm build
 corepack pnpm desktop:dev
 ```
 
-Create an unsigned NSIS installer:
+Create unsigned NSIS and MSI installers:
 
 ```powershell
 corepack pnpm --filter @gielinor/desktop prepare:runtime
-corepack pnpm --filter @gielinor/desktop exec tauri build --bundles nsis
+corepack pnpm --filter @gielinor/desktop exec tauri build --bundles nsis,msi
 ```
 
-The installer is written below
-`apps/desktop/src-tauri/target/release/bundle/nsis/`.
+Installers are written below
+`apps/desktop/src-tauri/target/release/bundle/nsis/` and `bundle/msi/`.
 
 ## macOS and Linux
 
 Install the platform prerequisites from the Tauri 2 documentation, then use the
-same install/build commands. The manual `Desktop release` workflow verifies DMG,
-AppImage, and Debian bundle paths in addition to Windows NSIS.
+same install/build commands. The tag-driven `Stable release` workflow builds
+DMG, AppImage, and Debian bundles in addition to Windows NSIS/MSI.
 
-Native bundles are unsigned development artifacts. macOS distribution therefore
-requires your own Apple signing and notarization configuration; trusted Windows
-distribution requires an Authenticode certificate.
+Locally built native bundles are unsigned unless you configure a platform
+certificate. The stable release workflow accepts maintainer-owned Apple signing
+inputs; macOS public distribution additionally requires notarization. Trusted
+Windows distribution requires an Authenticode certificate.
+
+## Installing a release artifact
+
+Download the installer for your operating system and `SHA256SUMS.txt` from the
+same GitHub release. Verify the hash before running it. Windows users can choose
+NSIS (`-setup.exe`) or MSI; macOS uses DMG; Linux provides AppImage and DEB.
+Unsigned artifacts are labelled as such when maintainer certificates are not
+configured. See [release integrity](../security/release-integrity.md).
+
+Version 1.0 does not silently download or apply updates. A user explicitly
+verifies and installs a newer release.
 
 ## Local data and offline use
 

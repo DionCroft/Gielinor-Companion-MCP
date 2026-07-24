@@ -1,6 +1,6 @@
 import type { GrandExchangeItem } from "@gielinor/shared-types";
 
-import type { ProviderPlugin } from "../../src/plugin.js";
+import { PROVIDER_PLUGIN_API_VERSION, type ProviderPlugin } from "../../src/plugin.js";
 
 export function fixturePrice(currentPrice: number, sourceName: string): GrandExchangeItem {
   return {
@@ -19,6 +19,7 @@ export function fixturePricePlugin(options: {
   offlineSupport?: "none" | "cache" | "full";
 }): ProviderPlugin {
   return {
+    apiVersion: PROVIDER_PLUGIN_API_VERSION,
     id: options.id,
     name: options.id,
     version: "1.0.0",

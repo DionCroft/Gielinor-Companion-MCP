@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { ProviderError } from "../src/http.js";
-import { ProviderRegistry } from "../src/plugin.js";
+import { PROVIDER_PLUGIN_API_VERSION, ProviderRegistry } from "../src/plugin.js";
 import { fixturePricePlugin } from "./fixtures/provider-contract.js";
 
 describe("ProviderRegistry", () => {
@@ -72,6 +72,7 @@ describe("ProviderRegistry", () => {
   it("rejects malformed high-priority results and uses the next valid provider", async () => {
     const registry = new ProviderRegistry();
     registry.register({
+      apiVersion: PROVIDER_PLUGIN_API_VERSION,
       id: "fixture.malformed",
       name: "Malformed fixture",
       version: "1.0.0",
@@ -153,5 +154,16 @@ describe("ProviderRegistry", () => {
     );
     expect(registry.capabilities()).toEqual([]);
     expect(registry.health.snapshot()).toEqual([]);
+  });
+
+  it("rejects incompatible plugin API versions before registration", () => {
+    const registry = new ProviderRegistry();
+    const incompatible = fixturePricePlugin({ id: "fixture.future", priority: 10 });
+    (incompatible as { apiVersion: number }).apiVersion = 2;
+
+    expect(() => registry.register(incompatible)).toThrowError(
+      expect.objectContaining({ code: "UNSUPPORTED_PROVIDER_PLUGIN_API" }),
+    );
+    expect(registry.capabilities()).toEqual([]);
   });
 });

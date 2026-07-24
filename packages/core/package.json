@@ -1,6 +1,7 @@
 {
   "name": "@gielinor/core",
-  "version": "0.9.0",
+  "version": "1.0.0",
+  "description": "Deterministic RuneScape 3 planning services for Gielinor Companion.",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -21,5 +22,15 @@
     "@gielinor/shared-types": "workspace:*",
     "zod": "^3.25.76"
   },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/DionCroft/Gielinor-Companion-MCP.git",
+    "directory": "packages/core"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "sideEffects": false,
   "license": "MIT"
 }

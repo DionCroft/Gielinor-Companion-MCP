@@ -1,6 +1,6 @@
 # Hardening, failure, and load testing
 
-Run the deterministic V0.9 suite:
+Run the deterministic Version 1 stable suite:
 
 ```sh
 corepack pnpm test:hardening

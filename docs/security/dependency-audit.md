@@ -1,4 +1,4 @@
-# Dependency audit
+# Version 1.0 dependency audit
 
 Audit date: 2026-07-24
 
@@ -10,16 +10,18 @@ still declares the 1.x adapter range, so the root lockfile now overrides that
 transitive adapter to 2.0.11. All hosted MCP protocol tests pass with the
 override.
 
-The repeated audit reports **no known vulnerabilities** across the locked Node
-dependency graph. CI runs the high/critical gate on every pull request.
+The Version 1.0 release audit, `corepack pnpm audit --audit-level moderate`,
+reports **no known vulnerabilities** across the locked Node dependency graph.
+CI runs the high/critical gate on every pull request.
 
 ## Rust
 
-The local environment did not have `cargo-audit` installed. CI uses the
+The local environment does not have `cargo-audit` installed. CI uses the
 official `rustsec/audit-check@v2.0.0` action against
 `apps/desktop/src-tauri/Cargo.lock`; an advisory fails the security job. The
-normal native job also runs formatting, Clippy with warnings denied, tests, and
-the no-bundle application build.
+normal native job also runs formatting, Clippy with warnings denied, four Rust
+tests, and the no-bundle application build. Local Version 1 validation passed
+Rust formatting, Clippy with `-D warnings`, and all four tests.
 
 Dependabot continues to open separate npm, Cargo, and GitHub Actions updates.
 Major dependency changes require focused compatibility tests and are not

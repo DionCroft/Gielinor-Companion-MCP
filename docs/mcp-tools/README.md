@@ -1,4 +1,11 @@
-# MCP tool reference — Version 0.9
+# MCP tool reference — Version 1.0
+
+Version 1.0 freezes the 48 tool names, strict input schemas, effect metadata,
+success envelope, and safe error envelope as MCP contract `1.0`. The generated
+[machine-readable contract](../../data/contracts/mcp-tools-v1.json) is checked
+against runtime definitions in CI. Compatible releases may add optional input
+fields; removing or renaming a tool, requiring a new field, or changing output
+semantics requires a new contract major version and migration guidance.
 
 All tools use strict JSON object inputs. Successful responses use:
 

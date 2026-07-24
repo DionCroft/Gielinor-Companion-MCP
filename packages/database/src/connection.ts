@@ -4,6 +4,7 @@ import { dirname, resolve } from "node:path";
 import Database from "better-sqlite3";
 
 export type DatabaseConnection = Database.Database;
+export const DATABASE_SCHEMA_VERSION = 5;
 
 export type DatabaseMigration = {
   version: number;

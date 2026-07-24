@@ -23,9 +23,20 @@ Never rename or remove a published tool in place. Add optional fields where
 possible. Required fields, enum removals, output shape changes, or semantic
 changes need a new contract version and migration/deprecation plan.
 
-`MCP_TOOL_NAMES_V0_9` is an executable compatibility snapshot. Update it only
-when the intentional tool change, documentation, and migration notes are in the
-same pull request.
+`MCP_TOOL_NAMES_V1` is the stable executable compatibility snapshot.
+`MCP_TOOL_NAMES_V0_9` remains a deprecated alias for prerelease consumers. A
+breaking surface change needs a new contract major version; do not mutate the
+v1 snapshot in place.
+
+Regenerate and verify the public machine-readable contract after a compatible
+schema change:
+
+```sh
+corepack pnpm generate:contracts
+corepack pnpm verify:contracts
+```
+
+Commit `data/contracts/mcp-tools-v1.json` with the source change.
 
 ## Error and safety rules
 
@@ -35,4 +46,5 @@ same pull request.
 - Profile mutations affect companion storage only.
 - GE results are guide data, never guaranteed trade outcomes.
 
-Run `corepack pnpm test:mcp`, `test:integration`, and `test:e2e` before review.
+Run `corepack pnpm test:mcp`, `test:integration`, `test:e2e`, and
+`test:release` before review.

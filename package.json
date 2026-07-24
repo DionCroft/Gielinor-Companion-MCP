@@ -1,12 +1,20 @@
 {
   "name": "gielinor-companion-mcp",
-  "version": "0.9.0",
+  "version": "1.0.0",
   "private": true,
   "description": "An open-source, AI-compatible RuneScape 3 quest, levelling and Grand Exchange companion.",
   "type": "module",
   "packageManager": "pnpm@10.34.5",
   "engines": {
     "node": ">=20"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/DionCroft/Gielinor-Companion-MCP.git"
+  },
+  "homepage": "https://github.com/DionCroft/Gielinor-Companion-MCP#readme",
+  "bugs": {
+    "url": "https://github.com/DionCroft/Gielinor-Companion-MCP/issues"
   },
   "scripts": {
     "build": "corepack pnpm --filter @gielinor/shared-types build && corepack pnpm --filter @gielinor/core build && corepack pnpm --filter @gielinor/providers build && corepack pnpm --filter @gielinor/database build && corepack pnpm --filter @gielinor/mcp-server build && corepack pnpm --filter @gielinor/hosted-server build && corepack pnpm --filter @gielinor/alt1-overlay build && corepack pnpm --filter @gielinor/agent-runtime build && corepack pnpm --filter @gielinor/desktop build",
@@ -21,6 +29,7 @@
     "test:overlay": "corepack pnpm --filter @gielinor/alt1-overlay test",
     "test:database": "corepack pnpm build && vitest run packages/database/test",
     "test:hardening": "corepack pnpm build && vitest run packages/shared-types/test packages/providers/test/provider-plugin.test.ts packages/providers/test/cache.test.ts packages/core/test/data-migrations.test.ts packages/core/test/quest-service.test.ts packages/database/test apps/hosted-server/test/load.test.ts",
+    "test:release": "corepack pnpm build && vitest run packages/shared-types/test/stable-contracts.test.ts packages/providers/test/stable-interface.test.ts packages/database/test/upgrade-path.test.ts && node scripts/verify-release.mjs",
     "test:load": "corepack pnpm build && vitest run packages/database/test/performance.test.ts apps/hosted-server/test/load.test.ts",
     "test:e2e": "corepack pnpm build && vitest run apps/mcp-server/test/quest-flow.e2e.test.ts apps/mcp-server/test/levelling-flow.e2e.test.ts apps/mcp-server/test/grand-exchange-flow.e2e.test.ts && corepack pnpm --filter @gielinor/desktop test:e2e",
     "test:desktop": "corepack pnpm --filter @gielinor/desktop test",
@@ -47,7 +56,14 @@
     "start:hosted": "node apps/hosted-server/dist/index.js",
     "overlay:dev": "corepack pnpm --filter @gielinor/alt1-overlay dev",
     "profile:performance": "corepack pnpm build && node scripts/profile-performance.mjs",
-    "load:hosted": "node scripts/load-hosted.mjs"
+    "load:hosted": "node scripts/load-hosted.mjs",
+    "generate:contracts": "corepack pnpm build && node scripts/generate-contracts.mjs --write",
+    "verify:contracts": "corepack pnpm build && node scripts/generate-contracts.mjs --check",
+    "verify:docs": "node scripts/verify-doc-links.mjs",
+    "verify:release": "corepack pnpm build && node scripts/verify-release.mjs",
+    "pack:release": "corepack pnpm build && node scripts/pack-release.mjs",
+    "smoke:clean-install": "corepack pnpm build && node scripts/clean-install-smoke.mjs",
+    "capture:screenshots": "corepack pnpm --filter @gielinor/desktop capture:screenshots"
   },
   "devDependencies": {
     "@eslint/js": "^9.31.0",

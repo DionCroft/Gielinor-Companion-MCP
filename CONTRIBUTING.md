@@ -16,6 +16,7 @@ corepack pnpm typecheck
 corepack pnpm lint
 corepack pnpm test
 corepack pnpm test:hardening
+corepack pnpm test:release
 corepack pnpm build
 ```
 
@@ -49,6 +50,7 @@ Focused guides:
 - [UI development](docs/development/ui-development.md)
 - [Migration policy](docs/architecture/migrations.md)
 - [Hardening and load tests](docs/testing/hardening.md)
+- [Release validation](docs/testing/release-validation.md)
 
 ## Security
 

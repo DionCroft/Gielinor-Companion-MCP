@@ -1,8 +1,9 @@
-# Version 0.9 architecture
+# Version 1.0 stable architecture
 
 ## Boundaries
 
-`@gielinor/shared-types` owns domain Zod schemas and stable vocabulary.
+`@gielinor/shared-types` owns domain Zod schemas, the stable 48-tool order,
+profile export version, and generated public contract vocabulary.
 `@gielinor/core` owns deterministic XP, quest-graph, levelling-planner, and
 price-analytics rules,
 application services, and ports. `@gielinor/providers` implements public API
@@ -53,6 +54,24 @@ interface. It contains no provider parsing or game recommendation logic.
 Provider refresh failures retain an existing valid record. Fresh records are
 served immediately; stale records may be served while one deduplicated background
 refresh runs. Expired records require a successful refresh.
+
+## Stable public contracts
+
+Version 1.0 declares four independently versioned boundaries:
+
+- MCP tool contract `1.0`: exact names, strict inputs, effect metadata, common
+  success envelope, and safe public error envelope;
+- profile export schema `1`: portable user data with a tested legacy-v0
+  migration;
+- provider plugin API `1`: typed capabilities, metadata, routing, validation,
+  offline behavior, and health;
+- SQLite schema `5`: forward-only named migrations with transactional
+  `user_version` updates.
+
+`data/contracts/mcp-tools-v1.json` is generated from the shared definitions used
+by the local model runtime. `data/schemas/profile-export.schema.json` publishes
+the portable profile shape. Contract changes follow semantic versioning;
+database/profile data changes require explicit migrations and fixtures.
 
 ## Quest synchronization
 
@@ -282,7 +301,7 @@ local or hosted SQLite only. The stdio MCP process writes protocol messages to
 stdout and diagnostics to stderr; the hosted process writes privacy-preserving
 JSON operational events to stdout.
 
-## Future extension
+## Post-1.0 extension
 
 Later transports or overlay bridges must preserve these boundaries. They must
 not reimplement calculations, quest graph traversal, levelling selection, price
