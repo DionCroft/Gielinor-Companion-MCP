@@ -11,7 +11,7 @@ describe.runIf(live)("live RuneScape Wiki training provider smoke test", () => {
     const provider = new RuneScapeWikiTrainingProvider({
       httpClient: new ResilientHttpClient({
         userAgent:
-          "Gielinor-Companion-MCP-live-test/0.4.0 (https://github.com/DionCroft/Gielinor-Companion-MCP)",
+          "Gielinor-Companion-MCP-live-test/0.5.0 (https://github.com/DionCroft/Gielinor-Companion-MCP)",
         timeoutMs: 30_000,
       }),
     });

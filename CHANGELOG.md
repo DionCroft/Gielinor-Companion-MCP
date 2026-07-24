@@ -3,6 +3,35 @@
 All notable changes follow [Keep a Changelog](https://keepachangelog.com/) and
 semantic versioning.
 
+## [0.5.0] - 2026-07-23
+
+### Added
+
+- Accessible Tauri 2 and React desktop application with first-run setup,
+  multiple local profiles, skills, quest route/checklist/shopping views,
+  levelling plans, GE search/charts, shopping lists, goals, source status,
+  updates, settings, optional-AI preview, and legal/safety views.
+- Portable profile JSON import/export and deterministic browser-preview fixtures
+  for first-run, returning, offline, and provider-failure states.
+- Least-privilege Tauri command bridge restricted to the 48 documented MCP tools
+  and a bundled target-specific Node/MCP production sidecar.
+- Dark, light, and system themes; compact density; responsive layouts; skip
+  navigation; reduced-motion behavior; loading, error, freshness, and retained
+  data states.
+- React state/form/component tests, eight Playwright user journeys, Rust
+  allowlist/error/stdio command tests, Windows NSIS packaging, and manual
+  multi-platform bundle CI.
+
+### Security
+
+- Desktop calculations continue through the validated MCP/core boundary rather
+  than duplicated UI logic.
+- Strict CSP, Tauri prototype freezing, one local window capability, sanitized
+  native errors, no shell interpolation, and no credentials or game-client
+  access.
+- Failed provider refreshes retain the last valid local catalogue and remain
+  visible with source timestamps.
+
 ## [0.4.0] - 2026-07-23
 
 ### Added

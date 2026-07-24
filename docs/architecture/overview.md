@@ -1,4 +1,4 @@
-# Version 0.4 architecture
+# Version 0.5 architecture
 
 ## Boundaries
 
@@ -9,7 +9,8 @@ application services, and ports. `@gielinor/providers` implements public API
 adapters, resilient caching, and RuneScape Wiki quest/training adapters.
 `@gielinor/database` implements SQLite profile, cache, quest, training, GE
 catalogue/history, alias, and sync-status ports. `@gielinor/mcp-server` composes
-dependencies and exposes stdio tools.
+dependencies and exposes stdio tools. `@gielinor/desktop` is a Tauri/React client
+that reaches those same tools through a least-privilege native stdio bridge.
 
 Dependencies point inward:
 
@@ -17,6 +18,7 @@ Dependencies point inward:
 shared-types <- core <- providers
                     <- database
 shared-types/core/providers/database <- mcp-server
+                                      <- desktop bridge <- React views
 ```
 
 The database package also implements the provider package's cache-storage
@@ -133,6 +135,25 @@ timeout are enabled for file-backed databases.
 Profile export intentionally excludes local profile and goal UUIDs. Import creates
 new UUIDs and accepts only schema version 1.
 
+## Desktop boundary
+
+The React UI contains presentation state and strict forms, not domain
+calculations. Tauri accepts only a documented tool name and JSON arguments,
+rejects everything outside the 48-tool allowlist, and starts the bundled MCP
+runtime without a shell. Each call performs MCP initialization and a structured
+tool call over stdio, then terminates its child process. Native errors are mapped
+to path-free public messages.
+
+Production preparation uses `pnpm deploy` to build a flattened dependency tree
+and copies the current target's Node executable as a Tauri external sidecar.
+Generated runtime, target, and installer files are ignored. The main window has
+only `core:default`, a strict CSP, and prototype freezing; it receives no generic
+filesystem, shell, process, or network capability.
+
+Browser preview and Playwright use deterministic fixtures and never replace
+native command tests. User profiles and provider catalogues continue to use the
+same SQLite file as the headless MCP server.
+
 ## Safety
 
 No layer communicates with a RuneScape client. Provider URLs are public read-only
@@ -141,6 +162,6 @@ writes protocol messages to stdout and diagnostics to stderr.
 
 ## Future extension
 
-The Version 0.5 desktop UI, later hosted transport, and agent runtimes must
-compose these same services; they must not reimplement calculations, quest graph
-traversal, levelling selection, price analytics, or valuation.
+Later local-agent and hosted transports must compose these same services; they
+must not reimplement calculations, quest graph traversal, levelling selection,
+price analytics, or valuation.

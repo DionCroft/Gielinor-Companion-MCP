@@ -5,3 +5,9 @@ pnpm-lock.yaml
 *.db
 *.db-shm
 *.db-wal
+apps/desktop/src-tauri/target
+apps/desktop/src-tauri/runtime
+apps/desktop/src-tauri/binaries
+apps/desktop/src-tauri/gen/schemas
+apps/desktop/test-results
+apps/desktop/playwright-report
