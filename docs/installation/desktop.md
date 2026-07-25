@@ -1,13 +1,13 @@
 # Desktop installation and source builds
 
-Version 1.0 is a local-first Tauri application with a complete no-AI mode and
+Version 1.1 is a local-first Tauri application with a complete no-AI mode and
 optional loopback-only Ollama or LM Studio support. It accepts only public
 RuneScape display names and optional planning preferences. It never needs game
 credentials or a model-provider API key.
 
 ## Windows source build
 
-Install Node.js 20+, Corepack, Rust 1.85+, and the Microsoft C++ build tools,
+Install Node.js 22 or 24 LTS, Corepack, Rust 1.85+, and the Microsoft C++ build tools,
 then run:
 
 ```powershell
@@ -45,7 +45,7 @@ NSIS (`-setup.exe`) or MSI; macOS uses DMG; Linux provides AppImage and DEB.
 Unsigned artifacts are labelled as such when maintainer certificates are not
 configured. See [release integrity](../security/release-integrity.md).
 
-Version 1.0 does not silently download or apply updates. A user explicitly
+Version 1.1 does not silently download or apply updates. A user explicitly
 verifies and installs a newer release.
 
 ## Local data and offline use

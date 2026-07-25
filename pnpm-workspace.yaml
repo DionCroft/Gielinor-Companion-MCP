@@ -2,6 +2,13 @@ packages:
   - "apps/*"
   - "packages/*"
 
+injectWorkspacePackages: true
+
+# better-sqlite3 12.x uses this audited install-time fallback. The next major
+# removes it but is not adopted until its database compatibility is validated.
+allowedDeprecatedVersions:
+  prebuild-install: "7.1.3"
+
 onlyBuiltDependencies:
   - better-sqlite3
   - esbuild

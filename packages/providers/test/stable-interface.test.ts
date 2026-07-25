@@ -24,7 +24,7 @@ describe("Version 1 provider plugin interface", () => {
 
     expect(PROVIDER_PLUGIN_API_VERSION).toBe(1);
     expect(plugin.apiVersion).toBe(PROVIDER_PLUGIN_API_VERSION);
-    expect(plugin.version).toBe("1.0.0");
+    expect(plugin.version).toBe("1.1.0");
     expect(plugin.capabilities.map((capability) => capability.capability)).toEqual(
       PROVIDER_CAPABILITIES,
     );
@@ -49,7 +49,7 @@ describe("Version 1 provider plugin interface", () => {
       expect.arrayContaining([
         expect.objectContaining({
           pluginId: plugin.id,
-          pluginVersion: "1.0.0",
+          pluginVersion: "1.1.0",
           offlineSupport: "cache",
         }),
       ]),

@@ -7,23 +7,25 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 Gielinor Companion MCP is a safe, model-independent foundation for deterministic
-RuneScape 3 planning. Version 1.0 stabilizes the 48-tool MCP surface, portable
-profile format, database migrations, and provider plugin API. It combines
+RuneScape 3 planning. Version 1.1 preserves the frozen 48-tool Version 1.0
+surface while extending it with health, recovery, maintenance, and update
+diagnostics. It combines
 hosted/local MCP servers, an accessible Tauri/React no-AI desktop, optional
 Ollama/LM Studio conversations, and optional Alt1 guidance. It never controls
 the game client.
 
 ## Release status
 
-**Current version: 1.0.0 — Stable Public Release.** The same 48 trusted tools are
-available over local stdio and stateless Streamable HTTP. Public JSON contracts,
+**Current version: 1.1.0 — Resilience, Self-Healing and Automatic Maintenance.**
+Sixty trusted tools are available over local stdio and stateless Streamable HTTP,
+with the original 48 names and schemas preserved as the frozen Version 1.0
+prefix. Public JSON contracts,
 profile migration fixtures, clean npm installation, forward-only database
 upgrades, cross-platform desktop builds, checksums, SBOMs, and provenance
 attestations are release gates.
 
-Read the [1.0.0 release notes](docs/releases/v1.0.0.md),
-[completion record](docs/releases/v1.0-completion.md), and
-[28-part final report](docs/releases/v1.0-final-report.md).
+Read the [1.1.0 release notes](docs/releases/v1.1.0.md) and
+[28-part completion report](docs/releases/v1.1.0-completion.md).
 
 ## Features
 
@@ -41,7 +43,13 @@ Read the [1.0.0 release notes](docs/releases/v1.0.0.md),
 - Overflow-safe inventory, equipment, quest-shopping, and training-material
   valuation plus JSON/CSV export and explicit freshness.
 - Persistent cache-first, stale-while-revalidate provider data.
-- Timeouts, bounded retries, response validation, provenance, and timestamps.
+- Stable structured error codes, trace IDs, redaction, bounded retries,
+  provider circuit breakers, validated fallback, quarantine, and visible stale
+  data provenance.
+- Automatic first-run catalogue population, startup stale checks, persistent
+  background scheduling, missed-job recovery, and configurable offline mode.
+- Verified database backups, migration rollback, integrity diagnostics,
+  interrupted-migration recovery, and non-destructive safe mode.
 - Typed provider plugins with capability metadata, deterministic priority,
   validated fallback, disagreement preservation, offline eligibility, and
   per-capability health tracking.
@@ -59,7 +67,8 @@ Read the [1.0.0 release notes](docs/releases/v1.0.0.md),
   available GP, daily play time, target dates, quest gates, Ironman checks, and
   explicit missing-data behavior.
 - Quest-XP reward comparison and weekly goal schedules.
-- Forty-eight local MCP tools over stdio.
+- Sixty local MCP tools over stdio, including twelve additive Version 1.1
+  health and maintenance tools; the original 48-tool contract remains frozen.
 - Tauri 2 and React desktop application with first-run setup, multiple profiles,
   skills, quest routes/checklists, levelling plans, GE charts, shopping lists,
   goals, source status, settings, update status, and legal/safety information.
@@ -134,7 +143,7 @@ profile data or copyrighted RuneScape assets.
 
 ## Requirements
 
-- Node.js 20 or later
+- Node.js 22 or 24 LTS
 - Corepack (included with supported Node distributions)
 - A C++ build toolchain only if a prebuilt `better-sqlite3` binary is unavailable
 - Rust 1.85 or later and platform Tauri prerequisites only for desktop source
@@ -231,7 +240,7 @@ discovers only models whose Ollama metadata advertises tool support. See the
 
 ### Standalone desktop
 
-Version 1.0 retains the complete no-AI dashboard and optional local AI.
+Version 1.1 retains the complete no-AI dashboard and optional local AI.
 Build and run it from source:
 
 ```sh
@@ -308,6 +317,18 @@ See the [Claude connector example](examples/claude-remote/README.md) and
 - `compare_quest_xp_rewards`
 - `refresh_training_data`
 - `get_training_data_status`
+- `get_system_health`
+- `get_provider_health`
+- `get_catalogue_health`
+- `list_recent_errors`
+- `list_recovery_events`
+- `retry_failed_operation`
+- `refresh_stale_catalogues`
+- `run_database_integrity_check`
+- `export_redacted_diagnostics`
+- `check_for_software_updates`
+- `clear_expired_quarantine_records`
+- `reset_provider_circuit`
 
 Every result is JSON and includes generation/source metadata. Full contracts,
 examples, and error cases are in [the MCP tool reference](docs/mcp-tools/README.md).

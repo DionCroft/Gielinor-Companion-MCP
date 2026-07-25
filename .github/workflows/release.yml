@@ -10,7 +10,7 @@ permissions:
   contents: read
 
 env:
-  NODE_VERSION: "22"
+  NODE_VERSION: "24"
   PNPM_VERSION: "10.34.5"
 
 jobs:
@@ -49,6 +49,12 @@ jobs:
           pnpm typecheck
           pnpm test
           pnpm build
+          pnpm test:errors
+          pnpm test:resilience
+          pnpm test:recovery
+          pnpm test:scheduler
+          pnpm test:update-checker
+          pnpm test:fault-injection
 
       - name: Verify stable release contracts and documentation
         run: |
@@ -84,6 +90,7 @@ jobs:
           path: |
             gielinor-companion.spdx.json
             data/contracts/mcp-tools-v1.json
+            data/contracts/mcp-tools-v1.1.json
             data/schemas/profile-export.schema.json
           if-no-files-found: error
 
@@ -248,7 +255,7 @@ jobs:
       - name: Publish GitHub release
         uses: softprops/action-gh-release@v3
         with:
-          body_path: docs/releases/v1.0.0.md
+          body_path: docs/releases/v1.1.0.md
           files: release/assets/**
           fail_on_unmatched_files: true
           generate_release_notes: true

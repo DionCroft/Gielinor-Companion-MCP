@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { APPLICATION_VERSION } from "@gielinor/shared-types";
 
 import type { CachePolicy } from "./cache.js";
 
@@ -39,7 +40,7 @@ export function loadProviderConfig(environment: NodeJS.ProcessEnv = process.env)
   return {
     userAgent:
       environment.GIELINOR_USER_AGENT ??
-      "Gielinor-Companion-MCP/1.0.0 (https://github.com/DionCroft/Gielinor-Companion-MCP)",
+      `Gielinor-Companion-MCP/${APPLICATION_VERSION} (https://github.com/DionCroft/Gielinor-Companion-MCP)`,
     offline: envBoolean(environment, "GIELINOR_OFFLINE", false),
     timeoutMs: envInteger(environment, "GIELINOR_HTTP_TIMEOUT_MS", 10_000),
     retries: z.coerce

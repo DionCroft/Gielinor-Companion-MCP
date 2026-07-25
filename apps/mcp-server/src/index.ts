@@ -10,24 +10,44 @@ import {
   QuestService,
 } from "@gielinor/core";
 import {
-  openDatabase,
+  openResilientDatabase,
   SqliteCacheStore,
+  SqliteDiagnosticsRepository,
   SqlitePriceRepository,
   SqlitePlayerProfileRepository,
   SqliteQuestRepository,
   SqliteTrainingMethodRepository,
 } from "@gielinor/database";
 import { createDefaultProviderStack, loadProviderConfig } from "@gielinor/providers";
+import {
+  APPLICATION_VERSION,
+  assertSupportedNodeVersion,
+  toGielinorError,
+} from "@gielinor/shared-types";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 
 import { createCompanionServer } from "./server.js";
+import { RuntimeDiagnosticsService } from "./diagnostics-service.js";
+import {
+  createCatalogueMaintenanceRuntime,
+  loadMaintenanceRuntimePolicy,
+  type CatalogueMaintenanceRuntime,
+} from "./maintenance-runtime.js";
 import { CompanionToolService } from "./tool-service.js";
+import { SoftwareUpdateService, softwareUpdateChecksEnabled } from "./update-service.js";
 
 async function main(): Promise<void> {
+  assertSupportedNodeVersion();
   const config = loadProviderConfig();
   const databasePath =
     process.env.GIELINOR_DB_PATH ?? join(homedir(), ".gielinor-companion", "gielinor.db");
-  const database = openDatabase(databasePath);
+  const databaseRuntime = openResilientDatabase(databasePath);
+  const database = databaseRuntime.database;
+  if (databaseRuntime.state.status === "safe-mode") {
+    process.stderr.write(
+      `Gielinor Companion database safe mode: ${databaseRuntime.state.error?.code ?? "GC-DB-004"}; trace ${databaseRuntime.state.error?.traceId ?? "unavailable"}\n`,
+    );
+  }
   const cacheStore = new SqliteCacheStore(database);
   const providers = createDefaultProviderStack(config, cacheStore);
   const statsProvider = providers.ports;
@@ -50,13 +70,79 @@ async function main(): Promise<void> {
     quests,
     planner,
   );
-  const tools = new CompanionToolService(profiles, priceProvider, quests, planner, exchange);
-  const server = createCompanionServer(tools);
+  const diagnosticsRepository =
+    databaseRuntime.state.status === "safe-mode"
+      ? undefined
+      : new SqliteDiagnosticsRepository(database);
+  const maintenancePolicy = loadMaintenanceRuntimePolicy();
+  const updateChecker = new SoftwareUpdateService({
+    installedVersion: APPLICATION_VERSION,
+    cacheStore,
+    userAgent: config.userAgent,
+    offline: config.offline,
+    enabled: softwareUpdateChecksEnabled(),
+    checkIntervalMs: maintenancePolicy.intervals["software-update-check"],
+    timeoutMs: config.timeoutMs,
+  });
+  let maintenance: CatalogueMaintenanceRuntime | undefined;
+  if (databaseRuntime.state.status !== "safe-mode") {
+    try {
+      maintenance = await createCatalogueMaintenanceRuntime({
+        database,
+        quests,
+        planner,
+        exchange,
+        offline: config.offline,
+        policy: maintenancePolicy,
+        diagnostics: diagnosticsRepository,
+        updateChecker,
+      });
+      if (process.env.GIELINOR_RUNTIME_MODE !== "desktop-ephemeral") {
+        maintenance.start();
+      }
+    } catch (error) {
+      const structured = toGielinorError(error, {
+        fallbackCode: "GC-SCHED-001",
+        source: "mcp-server",
+        operation: "maintenance-startup",
+      });
+      process.stderr.write(
+        `Gielinor Companion maintenance unavailable: ${structured.code}; trace ${structured.traceId}\n`,
+      );
+      diagnosticsRepository?.recordError(structured);
+    }
+  }
+  const diagnostics = new RuntimeDiagnosticsService({
+    database,
+    databaseRecovery: databaseRuntime.state,
+    providerRegistry: providers.registry,
+    cacheStore,
+    quests,
+    planner,
+    exchange,
+    maintenance,
+    maintenancePolicy,
+    updateChecker,
+    offline: config.offline,
+    repository: diagnosticsRepository,
+  });
+  const tools = new CompanionToolService(
+    profiles,
+    priceProvider,
+    quests,
+    planner,
+    exchange,
+    diagnostics,
+  );
+  const server = createCompanionServer(tools, {
+    recordError: (error) => diagnostics.recordError(error),
+  });
   const transport = new StdioServerTransport();
 
   const shutdown = async (): Promise<void> => {
+    await maintenance?.stop();
     await server.close();
-    database.close();
+    databaseRuntime.close();
   };
   process.once("SIGINT", () => {
     void shutdown().finally(() => process.exit(0));

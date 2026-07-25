@@ -1,9 +1,51 @@
-import { useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
 
-import type { CompanionBridge, DesktopProfile, RuntimeStatus } from "../types.js";
+import type { CompanionBridge, DataStatus, DesktopProfile, RuntimeStatus } from "../types.js";
 import { InlineAlert } from "../components/Common.js";
 import { Icon } from "../components/Icon.js";
+import { desktopError } from "../lib/errors.js";
 import { CreateProfileFormSchema, firstError } from "../lib/validation.js";
+
+type SetupStageId =
+  "database" | "statistics" | "quests" | "training" | "prices" | "validation" | "ready";
+
+type SetupStage = {
+  id: SetupStageId;
+  label: string;
+  status: "pending" | "active" | "complete" | "failed";
+  detail?: string;
+};
+
+const INITIAL_STAGES: readonly SetupStage[] = [
+  { id: "database", label: "Preparing local database", status: "pending" },
+  { id: "statistics", label: "Refreshing player statistics", status: "pending" },
+  { id: "quests", label: "Synchronising quest catalogue", status: "pending" },
+  { id: "training", label: "Synchronising training methods", status: "pending" },
+  { id: "prices", label: "Synchronising Grand Exchange item catalogue", status: "pending" },
+  { id: "validation", label: "Validating local data", status: "pending" },
+  { id: "ready", label: "Ready", status: "pending" },
+];
+
+const CATALOGUES = [
+  {
+    id: "quests",
+    statusTool: "get_quest_data_status",
+    refreshTool: "refresh_quest_data",
+    count: (status: DataStatus) => status.questCount ?? 0,
+  },
+  {
+    id: "training",
+    statusTool: "get_training_data_status",
+    refreshTool: "refresh_training_data",
+    count: (status: DataStatus) => status.methodCount ?? 0,
+  },
+  {
+    id: "prices",
+    statusTool: "get_price_data_status",
+    refreshTool: "refresh_price_data",
+    count: (status: DataStatus) => status.itemCount ?? 0,
+  },
+] as const;
 
 export function FirstRunView({
   bridge,
@@ -18,6 +60,48 @@ export function FirstRunView({
   const [gameMode, setGameMode] = useState<"normal" | "ironman" | "hardcore-ironman">("normal");
   const [error, setError] = useState<string>();
   const [busy, setBusy] = useState(false);
+  const [profile, setProfile] = useState<DesktopProfile>();
+  const [stages, setStages] = useState<SetupStage[]>(() =>
+    INITIAL_STAGES.map((stage) => ({ ...stage })),
+  );
+  const continued = useRef(false);
+
+  function updateStage(id: SetupStageId, status: SetupStage["status"], detail?: string): void {
+    setStages((current) =>
+      current.map((stage) =>
+        stage.id === id ? { ...stage, status, ...(detail === undefined ? {} : { detail }) } : stage,
+      ),
+    );
+  }
+
+  function continueWith(profileToUse: DesktopProfile): void {
+    if (!continued.current) {
+      continued.current = true;
+      onComplete(profileToUse);
+    }
+  }
+
+  async function populateCatalogue(catalogue: (typeof CATALOGUES)[number]): Promise<boolean> {
+    updateStage(catalogue.id, "active");
+    try {
+      const status = await bridge.callTool<DataStatus>(catalogue.statusTool, {});
+      if (status.data.state === "ready" && catalogue.count(status.data) > 0) {
+        updateStage(catalogue.id, "complete", "Validated local catalogue retained");
+        return true;
+      }
+      await bridge.callTool(catalogue.refreshTool, {});
+      updateStage(catalogue.id, "complete", "Catalogue synchronised");
+      return true;
+    } catch (caught) {
+      const failure = desktopError(caught, `first-run-${catalogue.id}`, "GC-SYNC-001");
+      updateStage(
+        catalogue.id,
+        "failed",
+        `${failure.code}; trace ${failure.traceId}. Other sections remain available.`,
+      );
+      return false;
+    }
+  }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -27,21 +111,56 @@ export function FirstRunView({
       return;
     }
     setBusy(true);
+    setProfile(undefined);
+    continued.current = false;
+    setStages(INITIAL_STAGES.map((stage) => ({ ...stage })));
     setError(undefined);
     try {
+      updateStage("database", "active");
       const created = await bridge.callTool<DesktopProfile>("create_player_profile", parsed.data);
       let profile = created.data;
+      setProfile(profile);
+      updateStage("database", "complete", "Local profile storage is ready");
+      updateStage("statistics", "active");
       try {
         const refreshed = await bridge.callTool<DesktopProfile>("refresh_player_stats", {
           profileId: profile.id,
         });
         profile = refreshed.data;
-      } catch {
-        // A valid local profile remains useful offline; the dashboard explains refresh state.
+        setProfile(profile);
+        updateStage("statistics", "complete", "Public Hiscores refreshed");
+      } catch (caught) {
+        const failure = desktopError(caught, "first-run-player-statistics", "GC-PROVIDER-001");
+        updateStage(
+          "statistics",
+          "failed",
+          `${failure.code}; trace ${failure.traceId}. The local profile remains usable.`,
+        );
       }
-      onComplete(profile);
+      const catalogueResults = await Promise.all(
+        CATALOGUES.map((catalogue) => populateCatalogue(catalogue)),
+      );
+      updateStage("validation", "active");
+      const completed = catalogueResults.filter(Boolean).length;
+      updateStage(
+        "validation",
+        "complete",
+        completed === CATALOGUES.length
+          ? "All local catalogues validated"
+          : `${completed} of ${CATALOGUES.length} catalogues ready; valid partial data preserved`,
+      );
+      updateStage(
+        "ready",
+        "complete",
+        completed === CATALOGUES.length
+          ? "Setup completed"
+          : "Setup completed with optional provider warnings",
+      );
+      continueWith(profile);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "The profile could not be created");
+      const failure = desktopError(caught, "first-run-profile", "GC-DB-001");
+      updateStage("database", "failed", `${failure.code}; trace ${failure.traceId}`);
+      setError(`${failure.userMessage} (${failure.code}; trace ${failure.traceId})`);
     } finally {
       setBusy(false);
     }
@@ -105,6 +224,27 @@ export function FirstRunView({
           <InlineAlert tone="error">{runtime.message}</InlineAlert>
         ) : null}
         {error === undefined ? null : <InlineAlert tone="error">{error}</InlineAlert>}
+        {busy || stages.some((stage) => stage.status !== "pending") ? (
+          <ol className="setup-progress" aria-label="First-run setup progress" aria-live="polite">
+            {stages.map((stage) => (
+              <li key={stage.id} data-status={stage.status}>
+                <span className="setup-stage-indicator" aria-hidden="true">
+                  {stage.status === "complete"
+                    ? "✓"
+                    : stage.status === "failed"
+                      ? "!"
+                      : stage.status === "active"
+                        ? "•"
+                        : ""}
+                </span>
+                <span>
+                  <strong>{stage.label}</strong>
+                  {stage.detail === undefined ? null : <small>{stage.detail}</small>}
+                </span>
+              </li>
+            ))}
+          </ol>
+        ) : null}
         <form className="setup-form" onSubmit={submit} noValidate>
           <label>
             RuneScape display name
@@ -151,6 +291,15 @@ export function FirstRunView({
             {busy ? "Creating local profile…" : "Continue to companion"}
             {busy ? null : <Icon name="chevron" />}
           </button>
+          {busy && profile !== undefined ? (
+            <button
+              className="secondary-button wide"
+              type="button"
+              onClick={() => continueWith(profile)}
+            >
+              Continue with available data
+            </button>
+          ) : null}
         </form>
         <div className="privacy-callout">
           <Icon name="about" />

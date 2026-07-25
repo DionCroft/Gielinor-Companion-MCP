@@ -14,22 +14,40 @@ import {
   type TrainingMethodProvider,
 } from "@gielinor/core";
 import {
-  openDatabase,
+  openResilientDatabase,
   SqliteCacheStore,
+  SqliteDiagnosticsRepository,
   SqlitePlayerProfileRepository,
   SqlitePriceRepository,
   SqliteQuestRepository,
   SqliteTrainingMethodRepository,
   type DatabaseConnection,
+  type DatabaseRecoveryState,
+  type ResilientDatabase,
 } from "@gielinor/database";
-import { CompanionToolService } from "@gielinor/mcp-server/library";
+import {
+  CompanionToolService,
+  createCatalogueMaintenanceRuntime,
+  loadMaintenanceRuntimePolicy,
+  RuntimeDiagnosticsService,
+  SoftwareUpdateService,
+  softwareUpdateChecksEnabled,
+  type CatalogueMaintenanceRuntime,
+  type MaintenanceRuntimePolicy,
+} from "@gielinor/mcp-server/library";
 import {
   createDefaultProviderStack,
   loadProviderConfig,
   type ProviderHealth,
   type ProviderRegistry,
 } from "@gielinor/providers";
-import { PlayerProfileSchema, type PlayerProfile } from "@gielinor/shared-types";
+import {
+  APPLICATION_VERSION,
+  PlayerProfileSchema,
+  toGielinorError,
+  type GielinorError,
+  type PlayerProfile,
+} from "@gielinor/shared-types";
 import { z } from "zod";
 
 import { HostedAccountImportSchema, type HostedAccountExport } from "./account-transfer.js";
@@ -66,11 +84,13 @@ class UnavailableProfileRepository implements PlayerProfileRepository {
 export type HostedToolSession = {
   tools: CompanionToolService;
   profiles: ProfileService;
+  diagnostics?: RuntimeDiagnosticsService;
+  databaseRecovery?: DatabaseRecoveryState;
   close(): void;
 };
 
 export type HostedReadiness = {
-  storage: "ready";
+  storage: "ready" | "safe-mode";
   datasets: {
     quests: string;
     training: string;
@@ -80,7 +100,9 @@ export type HostedReadiness = {
 };
 
 export class HostedServiceFactory {
+  private readonly publicDatabaseRuntime: ResilientDatabase;
   private readonly publicDatabase: DatabaseConnection;
+  private readonly cacheStore: SqliteCacheStore;
   private readonly providerRegistry: ProviderRegistry;
   private readonly statsProvider: PlayerStatsProvider;
   private readonly priceProvider: GrandExchangeDataProvider;
@@ -89,6 +111,17 @@ export class HostedServiceFactory {
   private readonly priceRepository: SqlitePriceRepository;
   private readonly questProvider: QuestDataProvider;
   private readonly trainingProvider: TrainingMethodProvider;
+  private readonly offline: boolean;
+  private readonly maintenancePolicy: MaintenanceRuntimePolicy;
+  private readonly diagnosticsRepository: SqliteDiagnosticsRepository | undefined;
+  private readonly maintenanceQuests: QuestService;
+  private readonly maintenancePlanner: LevellingPlannerService;
+  private readonly maintenanceExchange: GrandExchangeService;
+  private readonly updateChecker: SoftwareUpdateService;
+  private maintenance: CatalogueMaintenanceRuntime | undefined;
+  private diagnostics: RuntimeDiagnosticsService | undefined;
+  private maintenanceStarting: Promise<void> | undefined;
+  private maintenanceStartupError: GielinorError | undefined;
 
   public constructor(
     private readonly config: HostedConfig,
@@ -98,9 +131,15 @@ export class HostedServiceFactory {
       ...environment,
       GIELINOR_USER_AGENT: config.userAgent,
     });
-    this.publicDatabase = openDatabase(config.publicDatabasePath);
-    const cacheStore = new SqliteCacheStore(this.publicDatabase);
-    const providers = createDefaultProviderStack(providerConfig, cacheStore);
+    this.offline = providerConfig.offline;
+    this.maintenancePolicy = loadMaintenanceRuntimePolicy({
+      ...environment,
+      GIELINOR_MAINTENANCE_ENABLED: String(config.maintenanceEnabled),
+    });
+    this.publicDatabaseRuntime = openResilientDatabase(config.publicDatabasePath);
+    this.publicDatabase = this.publicDatabaseRuntime.database;
+    this.cacheStore = new SqliteCacheStore(this.publicDatabase);
+    const providers = createDefaultProviderStack(providerConfig, this.cacheStore);
     this.providerRegistry = providers.registry;
     this.statsProvider = providers.ports;
     this.priceProvider = providers.ports;
@@ -109,15 +148,50 @@ export class HostedServiceFactory {
     this.priceRepository = new SqlitePriceRepository(this.publicDatabase);
     this.questProvider = providers.ports.quests;
     this.trainingProvider = providers.ports.training;
+    this.diagnosticsRepository =
+      this.publicDatabaseRuntime.state.status === "safe-mode"
+        ? undefined
+        : new SqliteDiagnosticsRepository(this.publicDatabase);
+    const unavailableProfiles = new ProfileService(
+      new UnavailableProfileRepository(),
+      this.statsProvider,
+    );
+    this.maintenanceQuests = new QuestService(
+      this.questRepository,
+      unavailableProfiles,
+      this.questProvider,
+    );
+    this.maintenancePlanner = new LevellingPlannerService(
+      this.trainingRepository,
+      unavailableProfiles,
+      this.maintenanceQuests,
+      this.trainingProvider,
+    );
+    this.maintenanceExchange = new GrandExchangeService(
+      this.priceRepository,
+      this.priceProvider,
+      this.maintenanceQuests,
+      this.maintenancePlanner,
+    );
+    this.updateChecker = new SoftwareUpdateService({
+      installedVersion: APPLICATION_VERSION,
+      cacheStore: this.cacheStore,
+      userAgent: config.userAgent,
+      offline: this.offline,
+      enabled: softwareUpdateChecksEnabled(environment),
+      checkIntervalMs: this.maintenancePolicy.intervals["software-update-check"],
+    });
   }
 
   public createSession(actor: HostedActor): HostedToolSession {
-    let accountDatabase: DatabaseConnection | undefined;
+    let accountDatabaseRuntime: ResilientDatabase | undefined;
     const profileRepository =
       actor.kind === "account"
         ? (() => {
-            accountDatabase = openDatabase(this.accountDatabasePath(actor.accountId));
-            return new SqlitePlayerProfileRepository(accountDatabase);
+            accountDatabaseRuntime = openResilientDatabase(
+              this.accountDatabasePath(actor.accountId),
+            );
+            return new SqlitePlayerProfileRepository(accountDatabaseRuntime.database);
           })()
         : new UnavailableProfileRepository();
     const profiles = new ProfileService(profileRepository, this.statsProvider);
@@ -135,15 +209,26 @@ export class HostedServiceFactory {
       planner,
     );
     const tools = restrictToolService(
-      new CompanionToolService(profiles, this.priceProvider, quests, planner, exchange),
+      new CompanionToolService(
+        profiles,
+        this.priceProvider,
+        quests,
+        planner,
+        exchange,
+        this.diagnostics,
+      ),
       actor,
     );
 
     return {
       tools,
       profiles,
+      ...(this.diagnostics === undefined ? {} : { diagnostics: this.diagnostics }),
+      ...(accountDatabaseRuntime === undefined
+        ? {}
+        : { databaseRecovery: accountDatabaseRuntime.state }),
       close: () => {
-        accountDatabase?.close();
+        accountDatabaseRuntime?.close();
       },
     };
   }
@@ -211,7 +296,7 @@ export class HostedServiceFactory {
       this.priceRepository.getDataStatus(),
     ]);
     return {
-      storage: "ready",
+      storage: this.publicDatabaseRuntime.state.status === "safe-mode" ? "safe-mode" : "ready",
       datasets: {
         quests: quests.state,
         training: training.state,
@@ -221,8 +306,48 @@ export class HostedServiceFactory {
     };
   }
 
-  public close(): void {
-    this.publicDatabase.close();
+  public startMaintenance(): Promise<void> {
+    if (
+      !this.config.maintenanceEnabled ||
+      this.publicDatabaseRuntime.state.status === "safe-mode"
+    ) {
+      this.ensureDiagnostics();
+      return Promise.resolve();
+    }
+    if (this.maintenanceStarting !== undefined) {
+      return this.maintenanceStarting;
+    }
+    this.maintenanceStarting = createCatalogueMaintenanceRuntime({
+      database: this.publicDatabase,
+      quests: this.maintenanceQuests,
+      planner: this.maintenancePlanner,
+      exchange: this.maintenanceExchange,
+      offline: this.offline,
+      policy: this.maintenancePolicy,
+      diagnostics: this.diagnosticsRepository,
+      updateChecker: this.updateChecker,
+    })
+      .then((runtime) => {
+        this.maintenance = runtime;
+        runtime.start();
+        this.ensureDiagnostics();
+      })
+      .catch((error: unknown) => {
+        this.maintenanceStartupError = toGielinorError(error, {
+          fallbackCode: "GC-SCHED-001",
+          source: "hosted-server",
+          operation: "maintenance-startup",
+        });
+        this.diagnosticsRepository?.recordError(this.maintenanceStartupError);
+        this.ensureDiagnostics();
+      });
+    return this.maintenanceStarting;
+  }
+
+  public async close(): Promise<void> {
+    await this.maintenanceStarting;
+    await this.maintenance?.stop();
+    this.publicDatabaseRuntime.close();
   }
 
   private accountDatabasePath(accountId: string): string {
@@ -232,5 +357,27 @@ export class HostedServiceFactory {
       throw new Error("Invalid account storage path");
     }
     return path;
+  }
+
+  private ensureDiagnostics(): void {
+    this.diagnostics ??= new RuntimeDiagnosticsService({
+      database: this.publicDatabase,
+      databaseRecovery: this.publicDatabaseRuntime.state,
+      providerRegistry: this.providerRegistry,
+      cacheStore: this.cacheStore,
+      quests: this.maintenanceQuests,
+      planner: this.maintenancePlanner,
+      exchange: this.maintenanceExchange,
+      maintenance: this.maintenance,
+      maintenancePolicy: this.maintenancePolicy,
+      updateChecker: this.updateChecker,
+      offline: this.offline,
+      repository: this.diagnosticsRepository,
+      configuration: {
+        accountCreationEnabled: this.config.accountCreationEnabled,
+        requireHttps: this.config.requireHttps,
+        trustProxy: this.config.trustProxy,
+      },
+    });
   }
 }

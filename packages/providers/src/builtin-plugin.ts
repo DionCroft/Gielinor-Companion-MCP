@@ -4,6 +4,7 @@ import type {
   QuestDataProvider,
   TrainingMethodProvider,
 } from "@gielinor/core";
+import { APPLICATION_VERSION } from "@gielinor/shared-types";
 
 import {
   PROVIDER_PLUGIN_API_VERSION,
@@ -81,7 +82,7 @@ export function createBuiltinProviderPlugin(options: BuiltinProviderPluginOption
     apiVersion: PROVIDER_PLUGIN_API_VERSION,
     id: "gielinor.builtin-public-data",
     name: "Gielinor built-in public data providers",
-    version: "1.0.0",
+    version: APPLICATION_VERSION,
     capabilities,
   };
 }

@@ -13,7 +13,26 @@ import {
   type QuestService,
   type ValuationRequestLine,
 } from "@gielinor/core";
-import type { GameMode, ProfileExport, QuestStatus, SkillId } from "@gielinor/shared-types";
+import {
+  createGielinorError,
+  createTraceId,
+  toGielinorError,
+  type CatalogueHealth,
+  type ComponentHealth,
+  type GameMode,
+  type GielinorError,
+  type MaintenanceJobName,
+  type ProviderDiagnosticHealth,
+  type ProfileExport,
+  type QuestStatus,
+  type RecoveryEvent,
+  type RecoveryStatus,
+  type SkillId,
+  type SoftwareUpdateCheck,
+  type SystemHealth,
+  type RedactedDiagnostics,
+} from "@gielinor/shared-types";
+import type { MaintenanceRunResult } from "@gielinor/database";
 
 import { ToolEnvelopeSchema } from "./schemas.js";
 
@@ -22,13 +41,12 @@ export type ToolEnvelope<T> = {
   meta: {
     generatedAt: string;
     source: string;
+    traceId?: string;
+    recoveryStatus?: RecoveryStatus;
   };
 };
 
-export type ToolError = {
-  code: string;
-  message: string;
-};
+export type ToolError = GielinorError;
 
 function envelope<T>(data: T, source: string): ToolEnvelope<T> {
   return ToolEnvelopeSchema.parse({
@@ -40,14 +58,72 @@ function envelope<T>(data: T, source: string): ToolEnvelope<T> {
   }) as ToolEnvelope<T>;
 }
 
-export function publicToolError(error: unknown): ToolError {
-  if (error instanceof CompanionError) {
-    return { code: error.code, message: error.message };
-  }
-  return {
-    code: "INTERNAL_ERROR",
-    message: "The request could not be completed",
+function diagnosticEnvelope<T>(
+  data: T,
+  source: string,
+  recoveryStatus: RecoveryStatus,
+  traceId = createTraceId(),
+): ToolEnvelope<T> {
+  return ToolEnvelopeSchema.parse({
+    data,
+    meta: {
+      generatedAt: new Date().toISOString(),
+      source,
+      traceId,
+      recoveryStatus,
+    },
+  }) as ToolEnvelope<T>;
+}
+
+export type DiagnosticsToolBackend = {
+  getSystemHealth(): Promise<SystemHealth>;
+  getProviderHealth(): ProviderDiagnosticHealth[];
+  getCatalogueHealth(): Promise<CatalogueHealth[]>;
+  listRecentErrors(limit?: number, activeOnly?: boolean): GielinorError[];
+  listRecoveryEvents(limit?: number): RecoveryEvent[];
+  retryFailedOperation(
+    operation: Exclude<MaintenanceJobName, "software-update-check">,
+  ): Promise<MaintenanceRunResult>;
+  refreshStaleCatalogues(catalogues?: Array<"quests" | "training" | "prices">): Promise<{
+    results: MaintenanceRunResult[];
+    refreshed: Array<"quests" | "training" | "prices">;
+    alreadyFresh: Array<"quests" | "training" | "prices">;
+  }>;
+  runDatabaseIntegrityCheck(): ComponentHealth;
+  exportRedactedDiagnostics(): Promise<RedactedDiagnostics>;
+  checkForSoftwareUpdates(options?: {
+    includePrereleases?: boolean | undefined;
+    forceRefresh?: boolean | undefined;
+  }): Promise<SoftwareUpdateCheck>;
+  clearExpiredQuarantineRecords(retentionDays?: number): Promise<{
+    deleted: number;
+    cutoffAt: string;
+    retentionDays: number;
+  }>;
+  resetProviderCircuit(
+    providerId: string,
+    capability: string,
+  ): {
+    providerId: string;
+    capability: string;
+    resetCount: number;
+    state: "closed";
   };
+};
+
+export function publicToolError(error: unknown): ToolError {
+  if (!(error instanceof CompanionError)) {
+    return createGielinorError("GC-MCP-003", {
+      message: "The request could not be completed",
+      userMessage: "The request could not be completed",
+      source: "mcp-server",
+      operation: "tool-execution",
+    });
+  }
+  return toGielinorError(error, {
+    source: "mcp-server",
+    operation: "tool-execution",
+  });
 }
 
 export class CompanionToolService {
@@ -57,6 +133,7 @@ export class CompanionToolService {
     private readonly quests?: QuestService,
     private readonly planner?: LevellingPlannerService,
     private readonly exchange?: GrandExchangeService,
+    private readonly diagnostics?: DiagnosticsToolBackend,
   ) {}
 
   private questService(): QuestService {
@@ -81,6 +158,158 @@ export class CompanionToolService {
       );
     }
     return this.exchange;
+  }
+
+  private diagnosticsService(): DiagnosticsToolBackend {
+    if (this.diagnostics === undefined) {
+      throw new CompanionError("Diagnostics are not configured", "UNSUPPORTED_FEATURE");
+    }
+    return this.diagnostics;
+  }
+
+  public async getSystemHealth(): Promise<ToolEnvelope<SystemHealth>> {
+    return diagnosticEnvelope(
+      await this.diagnosticsService().getSystemHealth(),
+      "central local health service",
+      "not-required",
+    );
+  }
+
+  public async getProviderHealth(): Promise<ToolEnvelope<ProviderDiagnosticHealth[]>> {
+    return diagnosticEnvelope(
+      this.diagnosticsService().getProviderHealth(),
+      "provider health and circuit-breaker registry",
+      "not-required",
+    );
+  }
+
+  public async getCatalogueHealth(): Promise<ToolEnvelope<CatalogueHealth[]>> {
+    return diagnosticEnvelope(
+      await this.diagnosticsService().getCatalogueHealth(),
+      "validated local catalogue status",
+      "not-required",
+    );
+  }
+
+  public async listRecentErrors(
+    limit = 50,
+    activeOnly = false,
+  ): Promise<ToolEnvelope<GielinorError[]>> {
+    return diagnosticEnvelope(
+      this.diagnosticsService().listRecentErrors(limit, activeOnly),
+      "redacted local diagnostics history",
+      "not-required",
+    );
+  }
+
+  public async listRecoveryEvents(limit = 50): Promise<ToolEnvelope<RecoveryEvent[]>> {
+    return diagnosticEnvelope(
+      this.diagnosticsService().listRecoveryEvents(limit),
+      "local recovery history",
+      "not-required",
+    );
+  }
+
+  public async retryFailedOperation(
+    operation: "quest-refresh" | "training-refresh" | "price-refresh",
+  ): Promise<ToolEnvelope<MaintenanceRunResult>> {
+    const result = await this.diagnosticsService().retryFailedOperation(operation);
+    return diagnosticEnvelope(
+      result,
+      "persistent maintenance scheduler",
+      result.status === "success"
+        ? "succeeded"
+        : result.status === "failed"
+          ? "failed"
+          : "not-attempted",
+    );
+  }
+
+  public async refreshStaleCatalogues(
+    catalogues?: Array<"quests" | "training" | "prices">,
+  ): Promise<
+    ToolEnvelope<{
+      results: MaintenanceRunResult[];
+      refreshed: Array<"quests" | "training" | "prices">;
+      alreadyFresh: Array<"quests" | "training" | "prices">;
+    }>
+  > {
+    const result = await this.diagnosticsService().refreshStaleCatalogues(catalogues);
+    const successes = result.results.filter((entry) => entry.status === "success").length;
+    const failures = result.results.filter((entry) => entry.status === "failed").length;
+    return diagnosticEnvelope(
+      result,
+      "persistent maintenance scheduler",
+      result.results.length === 0
+        ? "not-required"
+        : failures === 0
+          ? "succeeded"
+          : successes > 0
+            ? "partial"
+            : "failed",
+    );
+  }
+
+  public async runDatabaseIntegrityCheck(): Promise<ToolEnvelope<ComponentHealth>> {
+    const result = this.diagnosticsService().runDatabaseIntegrityCheck();
+    return diagnosticEnvelope(
+      result,
+      "read-only SQLite quick integrity check",
+      result.state === "healthy" ? "not-required" : "failed",
+    );
+  }
+
+  public async exportRedactedDiagnostics(): Promise<ToolEnvelope<RedactedDiagnostics>> {
+    return diagnosticEnvelope(
+      await this.diagnosticsService().exportRedactedDiagnostics(),
+      "redacted local diagnostics export",
+      "not-required",
+    );
+  }
+
+  public async checkForSoftwareUpdates(input: {
+    includePrereleases?: boolean | undefined;
+    forceRefresh?: boolean | undefined;
+  }): Promise<ToolEnvelope<SoftwareUpdateCheck>> {
+    const result = await this.diagnosticsService().checkForSoftwareUpdates(input);
+    return diagnosticEnvelope(
+      result,
+      "read-only GitHub Releases metadata",
+      "not-required",
+      result.traceId,
+    );
+  }
+
+  public async clearExpiredQuarantineRecords(retentionDays?: number): Promise<
+    ToolEnvelope<{
+      deleted: number;
+      cutoffAt: string;
+      retentionDays: number;
+    }>
+  > {
+    return diagnosticEnvelope(
+      await this.diagnosticsService().clearExpiredQuarantineRecords(retentionDays),
+      "expired local cache quarantine records",
+      "succeeded",
+    );
+  }
+
+  public async resetProviderCircuit(
+    providerId: string,
+    capability: string,
+  ): Promise<
+    ToolEnvelope<{
+      providerId: string;
+      capability: string;
+      resetCount: number;
+      state: "closed";
+    }>
+  > {
+    return diagnosticEnvelope(
+      this.diagnosticsService().resetProviderCircuit(providerId, capability),
+      "provider circuit-breaker registry",
+      "succeeded",
+    );
   }
 
   public async createPlayerProfile(input: {

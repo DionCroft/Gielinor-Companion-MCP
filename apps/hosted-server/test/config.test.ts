@@ -21,6 +21,7 @@ describe("hosted configuration", () => {
     expect(config.allowedHosts.has("mcp.example.com")).toBe(true);
     expect(config.allowedOrigins.has("https://chat.example.com")).toBe(true);
     expect(config.maxRequestBytes).toBe(262_144);
+    expect(config.maintenanceEnabled).toBe(true);
   });
 
   it("rejects unsafe or unbounded settings", () => {

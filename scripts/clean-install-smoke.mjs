@@ -93,6 +93,11 @@ try {
       ),
     ).href
   );
+  const { MCP_TOOL_NAMES_V1, MCP_TOOL_NAMES_V1_1 } = await import(
+    pathToFileURL(
+      resolve(installationDirectory, "node_modules/@gielinor/shared-types/dist/index.js"),
+    ).href
+  );
   const databasePath = resolve(installationDirectory, "gielinor.db");
   const entry = resolve(installationDirectory, "node_modules/@gielinor/mcp-server/dist/index.js");
   const transport = new StdioClientTransport({
@@ -101,22 +106,33 @@ try {
     env: {
       ...process.env,
       GIELINOR_DB_PATH: databasePath,
+      GIELINOR_MAINTENANCE_ENABLED: "false",
       GIELINOR_OFFLINE: "true",
       GIELINOR_USER_AGENT:
-        "Gielinor-Companion-MCP-clean-install/1.0.0 (https://github.com/DionCroft/Gielinor-Companion-MCP)",
+        "Gielinor-Companion-MCP-clean-install/1.1.0 (https://github.com/DionCroft/Gielinor-Companion-MCP)",
     },
   });
   const client = new Client({ name: "clean-install-smoke", version: "1.0.0" });
   try {
     await client.connect(transport);
     const listed = await client.listTools();
-    if (listed.tools.length !== 48) {
-      throw new Error(`Clean npm installation exposed ${listed.tools.length} tools, expected 48`);
+    if (listed.tools.length !== MCP_TOOL_NAMES_V1_1.length) {
+      throw new Error(
+        `Clean npm installation exposed ${listed.tools.length} tools, expected ${MCP_TOOL_NAMES_V1_1.length}`,
+      );
+    }
+    if (
+      JSON.stringify(listed.tools.slice(0, MCP_TOOL_NAMES_V1.length).map((tool) => tool.name)) !==
+      JSON.stringify(MCP_TOOL_NAMES_V1)
+    ) {
+      throw new Error("Clean npm installation changed the frozen Version 1.0 tool prefix");
     }
   } finally {
     await client.close();
   }
-  process.stdout.write("Clean packed npm installation exposed all 48 stable MCP tools.\n");
+  process.stdout.write(
+    "Clean packed npm installation exposed all 60 tools with the frozen 48-tool Version 1.0 prefix.\n",
+  );
 } finally {
   await rm(installationDirectory, { recursive: true, force: true });
 }

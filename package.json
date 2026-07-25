@@ -1,12 +1,12 @@
 {
   "name": "gielinor-companion-mcp",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "description": "An open-source, AI-compatible RuneScape 3 quest, levelling and Grand Exchange companion.",
   "type": "module",
   "packageManager": "pnpm@10.34.5",
   "engines": {
-    "node": ">=20"
+    "node": "^22.0.0 || ^24.0.0"
   },
   "repository": {
     "type": "git",
@@ -29,6 +29,12 @@
     "test:overlay": "corepack pnpm --filter @gielinor/alt1-overlay test",
     "test:database": "corepack pnpm build && vitest run packages/database/test",
     "test:hardening": "corepack pnpm build && vitest run packages/shared-types/test packages/providers/test/provider-plugin.test.ts packages/providers/test/cache.test.ts packages/core/test/data-migrations.test.ts packages/core/test/quest-service.test.ts packages/database/test apps/hosted-server/test/load.test.ts",
+    "test:errors": "corepack pnpm --filter @gielinor/shared-types build && node scripts/generate-error-docs.mjs --check && vitest run packages/shared-types/test/errors.test.ts apps/mcp-server/test/schemas.test.ts apps/hosted-server/test/http-server.test.ts",
+    "test:resilience": "corepack pnpm build && vitest run packages/shared-types/test/retry.test.ts packages/providers/test/http.test.ts packages/providers/test/circuit-breaker.test.ts packages/providers/test/cache.test.ts packages/core/test/health-service.test.ts",
+    "test:recovery": "corepack pnpm build && vitest run packages/database/test/recovery.test.ts packages/database/test/scheduler.test.ts packages/database/test/diagnostics.test.ts apps/mcp-server/test/maintenance-runtime.test.ts apps/mcp-server/test/diagnostics-service.test.ts",
+    "test:scheduler": "corepack pnpm build && vitest run packages/database/test/scheduler.test.ts apps/mcp-server/test/maintenance-runtime.test.ts && corepack pnpm --filter @gielinor/desktop exec vitest run src/views/FirstRunView.test.tsx",
+    "test:update-checker": "corepack pnpm build && vitest run apps/mcp-server/test/update-service.test.ts apps/mcp-server/test/diagnostics-tools.integration.test.ts && corepack pnpm --filter @gielinor/desktop exec vitest run src/App.test.tsx -t \"checks validated releases\"",
+    "test:fault-injection": "corepack pnpm build && vitest run packages/providers/test/http.test.ts packages/providers/test/jagex-providers.test.ts packages/providers/test/cache.test.ts packages/database/test/recovery.test.ts packages/database/test/scheduler.test.ts packages/core/test/data-migrations.test.ts apps/mcp-server/test/update-service.test.ts",
     "test:release": "corepack pnpm build && vitest run packages/shared-types/test/stable-contracts.test.ts packages/providers/test/stable-interface.test.ts packages/database/test/upgrade-path.test.ts && node scripts/verify-release.mjs",
     "test:load": "corepack pnpm build && vitest run packages/database/test/performance.test.ts apps/hosted-server/test/load.test.ts",
     "test:e2e": "corepack pnpm build && vitest run apps/mcp-server/test/quest-flow.e2e.test.ts apps/mcp-server/test/levelling-flow.e2e.test.ts apps/mcp-server/test/grand-exchange-flow.e2e.test.ts && corepack pnpm --filter @gielinor/desktop test:e2e",
@@ -44,6 +50,8 @@
     "test:live:wiki": "corepack pnpm build && node scripts/run-live-tests.mjs wiki",
     "test:live:training": "corepack pnpm build && node scripts/run-live-tests.mjs training",
     "test:live:prices": "corepack pnpm build && node scripts/run-live-tests.mjs prices",
+    "test:live:updates": "corepack pnpm build && node scripts/run-live-tests.mjs updates",
+    "test:live:monitor": "corepack pnpm build && node scripts/run-live-monitor.mjs",
     "test:live:ollama": "corepack pnpm build && node scripts/run-local-ai-smoke.mjs ollama",
     "test:live:lm-studio": "corepack pnpm build && node scripts/run-local-ai-smoke.mjs lm-studio",
     "lint": "eslint . && prettier --check .",
@@ -58,7 +66,9 @@
     "profile:performance": "corepack pnpm build && node scripts/profile-performance.mjs",
     "load:hosted": "node scripts/load-hosted.mjs",
     "generate:contracts": "corepack pnpm build && node scripts/generate-contracts.mjs --write",
+    "generate:error-docs": "corepack pnpm --filter @gielinor/shared-types build && node scripts/generate-error-docs.mjs --write",
     "verify:contracts": "corepack pnpm build && node scripts/generate-contracts.mjs --check",
+    "verify:error-docs": "corepack pnpm --filter @gielinor/shared-types build && node scripts/generate-error-docs.mjs --check",
     "verify:docs": "node scripts/verify-doc-links.mjs",
     "verify:release": "corepack pnpm build && node scripts/verify-release.mjs",
     "pack:release": "corepack pnpm build && node scripts/pack-release.mjs",
@@ -68,7 +78,7 @@
   "devDependencies": {
     "@eslint/js": "^9.31.0",
     "@types/better-sqlite3": "^7.6.13",
-    "@types/node": "^20.17.0",
+    "@types/node": "^22.0.0",
     "eslint": "^9.31.0",
     "prettier": "^3.6.2",
     "typescript": "^5.8.3",
@@ -77,7 +87,8 @@
   },
   "pnpm": {
     "overrides": {
-      "@hono/node-server": "2.0.11"
+      "@hono/node-server": "2.0.11",
+      "brace-expansion": "5.0.8"
     }
   },
   "license": "MIT"

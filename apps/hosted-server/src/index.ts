@@ -1,9 +1,12 @@
 #!/usr/bin/env node
 
+import { APPLICATION_VERSION, assertSupportedNodeVersion } from "@gielinor/shared-types";
+
 import { loadHostedConfig } from "./config.js";
 import { createHostedHttpServer } from "./http-server.js";
 
 async function main(): Promise<void> {
+  assertSupportedNodeVersion();
   const config = loadHostedConfig();
   const hosted = createHostedHttpServer(config);
   const address = await hosted.start();
@@ -14,7 +17,7 @@ async function main(): Promise<void> {
       event: "hosted_server_started",
       host: address.host,
       port: address.port,
-      version: "1.0.0",
+      version: APPLICATION_VERSION,
     })}\n`,
   );
 

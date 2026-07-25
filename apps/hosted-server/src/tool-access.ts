@@ -34,6 +34,18 @@ const OPERATOR_METHODS = new Set<keyof CompanionToolService>([
   "refreshPriceData",
   "refreshQuestData",
   "refreshTrainingData",
+  "getSystemHealth",
+  "getProviderHealth",
+  "getCatalogueHealth",
+  "listRecentErrors",
+  "listRecoveryEvents",
+  "retryFailedOperation",
+  "refreshStaleCatalogues",
+  "runDatabaseIntegrityCheck",
+  "exportRedactedDiagnostics",
+  "checkForSoftwareUpdates",
+  "clearExpiredQuarantineRecords",
+  "resetProviderCircuit",
 ]);
 
 function authorize(

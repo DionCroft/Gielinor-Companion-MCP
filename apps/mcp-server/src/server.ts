@@ -4,6 +4,8 @@ import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import {
   CalculateXpRemainingToolInputSchema,
   CalculateTrainingCostToolInputSchema,
+  CheckForSoftwareUpdatesToolInputSchema,
+  ClearExpiredQuarantineToolInputSchema,
   CompareItemPricesToolInputSchema,
   CompareQuestXpRewardsToolInputSchema,
   CompareTrainingMethodsToolInputSchema,
@@ -20,10 +22,15 @@ import {
   ItemIdentifierInputSchema,
   ItemPriceHistoryToolInputSchema,
   ListTrainingMethodsToolInputSchema,
+  ListRecentErrorsToolInputSchema,
+  ListRecoveryEventsToolInputSchema,
   ProfileQuestInputSchema,
   ProfileIdInputSchema,
   QuestIdentifierInputSchema,
   RefreshPriceDataToolInputSchema,
+  RefreshStaleCataloguesToolInputSchema,
+  ResetProviderCircuitToolInputSchema,
+  RetryFailedOperationToolInputSchema,
   SearchItemsToolInputSchema,
   SearchQuestsToolInputSchema,
   SetMultipleQuestStatusesToolInputSchema,
@@ -32,6 +39,9 @@ import {
   ValueEquipmentSetupToolInputSchema,
   ValueItemListToolInputSchema,
 } from "./schemas.js";
+import type { GielinorError } from "@gielinor/shared-types";
+import { APPLICATION_VERSION } from "@gielinor/shared-types";
+
 import { publicToolError, type CompanionToolService, type ToolEnvelope } from "./tool-service.js";
 
 function success(value: ToolEnvelope<unknown>): CallToolResult {
@@ -41,11 +51,19 @@ function success(value: ToolEnvelope<unknown>): CallToolResult {
   };
 }
 
-async function run(operation: () => Promise<ToolEnvelope<unknown>>): Promise<CallToolResult> {
+async function runTool(
+  operation: () => Promise<ToolEnvelope<unknown>>,
+  recordError?: ((error: GielinorError) => void | Promise<void>) | undefined,
+): Promise<CallToolResult> {
   try {
     return success(await operation());
   } catch (error) {
     const result = publicToolError(error);
+    try {
+      await recordError?.(result);
+    } catch {
+      // Diagnostics persistence cannot replace the original public tool error.
+    }
     return {
       content: [{ type: "text", text: JSON.stringify({ error: result }) }],
       isError: true,
@@ -53,9 +71,18 @@ async function run(operation: () => Promise<ToolEnvelope<unknown>>): Promise<Cal
   }
 }
 
-export function createCompanionServer(tools: CompanionToolService): McpServer {
+export type CompanionServerOptions = {
+  recordError?: ((error: GielinorError) => void | Promise<void>) | undefined;
+};
+
+export function createCompanionServer(
+  tools: CompanionToolService,
+  options: CompanionServerOptions = {},
+): McpServer {
+  const run = (operation: () => Promise<ToolEnvelope<unknown>>): Promise<CallToolResult> =>
+    runTool(operation, options.recordError);
   const server = new McpServer(
-    { name: "gielinor-companion-mcp", version: "1.0.0" },
+    { name: "gielinor-companion-mcp", version: APPLICATION_VERSION },
     {
       instructions:
         "Use these deterministic, read-only RuneScape 3 data and planning tools. " +
@@ -595,6 +622,137 @@ export function createCompanionServer(tools: CompanionToolService): McpServer {
       annotations: { readOnlyHint: true },
     },
     () => run(() => tools.getTrainingDataStatus()),
+  );
+
+  server.registerTool(
+    "get_system_health",
+    {
+      description:
+        "Read central database, provider, catalogue, scheduler, update, and recovery health without probing upstream providers.",
+      inputSchema: EmptyInputSchema,
+      annotations: { readOnlyHint: true },
+    },
+    () => run(() => tools.getSystemHealth()),
+  );
+
+  server.registerTool(
+    "get_provider_health",
+    {
+      description:
+        "Read provider success/failure counters and circuit-breaker state without making network requests.",
+      inputSchema: EmptyInputSchema,
+      annotations: { readOnlyHint: true },
+    },
+    () => run(() => tools.getProviderHealth()),
+  );
+
+  server.registerTool(
+    "get_catalogue_health",
+    {
+      description:
+        "Read local quest, training, and price catalogue freshness, counts, failures, and next refresh times.",
+      inputSchema: EmptyInputSchema,
+      annotations: { readOnlyHint: true },
+    },
+    () => run(() => tools.getCatalogueHealth()),
+  );
+
+  server.registerTool(
+    "list_recent_errors",
+    {
+      description:
+        "List recent redacted structured diagnostics errors with stable codes and trace identifiers.",
+      inputSchema: ListRecentErrorsToolInputSchema,
+      annotations: { readOnlyHint: true },
+    },
+    ({ limit, activeOnly }) => run(() => tools.listRecentErrors(limit, activeOnly)),
+  );
+
+  server.registerTool(
+    "list_recovery_events",
+    {
+      description: "List recent bounded automatic and manual recovery attempts.",
+      inputSchema: ListRecoveryEventsToolInputSchema,
+      annotations: { readOnlyHint: true },
+    },
+    ({ limit }) => run(() => tools.listRecoveryEvents(limit)),
+  );
+
+  server.registerTool(
+    "retry_failed_operation",
+    {
+      description:
+        "Safely retry one catalogue refresh through the persistent scheduler; no destructive repair is exposed.",
+      inputSchema: RetryFailedOperationToolInputSchema,
+      annotations: { destructiveHint: false, idempotentHint: true },
+    },
+    ({ operation }) => run(() => tools.retryFailedOperation(operation)),
+  );
+
+  server.registerTool(
+    "refresh_stale_catalogues",
+    {
+      description:
+        "Refresh only selected catalogues that are stale, missing, or failed while retaining prior valid snapshots.",
+      inputSchema: RefreshStaleCataloguesToolInputSchema,
+      annotations: { destructiveHint: false, idempotentHint: true },
+    },
+    ({ catalogues }) => run(() => tools.refreshStaleCatalogues(catalogues)),
+  );
+
+  server.registerTool(
+    "run_database_integrity_check",
+    {
+      description:
+        "Run SQLite's read-only quick integrity check; this tool never repairs, resets, or deletes data.",
+      inputSchema: EmptyInputSchema,
+      annotations: { readOnlyHint: true },
+    },
+    () => run(() => tools.runDatabaseIntegrityCheck()),
+  );
+
+  server.registerTool(
+    "export_redacted_diagnostics",
+    {
+      description:
+        "Export health, safe configuration, error codes, and recovery history without profiles, secrets, payloads, or absolute paths.",
+      inputSchema: EmptyInputSchema,
+      annotations: { readOnlyHint: true },
+    },
+    () => run(() => tools.exportRedactedDiagnostics()),
+  );
+
+  server.registerTool(
+    "check_for_software_updates",
+    {
+      description:
+        "Read validated GitHub Releases metadata and compare semantic versions without downloading or installing code.",
+      inputSchema: CheckForSoftwareUpdatesToolInputSchema,
+      annotations: { readOnlyHint: true },
+    },
+    (input) => run(() => tools.checkForSoftwareUpdates(input)),
+  );
+
+  server.registerTool(
+    "clear_expired_quarantine_records",
+    {
+      description:
+        "Delete only invalid cache quarantine records older than a bounded retention period; active cache and player data are never touched.",
+      inputSchema: ClearExpiredQuarantineToolInputSchema,
+      annotations: { destructiveHint: true, idempotentHint: true },
+    },
+    ({ retentionDays }) => run(() => tools.clearExpiredQuarantineRecords(retentionDays)),
+  );
+
+  server.registerTool(
+    "reset_provider_circuit",
+    {
+      description:
+        "Reset one provider capability circuit after explicit confirmation; this permits only the provider's normal bounded probe behaviour.",
+      inputSchema: ResetProviderCircuitToolInputSchema,
+      annotations: { destructiveHint: false, idempotentHint: true },
+    },
+    ({ providerId, capability }) => run(() => tools.resetProviderCircuit(providerId, capability)),
   );
 
   return server;

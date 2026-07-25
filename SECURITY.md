@@ -29,6 +29,13 @@ Unexpected internal errors are converted to stable public messages so MCP result
 do not expose local paths or provider internals. Local SQLite files should receive
 the same operating-system protections as other user data.
 
+Version 1.1 recovery is bounded and non-destructive. Invalid provider/cache
+candidates are quarantined with redacted metadata and cannot replace active
+data. Database upgrades are backup-first and transactional; corruption or an
+unsafe rollback enters read-only safe mode instead of resetting user data.
+Provider circuits, scheduler recovery limits, and explicit confirmation on
+targeted maintenance actions prevent recovery storms and broad resets.
+
 Provider plugins are untrusted outward adapters. The registry applies shared
 result schemas, explicit priority, fallback diagnostics, disagreement
 preservation, offline eligibility, and health tracking before data reaches core
@@ -69,8 +76,10 @@ adapter must never gain generated input, process/client-memory, packet, socket,
 or trading capabilities. See
 [overlay privacy and consent](docs/security/overlay-privacy.md).
 
-Dependencies and release artifacts must be reviewed. Desktop updates must be
-opt-in and must not silently install untrusted code.
+Dependencies and release artifacts must be reviewed. The read-only update
+checker contacts only the official GitHub Releases API, validates official
+release and asset URLs, and never downloads or installs code. Desktop updates
+remain opt-in.
 
 The maintained [threat model](docs/security/threat-model.md),
 [audit checklist](docs/security/audit-checklist.md), and

@@ -4,6 +4,7 @@ import { join } from "node:path";
 
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import { MCP_TOOL_NAMES_V1, MCP_TOOL_NAMES_V1_1 } from "@gielinor/shared-types";
 import { afterEach, describe, expect, it } from "vitest";
 
 import type { HostedConfig } from "../src/config.js";
@@ -43,6 +44,7 @@ function testConfig(directory: string, overrides: Partial<HostedConfig> = {}): H
     toolCallsPerMinute: 100,
     requestTimeoutMs: 10_000,
     shutdownTimeoutMs: 1_000,
+    maintenanceEnabled: false,
     userAgent: "Gielinor-Hosted-Test/1.0.0",
     ...overrides,
   };
@@ -100,7 +102,7 @@ describe("hosted Streamable HTTP service", () => {
     const live = await fetch(`${running.url}/health/live`);
     expect(live.status).toBe(200);
     expect(live.headers.get("x-content-type-options")).toBe("nosniff");
-    await expect(live.json()).resolves.toMatchObject({ status: "ok", version: "1.0.0" });
+    await expect(live.json()).resolves.toMatchObject({ status: "ok", version: "1.1.0" });
 
     const ready = await fetch(`${running.url}/health/ready`);
     expect(ready.status).toBe(200);
@@ -116,7 +118,10 @@ describe("hosted Streamable HTTP service", () => {
 
     const client = await connect(running.url);
     const tools = await client.listTools();
-    expect(tools.tools).toHaveLength(48);
+    expect(tools.tools.map((tool) => tool.name)).toEqual(MCP_TOOL_NAMES_V1_1);
+    expect(tools.tools.slice(0, MCP_TOOL_NAMES_V1.length).map((tool) => tool.name)).toEqual(
+      MCP_TOOL_NAMES_V1,
+    );
     const xp = await client.callTool({
       name: "calculate_xp_remaining",
       arguments: { currentExperience: 1_000_000, targetLevel: 99 },
@@ -309,6 +314,16 @@ describe("hosted Streamable HTTP service", () => {
     });
     expect(maintenance.isError).toBe(true);
     expect(maintenance.content).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ text: expect.stringContaining("OPERATOR_REQUIRED") }),
+      ]),
+    );
+    const diagnostics = await client.callTool({
+      name: "get_system_health",
+      arguments: {},
+    });
+    expect(diagnostics.isError).toBe(true);
+    expect(diagnostics.content).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ text: expect.stringContaining("OPERATOR_REQUIRED") }),
       ]),

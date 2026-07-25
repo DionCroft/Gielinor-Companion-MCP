@@ -4,7 +4,7 @@ Thank you for helping build a safe RuneScape companion.
 
 ## Set up
 
-1. Install Node.js 20 or later.
+1. Install Node.js 22 or 24 LTS (Node.js 24 is recommended).
 2. Run `corepack enable`.
 3. Run `corepack pnpm install`.
 4. Run `corepack pnpm build`.

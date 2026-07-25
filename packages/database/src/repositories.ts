@@ -5,8 +5,14 @@ import type {
   TrainingMethodRepository,
 } from "@gielinor/core";
 import { CompanionError, NotFoundError } from "@gielinor/core";
-import type { CacheEntry, CacheStore } from "@gielinor/providers";
+import type {
+  CacheEntry,
+  CacheQuarantineRecord,
+  CacheRefreshFailure,
+  CacheStore,
+} from "@gielinor/providers";
 import {
+  createTraceId,
   PlayerProfileSchema,
   PriceCatalogueItemSchema,
   PriceDataSnapshotSchema,
@@ -49,9 +55,31 @@ type ProfileRow = {
 
 type CacheRow = {
   value_json: string;
+  metadata_version: number;
+  provider: string;
+  fetched_at: number;
   stored_at: number;
   fresh_until: number;
   stale_until: number;
+  last_successful_refresh_at: number;
+  last_failed_refresh_at: number | null;
+  last_failure_code: string | null;
+  last_failure_trace_id: string | null;
+};
+
+type CacheQuarantineRow = {
+  quarantine_id: string;
+  provider: string;
+  quarantined_at: number;
+  stored_at: number;
+  error_code: "GC-CACHE-004" | "GC-CACHE-005";
+  reason: string;
+  sample_json: string | null;
+};
+
+type CacheRestoreRow = {
+  cache_key: string;
+  entry_json: string;
 };
 
 type QuestRow = {
@@ -242,7 +270,9 @@ export class SqliteCacheStore implements CacheStore {
   public async get<T>(key: string): Promise<CacheEntry<T> | null> {
     const row = this.database
       .prepare(
-        `SELECT value_json, stored_at, fresh_until, stale_until
+        `SELECT value_json, metadata_version, provider, fetched_at, stored_at,
+                fresh_until, stale_until, last_successful_refresh_at,
+                last_failed_refresh_at, last_failure_code, last_failure_trace_id
          FROM provider_cache
          WHERE cache_key = ?`,
       )
@@ -254,13 +284,50 @@ export class SqliteCacheStore implements CacheStore {
 
     try {
       return {
+        metadataVersion: 1,
         value: JSON.parse(row.value_json) as T,
+        provider: row.provider,
+        fetchedAt: row.fetched_at,
         storedAt: row.stored_at,
         freshUntil: row.fresh_until,
         staleUntil: row.stale_until,
+        lastSuccessfulRefreshAt: row.last_successful_refresh_at,
+        ...(row.last_failed_refresh_at === null
+          ? {}
+          : { lastFailedRefreshAt: row.last_failed_refresh_at }),
+        ...(row.last_failure_code === null
+          ? {}
+          : {
+              lastFailureCode: row.last_failure_code as NonNullable<
+                CacheEntry<T>["lastFailureCode"]
+              >,
+            }),
+        ...(row.last_failure_trace_id === null
+          ? {}
+          : { lastFailureTraceId: row.last_failure_trace_id }),
       };
     } catch {
-      this.database.prepare("DELETE FROM provider_cache WHERE cache_key = ?").run(key);
+      const quarantineId = createTraceId();
+      this.database.transaction(() => {
+        this.database
+          .prepare(
+            `INSERT INTO provider_cache_quarantine
+               (quarantine_id, cache_key, provider, quarantined_at, stored_at,
+                error_code, reason, sample_json, entry_json)
+             VALUES (?, ?, ?, ?, ?, 'GC-CACHE-005', ?, ?, ?)`,
+          )
+          .run(
+            quarantineId,
+            key,
+            row.provider,
+            Date.now(),
+            row.stored_at,
+            "Cached JSON could not be parsed and was quarantined",
+            JSON.stringify({ payload: "[invalid-json]" }),
+            JSON.stringify({ row }),
+          );
+        this.database.prepare("DELETE FROM provider_cache WHERE cache_key = ?").run(key);
+      })();
       return null;
     }
   }
@@ -269,15 +336,179 @@ export class SqliteCacheStore implements CacheStore {
     this.database
       .prepare(
         `INSERT INTO provider_cache
-           (cache_key, value_json, stored_at, fresh_until, stale_until)
-         VALUES (?, ?, ?, ?, ?)
+           (cache_key, value_json, metadata_version, provider, fetched_at,
+            stored_at, fresh_until, stale_until, last_successful_refresh_at,
+            last_failed_refresh_at, last_failure_code, last_failure_trace_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT(cache_key) DO UPDATE SET
            value_json = excluded.value_json,
+           metadata_version = excluded.metadata_version,
+           provider = excluded.provider,
+           fetched_at = excluded.fetched_at,
            stored_at = excluded.stored_at,
            fresh_until = excluded.fresh_until,
-           stale_until = excluded.stale_until`,
+           stale_until = excluded.stale_until,
+           last_successful_refresh_at = excluded.last_successful_refresh_at,
+           last_failed_refresh_at = excluded.last_failed_refresh_at,
+           last_failure_code = excluded.last_failure_code,
+           last_failure_trace_id = excluded.last_failure_trace_id`,
       )
-      .run(key, JSON.stringify(entry.value), entry.storedAt, entry.freshUntil, entry.staleUntil);
+      .run(
+        key,
+        JSON.stringify(entry.value),
+        entry.metadataVersion,
+        entry.provider,
+        entry.fetchedAt,
+        entry.storedAt,
+        entry.freshUntil,
+        entry.staleUntil,
+        entry.lastSuccessfulRefreshAt,
+        entry.lastFailedRefreshAt ?? null,
+        entry.lastFailureCode ?? null,
+        entry.lastFailureTraceId ?? null,
+      );
+  }
+
+  public async quarantine<T>(
+    key: string,
+    entry: CacheEntry<T>,
+    record: CacheQuarantineRecord,
+    removeActive = true,
+  ): Promise<void> {
+    this.database.transaction(() => {
+      this.database
+        .prepare(
+          `INSERT INTO provider_cache_quarantine
+             (quarantine_id, cache_key, provider, quarantined_at, stored_at,
+              error_code, reason, sample_json, entry_json)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        )
+        .run(
+          record.quarantineId,
+          key,
+          record.provider,
+          record.quarantinedAt,
+          record.storedAt,
+          record.errorCode,
+          record.reason,
+          record.sample === undefined ? null : JSON.stringify(record.sample),
+          JSON.stringify(entry),
+        );
+      if (removeActive) {
+        this.database.prepare("DELETE FROM provider_cache WHERE cache_key = ?").run(key);
+      }
+    })();
+  }
+
+  public async recordRefreshFailure(key: string, failure: CacheRefreshFailure): Promise<void> {
+    this.database
+      .prepare(
+        `UPDATE provider_cache
+         SET last_failed_refresh_at = ?,
+             last_failure_code = ?,
+             last_failure_trace_id = ?
+         WHERE cache_key = ?`,
+      )
+      .run(failure.failedAt, failure.code, failure.traceId, key);
+  }
+
+  public async listQuarantined(): Promise<CacheQuarantineRecord[]> {
+    const rows = this.database
+      .prepare(
+        `SELECT quarantine_id, provider, quarantined_at, stored_at,
+                error_code, reason, sample_json
+         FROM provider_cache_quarantine
+         ORDER BY quarantined_at DESC`,
+      )
+      .all() as CacheQuarantineRow[];
+    return rows.map((row) => ({
+      quarantineId: row.quarantine_id,
+      provider: row.provider,
+      quarantinedAt: row.quarantined_at,
+      storedAt: row.stored_at,
+      errorCode: row.error_code,
+      reason: row.reason,
+      ...(row.sample_json === null
+        ? {}
+        : {
+            sample: JSON.parse(row.sample_json) as Record<string, unknown>,
+          }),
+    }));
+  }
+
+  public async restoreQuarantined(quarantineId: string): Promise<boolean> {
+    const row = this.database
+      .prepare(
+        `SELECT cache_key, entry_json
+         FROM provider_cache_quarantine
+         WHERE quarantine_id = ?`,
+      )
+      .get(quarantineId) as CacheRestoreRow | undefined;
+    if (row === undefined) {
+      return false;
+    }
+    let entry: CacheEntry<unknown>;
+    try {
+      entry = JSON.parse(row.entry_json) as CacheEntry<unknown>;
+      if (
+        entry.metadataVersion !== 1 ||
+        typeof entry.provider !== "string" ||
+        !Number.isSafeInteger(entry.storedAt)
+      ) {
+        return false;
+      }
+    } catch {
+      return false;
+    }
+    this.database.transaction(() => {
+      this.database
+        .prepare(
+          `INSERT INTO provider_cache
+             (cache_key, value_json, metadata_version, provider, fetched_at,
+              stored_at, fresh_until, stale_until, last_successful_refresh_at,
+              last_failed_refresh_at, last_failure_code, last_failure_trace_id)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+           ON CONFLICT(cache_key) DO UPDATE SET
+             value_json = excluded.value_json,
+             metadata_version = excluded.metadata_version,
+             provider = excluded.provider,
+             fetched_at = excluded.fetched_at,
+             stored_at = excluded.stored_at,
+             fresh_until = excluded.fresh_until,
+             stale_until = excluded.stale_until,
+             last_successful_refresh_at = excluded.last_successful_refresh_at,
+             last_failed_refresh_at = excluded.last_failed_refresh_at,
+             last_failure_code = excluded.last_failure_code,
+             last_failure_trace_id = excluded.last_failure_trace_id`,
+        )
+        .run(
+          row.cache_key,
+          JSON.stringify(entry.value),
+          entry.metadataVersion,
+          entry.provider,
+          entry.fetchedAt,
+          entry.storedAt,
+          entry.freshUntil,
+          entry.staleUntil,
+          entry.lastSuccessfulRefreshAt,
+          entry.lastFailedRefreshAt ?? null,
+          entry.lastFailureCode ?? null,
+          entry.lastFailureTraceId ?? null,
+        );
+      this.database
+        .prepare("DELETE FROM provider_cache_quarantine WHERE quarantine_id = ?")
+        .run(quarantineId);
+    })();
+    return true;
+  }
+
+  public async clearExpiredQuarantine(cutoffAt: number): Promise<number> {
+    if (!Number.isSafeInteger(cutoffAt) || cutoffAt < 0) {
+      throw new RangeError("Quarantine cutoff must be a non-negative integer timestamp");
+    }
+    return this.database
+      .prepare("DELETE FROM provider_cache_quarantine WHERE quarantined_at < ?")
+      .run(cutoffAt).changes;
   }
 }
 

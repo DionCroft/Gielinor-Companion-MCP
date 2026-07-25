@@ -1,5 +1,6 @@
 export * from "./builtin-plugin.js";
 export * from "./cache.js";
+export * from "./circuit-breaker.js";
 export * from "./config.js";
 export * from "./factory.js";
 export * from "./http.js";

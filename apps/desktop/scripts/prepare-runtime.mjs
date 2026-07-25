@@ -48,7 +48,6 @@ const deploy = spawnSync(
     "@gielinor/mcp-server",
     "deploy",
     "--prod",
-    "--legacy",
     "--config.node-linker=hoisted",
     runtimeDirectory,
   ],

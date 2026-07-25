@@ -1,9 +1,12 @@
 {
   "name": "@gielinor/desktop",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "description": "Tauri and React desktop companion with a deterministic no-AI dashboard.",
   "type": "module",
+  "engines": {
+    "node": "^22.0.0 || ^24.0.0"
+  },
   "scripts": {
     "predev": "corepack pnpm --filter @gielinor/agent-runtime build",
     "dev": "vite",

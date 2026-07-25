@@ -5,7 +5,15 @@ import {
   type JsonTransportResponse,
 } from "@gielinor/agent-runtime";
 import { parseHiscoresCsv } from "@gielinor/providers/jagex-hiscores-parser";
-import { SKILL_IDS, type PlayerProfile, type ProfileExport } from "@gielinor/shared-types";
+import {
+  APPLICATION_VERSION,
+  SKILL_IDS,
+  type PlayerProfile,
+  type ProfileExport,
+  type RedactedDiagnostics,
+  type SoftwareUpdateCheck,
+  type SystemHealth,
+} from "@gielinor/shared-types";
 import { invoke, isTauri } from "@tauri-apps/api/core";
 
 import type {
@@ -67,6 +75,81 @@ function demoProfile(): PlayerProfile {
     inProgressQuestIds: [],
     goals: [],
     lastHiscoresRefresh: NOW,
+  };
+}
+
+function demoSystemHealth(offline = false, circuitOpen = false): SystemHealth {
+  return {
+    overall: offline ? "offline" : "healthy",
+    database: {
+      id: "database",
+      state: "healthy",
+      message: "SQLite integrity and schema are ready",
+      checkedAt: NOW,
+      lastSuccessAt: NOW,
+    },
+    providers: [
+      {
+        providerId: "gielinor.builtin-public-data",
+        capability: "quest-snapshot",
+        state: offline ? "unknown" : circuitOpen ? "degraded" : "healthy",
+        circuitState: circuitOpen ? "open" : "closed",
+        successfulRequests: offline ? 0 : 1,
+        failedRequests: circuitOpen ? 3 : 0,
+        consecutiveFailures: circuitOpen ? 3 : 0,
+        averageLatencyMs: offline ? 0 : 84,
+        ...(offline ? {} : { lastSuccessAt: NOW }),
+      },
+    ],
+    catalogues: [
+      {
+        catalogue: "quests",
+        state: offline ? "offline" : "fresh",
+        recordCount: 269,
+        freshnessIntervalMs: 86_400_000,
+        ageMs: 0,
+        source: "RuneScape Wiki",
+        lastSuccessAt: NOW,
+        nextRefreshAt: "2026-07-24T12:00:00.000Z",
+      },
+      {
+        catalogue: "training",
+        state: offline ? "offline" : "fresh",
+        recordCount: 793,
+        freshnessIntervalMs: 86_400_000,
+        ageMs: 0,
+        source: "RuneScape Wiki",
+        lastSuccessAt: NOW,
+        nextRefreshAt: "2026-07-24T12:00:00.000Z",
+      },
+      {
+        catalogue: "prices",
+        state: offline ? "offline" : "fresh",
+        recordCount: 7_310,
+        freshnessIntervalMs: 21_600_000,
+        ageMs: 0,
+        source: "RuneScape Wiki GE Market Watch",
+        lastSuccessAt: NOW,
+        nextRefreshAt: "2026-07-23T18:00:00.000Z",
+      },
+    ],
+    scheduler: {
+      state: offline ? "offline" : "healthy",
+      enabled: !offline,
+      runningJobs: 0,
+      failedJobs: 0,
+      jobs: [],
+      checkedAt: NOW,
+    },
+    updateChecker: {
+      id: "update-checker",
+      state: "disabled",
+      message: "Update checks are not connected in this fixture",
+      checkedAt: NOW,
+    },
+    activeErrors: [],
+    recentRecoveries: [],
+    checkedAt: NOW,
   };
 }
 
@@ -250,6 +333,7 @@ export class DemoCompanionBridge implements CompanionBridge {
       "ai-ready",
       "ai-provider-error",
       "ai-model-error",
+      "circuit-open",
     ].includes(fixture)
       ? [demoProfile()]
       : [];
@@ -672,6 +756,101 @@ export class DemoCompanionBridge implements CompanionBridge {
           itemCount: 7_310,
           historyPointCount: 180,
         } satisfies DataStatus;
+        break;
+      case "get_system_health":
+        result = demoSystemHealth(this.fixture === "offline", this.fixture === "circuit-open");
+        break;
+      case "get_provider_health":
+        result = demoSystemHealth(
+          this.fixture === "offline",
+          this.fixture === "circuit-open",
+        ).providers;
+        break;
+      case "get_catalogue_health":
+        result = demoSystemHealth(
+          this.fixture === "offline",
+          this.fixture === "circuit-open",
+        ).catalogues;
+        break;
+      case "list_recent_errors":
+        result = [];
+        break;
+      case "list_recovery_events":
+        result = [];
+        break;
+      case "run_database_integrity_check":
+        result = demoSystemHealth().database;
+        break;
+      case "export_redacted_diagnostics": {
+        const health = demoSystemHealth(
+          this.fixture === "offline",
+          this.fixture === "circuit-open",
+        );
+        result = {
+          exportVersion: 1,
+          generatedAt: NOW,
+          application: {
+            version: APPLICATION_VERSION,
+            operatingSystem: "browser-preview",
+            architecture: "browser",
+            nodeVersion: "not-applicable",
+            databaseSchemaVersion: 6,
+            mcpContractVersion: "1.1",
+          },
+          health,
+          configuration: { offline: this.fixture === "offline" },
+          recentErrors: [],
+          recentRecoveries: [],
+          recentLogs: [],
+          redactionNotice: "Secrets, credentials, personal identifiers, and paths are excluded.",
+        } satisfies RedactedDiagnostics;
+        break;
+      }
+      case "check_for_software_updates":
+        result = {
+          state: "up-to-date",
+          installedVersion: "1.1.0",
+          checkedAt: NOW,
+          nextCheckAt: "2026-07-24T12:00:00.000Z",
+          source: "cache",
+          message: "Version 1.1.0 is up to date",
+          warnings: [],
+          traceId: "00000000-0000-4000-8000-000000000021",
+          release: {
+            version: "1.1.0",
+            tagName: "v1.1.0",
+            name: "Gielinor Companion 1.1.0",
+            notes: "Resilience, self-healing, automatic maintenance, and diagnostics.",
+            publishedAt: NOW,
+            releaseUrl: "https://github.com/DionCroft/Gielinor-Companion-MCP/releases/tag/v1.1.0",
+            prerelease: false,
+            assets: [
+              {
+                name: "gielinor-companion-windows.zip",
+                contentType: "application/zip",
+                size: 12_345_678,
+                downloadUrl:
+                  "https://github.com/DionCroft/Gielinor-Companion-MCP/releases/download/v1.1.0/gielinor-companion-windows.zip",
+                digest: "sha256:preview-checksum",
+              },
+            ],
+          },
+        } satisfies SoftwareUpdateCheck;
+        break;
+      case "clear_expired_quarantine_records":
+        result = {
+          deleted: 0,
+          cutoffAt: "2026-06-24T12:00:00.000Z",
+          retentionDays: 30,
+        };
+        break;
+      case "reset_provider_circuit":
+        result = {
+          providerId: String(arguments_.providerId),
+          capability: String(arguments_.capability),
+          resetCount: 1,
+          state: "closed",
+        };
         break;
       case "refresh_quest_data":
         result = { total: 269, inserted: 0, updated: 0, unchanged: 269, removed: 0 };

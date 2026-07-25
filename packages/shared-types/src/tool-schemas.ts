@@ -13,6 +13,15 @@ import {
 
 export const EmptyInputSchema = z.object({}).strict();
 
+export const RecoveryStatusSchema = z.enum([
+  "not-required",
+  "not-attempted",
+  "succeeded",
+  "failed",
+  "partial",
+]);
+export type RecoveryStatus = z.infer<typeof RecoveryStatusSchema>;
+
 export const ToolEnvelopeSchema = z
   .object({
     data: z.unknown(),
@@ -20,6 +29,8 @@ export const ToolEnvelopeSchema = z
       .object({
         generatedAt: z.string().datetime({ offset: true }),
         source: z.string().min(1),
+        traceId: z.string().uuid().optional(),
+        recoveryStatus: RecoveryStatusSchema.optional(),
       })
       .strict(),
   })
@@ -253,5 +264,66 @@ export const CompareQuestXpRewardsToolInputSchema = z
     skillId: SkillIdSchema,
     profileId: z.string().uuid().optional(),
     limit: z.number().int().min(1).max(100).optional(),
+  })
+  .strict();
+
+export const ListRecentErrorsToolInputSchema = z
+  .object({
+    limit: z.number().int().min(1).max(100).optional(),
+    activeOnly: z.boolean().optional(),
+  })
+  .strict();
+
+export const ListRecoveryEventsToolInputSchema = z
+  .object({
+    limit: z.number().int().min(1).max(100).optional(),
+  })
+  .strict();
+
+export const RetryFailedOperationToolInputSchema = z
+  .object({
+    operation: z.enum(["quest-refresh", "training-refresh", "price-refresh"]),
+  })
+  .strict();
+
+export const RefreshStaleCataloguesToolInputSchema = z
+  .object({
+    catalogues: z
+      .array(z.enum(["quests", "training", "prices"]))
+      .min(1)
+      .max(3)
+      .optional(),
+  })
+  .strict();
+
+export const CheckForSoftwareUpdatesToolInputSchema = z
+  .object({
+    includePrereleases: z.boolean().optional(),
+    forceRefresh: z.boolean().optional(),
+  })
+  .strict();
+
+export const ClearExpiredQuarantineToolInputSchema = z
+  .object({
+    retentionDays: z.number().int().min(1).max(3_650).optional(),
+  })
+  .strict();
+
+export const ResetProviderCircuitToolInputSchema = z
+  .object({
+    providerId: z
+      .string()
+      .min(1)
+      .max(200)
+      .regex(/^[a-z0-9._-]+$/i),
+    capability: z.enum([
+      "player-stats",
+      "current-price",
+      "price-history",
+      "price-snapshot",
+      "quest-snapshot",
+      "training-snapshot",
+    ]),
+    confirmed: z.literal(true),
   })
   .strict();

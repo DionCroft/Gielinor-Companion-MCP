@@ -1,6 +1,7 @@
 import { resolve } from "node:path";
 
 import { z } from "zod";
+import { APPLICATION_VERSION } from "@gielinor/shared-types";
 
 const PortSchema = z.coerce.number().int().min(1).max(65_535);
 const PositiveIntegerSchema = z.coerce.number().int().positive();
@@ -90,6 +91,7 @@ export type HostedConfig = {
   toolCallsPerMinute: number;
   requestTimeoutMs: number;
   shutdownTimeoutMs: number;
+  maintenanceEnabled: boolean;
   userAgent: string;
 };
 
@@ -145,8 +147,9 @@ export function loadHostedConfig(
       1_000,
       60_000,
     ),
+    maintenanceEnabled: optionalBoolean(environment.GIELINOR_MAINTENANCE_ENABLED, true),
     userAgent:
       environment.GIELINOR_USER_AGENT ??
-      "Gielinor-Companion-MCP/1.0.0 (hosted; contact: operator-not-configured)",
+      `Gielinor-Companion-MCP/${APPLICATION_VERSION} (hosted; contact: operator-not-configured)`,
   };
 }
