@@ -23,6 +23,7 @@ import {
 } from "@gielinor/shared-types";
 import { z } from "zod";
 
+import { ProviderCircuitBreakers, type ProviderCircuitBreakerOptions } from "./circuit-breaker.js";
 import { ProviderError } from "./http.js";
 
 export const PROVIDER_CAPABILITIES = [
@@ -216,6 +217,14 @@ export type ProviderAttempt<TResult> =
       durationMs: number;
       errorCode: string;
       message: string;
+    }
+  | {
+      pluginId: string;
+      outcome: "skipped";
+      durationMs: 0;
+      errorCode: "CIRCUIT_OPEN";
+      message: string;
+      nextProbeAt: string;
     };
 
 export type ProviderDisagreement<TResult> = {
@@ -250,6 +259,21 @@ function errorDetails(error: unknown): { errorCode: string; message: string } {
     };
   }
   return { errorCode: "PROVIDER_FAILURE", message: "Provider capability execution failed" };
+}
+
+function affectsCircuit(error: unknown): boolean {
+  if (error instanceof z.ZodError) {
+    return true;
+  }
+  if (error instanceof ProviderError) {
+    return (
+      error.retryable ||
+      error.gielinorError.code === "GC-PROVIDER-003" ||
+      error.gielinorError.code === "GC-PROVIDER-004" ||
+      error.gielinorError.code === "GC-PROVIDER-005"
+    );
+  }
+  return true;
 }
 
 function comparable(value: unknown): string {
@@ -288,8 +312,14 @@ function validateResult<K extends ProviderCapability>(
 export class ProviderRegistry {
   private readonly registrations = new Map<ProviderCapability, RegisteredCapability[]>();
   private readonly pluginIds = new Set<string>();
+  public readonly circuits: ProviderCircuitBreakers;
 
-  public constructor(public readonly health = new ProviderHealthTracker()) {}
+  public constructor(
+    public readonly health = new ProviderHealthTracker(),
+    circuitOptions: ProviderCircuitBreakerOptions = {},
+  ) {
+    this.circuits = new ProviderCircuitBreakers(circuitOptions);
+  }
 
   public register(plugin: ProviderPlugin): void {
     if (plugin.apiVersion !== PROVIDER_PLUGIN_API_VERSION) {
@@ -388,6 +418,7 @@ export class ProviderRegistry {
 
     for (const registered of prepared) {
       this.health.track(plugin.id, registered.metadata.capability);
+      this.circuits.track(plugin.id, registered.metadata.capability);
       const registrations = this.registrations.get(registered.metadata.capability) ?? [];
       registrations.push(registered);
       registrations.sort(
@@ -439,10 +470,23 @@ export class ProviderRegistry {
     const successes: Array<{ pluginId: string; value: ProviderCapabilityResultMap[K] }> = [];
 
     for (const candidate of candidates) {
+      const permit = this.circuits.acquire(candidate.metadata.pluginId, capability);
+      if (!permit.allowed) {
+        attempts.push({
+          pluginId: candidate.metadata.pluginId,
+          outcome: "skipped",
+          durationMs: 0,
+          errorCode: "CIRCUIT_OPEN",
+          message: "Provider circuit is open; a healthy fallback was selected",
+          nextProbeAt: new Date(permit.nextProbeAt).toISOString(),
+        });
+        continue;
+      }
       const startedAt = performance.now();
       try {
         const value = validateResult(capability, await candidate.handler(request, context));
         const durationMs = performance.now() - startedAt;
+        this.circuits.success(candidate.metadata.pluginId, capability);
         this.health.success(candidate.metadata.pluginId, capability, durationMs);
         attempts.push({
           pluginId: candidate.metadata.pluginId,
@@ -456,6 +500,11 @@ export class ProviderRegistry {
         }
       } catch (error) {
         const durationMs = performance.now() - startedAt;
+        if (affectsCircuit(error)) {
+          this.circuits.failure(candidate.metadata.pluginId, capability);
+        } else {
+          this.circuits.success(candidate.metadata.pluginId, capability);
+        }
         this.health.failure(candidate.metadata.pluginId, capability, durationMs, error);
         attempts.push({
           pluginId: candidate.metadata.pluginId,
@@ -471,11 +520,21 @@ export class ProviderRegistry {
       const failures = attempts
         .filter((attempt) => attempt.outcome === "failure")
         .map((attempt) => new Error(`${attempt.pluginId}: ${attempt.message}`));
+      const nextProbeAt = attempts
+        .filter((attempt) => attempt.outcome === "skipped")
+        .map((attempt) => Date.parse(attempt.nextProbeAt))
+        .filter(Number.isFinite)
+        .sort((left, right) => left - right)[0];
       throw new ProviderError(
         `Every provider failed for ${capability}`,
         "ALL_PROVIDERS_FAILED",
         true,
-        { cause: new AggregateError(failures) },
+        {
+          cause: new AggregateError(failures),
+          ...(nextProbeAt === undefined
+            ? {}
+            : { retryAfterMs: Math.max(0, nextProbeAt - Date.now()) }),
+        },
       );
     }
 

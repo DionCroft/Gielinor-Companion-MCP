@@ -4,7 +4,7 @@ import { dirname, resolve } from "node:path";
 import Database from "better-sqlite3";
 
 export type DatabaseConnection = Database.Database;
-export const DATABASE_SCHEMA_VERSION = 5;
+export const DATABASE_SCHEMA_VERSION = 6;
 
 export type DatabaseMigration = {
   version: number;
@@ -185,6 +185,140 @@ export const DATABASE_MIGRATIONS: readonly DatabaseMigration[] = [
 
       CREATE INDEX IF NOT EXISTS idx_ge_price_history_timestamp
         ON ge_price_history(timestamp);
+    `,
+  },
+  {
+    version: 6,
+    name: "resilience-maintenance-state",
+    sql: `
+      ALTER TABLE provider_cache
+        ADD COLUMN metadata_version INTEGER NOT NULL DEFAULT 1;
+      ALTER TABLE provider_cache
+        ADD COLUMN provider TEXT NOT NULL DEFAULT 'legacy-provider';
+      ALTER TABLE provider_cache
+        ADD COLUMN fetched_at INTEGER NOT NULL DEFAULT 0;
+      ALTER TABLE provider_cache
+        ADD COLUMN last_successful_refresh_at INTEGER NOT NULL DEFAULT 0;
+      ALTER TABLE provider_cache
+        ADD COLUMN last_failed_refresh_at INTEGER;
+      ALTER TABLE provider_cache
+        ADD COLUMN last_failure_code TEXT;
+      ALTER TABLE provider_cache
+        ADD COLUMN last_failure_trace_id TEXT;
+
+      UPDATE provider_cache
+      SET fetched_at = stored_at,
+          last_successful_refresh_at = stored_at
+      WHERE fetched_at = 0 OR last_successful_refresh_at = 0;
+
+      CREATE TABLE provider_cache_quarantine (
+        quarantine_id TEXT PRIMARY KEY,
+        cache_key TEXT NOT NULL,
+        provider TEXT NOT NULL,
+        quarantined_at INTEGER NOT NULL,
+        stored_at INTEGER NOT NULL,
+        error_code TEXT NOT NULL,
+        reason TEXT NOT NULL,
+        sample_json TEXT,
+        entry_json TEXT NOT NULL
+      );
+
+      CREATE INDEX idx_provider_cache_quarantine_time
+        ON provider_cache_quarantine(quarantined_at DESC);
+
+      CREATE TABLE database_recovery_events (
+        event_id TEXT PRIMARY KEY,
+        event_at TEXT NOT NULL,
+        status TEXT NOT NULL CHECK (status IN ('ready', 'recovered', 'safe-mode')),
+        error_code TEXT,
+        action TEXT NOT NULL,
+        details_json TEXT NOT NULL DEFAULT '{}'
+      );
+
+      CREATE INDEX idx_database_recovery_events_time
+        ON database_recovery_events(event_at DESC);
+
+      CREATE TABLE system_state (
+        state_key TEXT PRIMARY KEY,
+        value_json TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+
+      CREATE TABLE maintenance_jobs (
+        job_name TEXT PRIMARY KEY CHECK (
+          job_name IN (
+            'quest-refresh',
+            'training-refresh',
+            'price-refresh',
+            'software-update-check'
+          )
+        ),
+        enabled INTEGER NOT NULL DEFAULT 1 CHECK (enabled IN (0, 1)),
+        interval_ms INTEGER NOT NULL CHECK (interval_ms >= 60000),
+        last_attempt_at INTEGER,
+        last_success_at INTEGER,
+        next_run_at INTEGER NOT NULL,
+        failure_count INTEGER NOT NULL DEFAULT 0 CHECK (failure_count >= 0),
+        last_error_code TEXT,
+        state TEXT NOT NULL DEFAULT 'idle' CHECK (
+          state IN ('idle', 'running', 'backoff', 'failed', 'disabled')
+        ),
+        lease_owner TEXT,
+        lease_expires_at INTEGER,
+        updated_at INTEGER NOT NULL,
+        CHECK (
+          (state = 'running' AND lease_owner IS NOT NULL AND lease_expires_at IS NOT NULL)
+          OR state != 'running'
+        )
+      );
+
+      CREATE INDEX idx_maintenance_jobs_due
+        ON maintenance_jobs(enabled, next_run_at, lease_expires_at);
+
+      CREATE TABLE maintenance_job_attempts (
+        attempt_id TEXT PRIMARY KEY,
+        job_name TEXT NOT NULL REFERENCES maintenance_jobs(job_name) ON DELETE CASCADE,
+        started_at INTEGER NOT NULL,
+        completed_at INTEGER,
+        outcome TEXT CHECK (
+          outcome IS NULL OR outcome IN ('success', 'failure', 'cancelled', 'interrupted')
+        ),
+        error_code TEXT,
+        duration_ms INTEGER CHECK (duration_ms IS NULL OR duration_ms >= 0)
+      );
+
+      CREATE INDEX idx_maintenance_job_attempts_time
+        ON maintenance_job_attempts(started_at DESC);
+      CREATE INDEX idx_maintenance_job_attempts_job_time
+        ON maintenance_job_attempts(job_name, started_at DESC);
+
+      CREATE TABLE diagnostic_errors (
+        trace_id TEXT PRIMARY KEY,
+        occurred_at INTEGER NOT NULL,
+        error_json TEXT NOT NULL,
+        active INTEGER NOT NULL DEFAULT 1 CHECK (active IN (0, 1)),
+        resolved_at INTEGER
+      );
+
+      CREATE INDEX idx_diagnostic_errors_time
+        ON diagnostic_errors(occurred_at DESC);
+      CREATE INDEX idx_diagnostic_errors_active
+        ON diagnostic_errors(active, occurred_at DESC);
+
+      CREATE TABLE recovery_events (
+        event_id TEXT PRIMARY KEY,
+        component TEXT NOT NULL,
+        action TEXT NOT NULL,
+        outcome TEXT NOT NULL CHECK (outcome IN ('succeeded', 'failed', 'in-progress')),
+        automatic INTEGER NOT NULL CHECK (automatic IN (0, 1)),
+        occurred_at INTEGER NOT NULL,
+        error_code TEXT,
+        trace_id TEXT,
+        details_json TEXT NOT NULL DEFAULT '{}'
+      );
+
+      CREATE INDEX idx_recovery_events_time
+        ON recovery_events(occurred_at DESC);
     `,
   },
 ];

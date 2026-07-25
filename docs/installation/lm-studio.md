@@ -16,7 +16,7 @@ merge:
       "args": ["/absolute/path/to/Gielinor-Companion-MCP/apps/mcp-server/dist/index.js"],
       "env": {
         "GIELINOR_DB_PATH": "/absolute/private/path/gielinor.db",
-        "GIELINOR_USER_AGENT": "Gielinor-Companion-MCP/1.0.0 (contact: you@example.com)"
+        "GIELINOR_USER_AGENT": "Gielinor-Companion-MCP/1.1.0 (contact: you@example.com)"
       }
     }
   }

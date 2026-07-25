@@ -9,6 +9,7 @@ import {
   type OverlayObservation,
   type OverlaySignal,
 } from "./contracts.js";
+import { overlayErrorMessage } from "./errors.js";
 import { OverlaySession } from "./session.js";
 
 const STORAGE_KEY = "gielinor-overlay-preferences-v1";
@@ -300,8 +301,7 @@ element<HTMLButtonElement>("grant-consent").addEventListener("click", () => {
       detail: "Enabled fields are ready, but no visible pixels are being read.",
     });
   } catch (error) {
-    guideStatus.textContent =
-      error instanceof Error ? error.message : "Consent could not be saved.";
+    guideStatus.textContent = overlayErrorMessage(error, "grant-consent", "GC-SEC-003");
     guideStatus.dataset.state = "error";
   }
 });
@@ -319,7 +319,7 @@ element<HTMLButtonElement>("connect-overlay").addEventListener("click", async ()
   } catch (error) {
     setStatus({
       state: "consent-required",
-      detail: error instanceof Error ? error.message : "Consent and a guide are required.",
+      detail: overlayErrorMessage(error, "connect-overlay", "GC-SEC-003"),
     });
   }
 });
@@ -365,8 +365,7 @@ element<HTMLButtonElement>("analyse-manual").addEventListener("click", () => {
     recordLines([value], "manual-paste");
     manualText.value = "";
   } catch (error) {
-    guideStatus.textContent =
-      error instanceof Error ? error.message : "Enable fields and load a guide first.";
+    guideStatus.textContent = overlayErrorMessage(error, "analyse-manual", "GC-SEC-003");
     guideStatus.dataset.state = "error";
   }
 });

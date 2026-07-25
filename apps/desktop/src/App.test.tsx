@@ -1,9 +1,14 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { afterEach, vi } from "vitest";
 
 import { App } from "./App.js";
 import { DemoCompanionBridge } from "./lib/bridge.js";
 import { loadLocalAiSettings } from "./views/AiProvidersView.js";
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 describe("desktop application flows", () => {
   it("completes first-run setup without an AI provider", async () => {
@@ -39,10 +44,63 @@ describe("desktop application flows", () => {
 
     await user.click(await screen.findByRole("button", { name: "Settings" }));
     await user.click(screen.getByRole("switch", { name: /use retained local data only/i }));
-    await user.click(screen.getByRole("button", { name: "Data sources" }));
+    await user.click(screen.getByRole("button", { name: "Diagnostics" }));
 
-    expect(await screen.findByText(/offline mode is active/i)).toBeVisible();
-    expect(screen.getByText("7,310")).toBeVisible();
+    expect(await screen.findByText(/using retained local data/i)).toBeVisible();
+    expect(screen.getByText(/7,310 records/i)).toBeVisible();
+  });
+
+  it("shows central health and runs safe diagnostics actions", async () => {
+    const user = userEvent.setup();
+    render(<App bridge={new DemoCompanionBridge("returning")} />);
+
+    await user.click(await screen.findByRole("button", { name: "Diagnostics" }));
+    expect(await screen.findByRole("heading", { name: "Diagnostics centre" })).toBeVisible();
+    expect(screen.getByText("Overall status")).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Database" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Providers and circuit breakers" })).toBeVisible();
+
+    await user.click(screen.getByRole("button", { name: "Run database integrity check" }));
+    expect(await screen.findByText(/integrity check completed/i)).toBeVisible();
+
+    await user.click(screen.getByRole("button", { name: "Export diagnostics" }));
+    expect(await screen.findByText(/without profiles, credentials, or paths/i)).toBeVisible();
+
+    await user.click(screen.getByRole("button", { name: "Check for updates" }));
+    expect(await screen.findByText(/read-only software update check completed/i)).toBeVisible();
+
+    vi.spyOn(window, "confirm").mockReturnValueOnce(true);
+    await user.click(screen.getByRole("button", { name: "Clear expired quarantine" }));
+    expect(await screen.findByText(/active data was preserved/i)).toBeVisible();
+  });
+
+  it("requires confirmation before resetting one open provider circuit", async () => {
+    const user = userEvent.setup();
+    const confirm = vi.spyOn(window, "confirm").mockReturnValueOnce(true);
+    render(<App bridge={new DemoCompanionBridge("circuit-open")} />);
+
+    await user.click(await screen.findByRole("button", { name: "Diagnostics" }));
+    await user.click(await screen.findByRole("button", { name: "Reset circuit" }));
+
+    expect(confirm).toHaveBeenCalledOnce();
+    expect(await screen.findByText(/selected provider circuit was reset/i)).toBeVisible();
+  });
+
+  it("checks validated releases without downloading or installing assets", async () => {
+    const user = userEvent.setup();
+    render(<App bridge={new DemoCompanionBridge("returning")} />);
+
+    await user.click(await screen.findByRole("button", { name: "Updates" }));
+    expect(await screen.findByRole("heading", { name: "Update status" })).toBeVisible();
+    expect(await screen.findByText("Version 1.1.0")).toBeVisible();
+    expect(screen.getByText("sha256:preview-checksum")).toBeVisible();
+    expect(screen.getByRole("link", { name: "Open official release" })).toHaveAttribute(
+      "href",
+      expect.stringContaining("github.com/DionCroft/Gielinor-Companion-MCP/releases"),
+    );
+    await user.click(screen.getByRole("switch", { name: /include pre-releases/i }));
+    await user.click(screen.getByRole("button", { name: "Check now" }));
+    expect(await screen.findByText(/never downloads, installs, or executes/i)).toBeVisible();
   });
 
   it("discovers an Ollama model and answers through a validated tool call", async () => {

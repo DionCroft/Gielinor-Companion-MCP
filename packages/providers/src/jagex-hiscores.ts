@@ -7,6 +7,7 @@ import {
   type PlayerSkill,
   type PlayerStatsResult,
 } from "@gielinor/shared-types";
+import { z } from "zod";
 
 import {
   MemoryCacheStore,
@@ -29,6 +30,15 @@ type CachedStats = {
   skills: PlayerSkill[];
   retrievedAt: string;
 };
+
+const CachedStatsSchema = z
+  .object({
+    displayName: PlayerProfileSchema.shape.displayName,
+    gameMode: GameModeSchema,
+    skills: PlayerStatsResultSchema.shape.skills,
+    retrievedAt: z.string().datetime({ offset: true }),
+  })
+  .strict();
 
 export type JagexHiscoresOptions = {
   httpClient: ResilientHttpClient;
@@ -97,6 +107,11 @@ export class JagexHiscoresProvider implements PlayerStatsProvider {
       },
       requestOptions.forceRefresh ?? false,
       requestOptions.offline ?? false,
+      {
+        provider: "Jagex public Hiscores",
+        scope: "public-hiscores",
+        validate: (value) => CachedStatsSchema.parse(value),
+      },
     );
 
     return PlayerStatsResultSchema.parse({
@@ -108,6 +123,19 @@ export class JagexHiscoresProvider implements PlayerStatsProvider {
         retrievedAt: result.value.retrievedAt,
         cacheStatus: result.status,
         cacheStoredAt: new Date(result.storedAt).toISOString(),
+        cacheAgeSeconds: Math.floor(result.metadata.ageMs / 1_000),
+        cacheFreshUntil: new Date(result.metadata.freshUntil).toISOString(),
+        cacheStaleUntil: new Date(result.metadata.staleUntil).toISOString(),
+        lastSuccessfulRefreshAt: new Date(result.metadata.lastSuccessfulRefreshAt).toISOString(),
+        ...(result.metadata.lastFailedRefreshAt === undefined
+          ? {}
+          : {
+              lastFailedRefreshAt: new Date(result.metadata.lastFailedRefreshAt).toISOString(),
+            }),
+        ...(result.metadata.lastFailureCode === undefined
+          ? {}
+          : { lastRefreshErrorCode: result.metadata.lastFailureCode }),
+        ...(result.staleReason === undefined ? {} : { staleReason: result.staleReason }),
       },
     });
   }

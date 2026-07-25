@@ -9,6 +9,8 @@ account, and do not collect telemetry.
 - A RuneScape display name and public Hiscores snapshot.
 - Manually selected account mode, quest state, planning preferences, and goals.
 - Validated public quest, training, and Grand Exchange cache records.
+- Redacted error codes, provider health, scheduler attempts, recovery events,
+  and bounded invalid-cache quarantine metadata.
 - Optional ad-hoc dashboard goals and shopping lists in installation-local UI
   storage.
 
@@ -30,6 +32,11 @@ Wiki. A player-stat refresh sends the public display name to the selected
 Hiscores endpoint. Requests include the configured application User-Agent.
 Provider responses are validated, source-stamped, cached, and never treated as
 game credentials.
+
+Automatic maintenance sends the same minimal public requests as a manual
+refresh and respects offline mode. The update checker may request public release
+metadata from GitHub at most once every 24 hours by default. It sends no player
+profile or local diagnostic data.
 
 ## Local AI
 
@@ -60,6 +67,10 @@ deletion, legal-jurisdiction, and contact terms. See
 Profile export contains public and manually entered companion data. Treat it as
 personal data if a display name identifies you. Standard logs redact tokens,
 tool arguments, display names, provider bodies, profile content, local paths,
+and stack traces.
+
+The diagnostic export deliberately excludes profiles, databases, raw provider
+payloads, private identifiers, authentication headers, prompts, absolute paths,
 and stack traces.
 
 Privacy or security concerns should follow [SECURITY.md](SECURITY.md).

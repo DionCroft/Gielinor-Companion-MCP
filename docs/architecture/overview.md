@@ -1,4 +1,10 @@
-# Version 1.0 stable architecture
+# Stable architecture
+
+Version 1.1 preserves every Version 1.0 boundary and adds shared structured
+errors, provider resilience, cache quarantine, verified database recovery,
+persistent automatic maintenance, central diagnostics, and a read-only update
+checker. See [resilience](resilience.md), [scheduler](scheduler.md),
+[diagnostics](diagnostics.md), and [update checker](update-checker.md).
 
 ## Boundaries
 
@@ -191,10 +197,11 @@ URLs and cache refresh keys are independently coalesced.
 
 The React UI contains presentation state and strict forms, not domain
 calculations. Tauri accepts only a documented tool name and JSON arguments,
-rejects everything outside the 48-tool allowlist, and starts the bundled MCP
-runtime without a shell. Each call performs MCP initialization and a structured
-tool call over stdio, then terminates its child process. Native errors are mapped
-to path-free public messages.
+rejects everything outside the generated 60-tool allowlist (including the
+frozen 48-tool Version 1.0 prefix), and starts the bundled MCP runtime without a
+shell. Each call performs MCP initialization and a structured tool call over
+stdio, then terminates its child process. Native errors are mapped to path-free
+public messages.
 
 Production preparation uses `pnpm deploy` to build a flattened dependency tree
 and copies the current target's Node executable as a Tauri external sidecar.

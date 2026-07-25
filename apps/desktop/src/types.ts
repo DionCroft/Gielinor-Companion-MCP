@@ -1,11 +1,21 @@
 import type { JsonTransport } from "@gielinor/agent-runtime";
-import type { GameMode, PlayerProfile, PlayerSkill, SkillId } from "@gielinor/shared-types";
+import type {
+  GameMode,
+  PlayerProfile,
+  PlayerSkill,
+  RedactedDiagnostics,
+  SkillId,
+  SoftwareUpdateCheck,
+  SystemHealth,
+} from "@gielinor/shared-types";
 
 export type ToolEnvelope<T> = {
   data: T;
   meta: {
     generatedAt: string;
     source: string;
+    traceId?: string;
+    recoveryStatus?: "not-required" | "not-attempted" | "succeeded" | "failed" | "partial";
   };
 };
 
@@ -25,6 +35,9 @@ export type DesktopProfile = PlayerProfile;
 export type DesktopSkill = PlayerSkill;
 export type DesktopSkillId = SkillId;
 export type DesktopGameMode = GameMode;
+export type DesktopSystemHealth = SystemHealth;
+export type DesktopRedactedDiagnostics = RedactedDiagnostics;
+export type DesktopSoftwareUpdateCheck = SoftwareUpdateCheck;
 
 export type DataStatus = {
   state: "never-synced" | "ready" | "failed";

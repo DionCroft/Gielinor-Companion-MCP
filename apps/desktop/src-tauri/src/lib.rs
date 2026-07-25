@@ -55,6 +55,18 @@ const ALLOWED_TOOLS: &[&str] = &[
     "compare_quest_xp_rewards",
     "refresh_training_data",
     "get_training_data_status",
+    "get_system_health",
+    "get_provider_health",
+    "get_catalogue_health",
+    "list_recent_errors",
+    "list_recovery_events",
+    "retry_failed_operation",
+    "refresh_stale_catalogues",
+    "run_database_integrity_check",
+    "export_redacted_diagnostics",
+    "check_for_software_updates",
+    "clear_expired_quarantine_records",
+    "reset_provider_circuit",
 ];
 const MAX_ARGUMENT_BYTES: usize = 256 * 1024;
 
@@ -217,6 +229,7 @@ fn invoke_tool(
 ) -> Result<Value, BridgeError> {
     let mut child = Command::new(&runtime.executable)
         .arg(&runtime.entry)
+        .env("GIELINOR_RUNTIME_MODE", "desktop-ephemeral")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::null())
@@ -238,7 +251,7 @@ fn invoke_tool(
                     "capabilities": {},
                     "clientInfo": {
                         "name": "gielinor-companion-desktop",
-                        "version": "1.0.0"
+                        "version": "1.1.0"
                     }
                 }
             }),
@@ -370,7 +383,7 @@ mod tests {
         assert!(is_allowed_tool("create_levelling_plan"));
         assert!(!is_allowed_tool("run_shell_command"));
         assert!(!is_allowed_tool("../mcp-server"));
-        assert_eq!(ALLOWED_TOOLS.len(), 48);
+        assert_eq!(ALLOWED_TOOLS.len(), 60);
     }
 
     #[test]

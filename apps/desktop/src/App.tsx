@@ -3,6 +3,7 @@ import { useEffect, useMemo, useReducer } from "react";
 import { InlineAlert, LoadingBlock } from "./components/Common.js";
 import { Layout } from "./components/Layout.js";
 import { createDefaultBridge } from "./lib/bridge.js";
+import { desktopError } from "./lib/errors.js";
 import {
   appReducer,
   initialAppState,
@@ -21,7 +22,7 @@ import {
   QuestPlannerView,
   ShoppingListsView,
 } from "./views/PlanningViews.js";
-import { AboutView, DataStatusView, SettingsView, UpdatesView } from "./views/SystemViews.js";
+import { AboutView, DiagnosticsView, SettingsView, UpdatesView } from "./views/SystemViews.js";
 
 function activeContent(
   state: AppState,
@@ -61,8 +62,14 @@ function activeContent(
         onRemove={(goalId) => dispatch({ type: "remove-goal", goalId })}
       />
     ),
-    "data-status": <DataStatusView bridge={bridge} offlineMode={state.offlineMode} />,
-    updates: <UpdatesView />,
+    "data-status": (
+      <DiagnosticsView
+        bridge={bridge}
+        offlineMode={state.offlineMode}
+        onOffline={(offlineMode) => dispatch({ type: "set-offline", offlineMode })}
+      />
+    ),
+    updates: <UpdatesView bridge={bridge} />,
     settings: (
       <SettingsView
         {...(state.runtime === undefined ? {} : { runtime: state.runtime })}
@@ -100,12 +107,13 @@ export function App({ bridge: providedBridge }: { bridge?: CompanionBridge }) {
         }
       } catch (error) {
         if (active) {
+          const failure = desktopError(error, "initialise-runtime", "GC-CFG-002");
           dispatch({
             type: "set-runtime",
             runtime: {
               ready: false,
               mode: "unavailable",
-              message: error instanceof Error ? error.message : "The local runtime is unavailable",
+              message: `${failure.userMessage} (${failure.code}; ${failure.traceId})`,
             },
           });
         }

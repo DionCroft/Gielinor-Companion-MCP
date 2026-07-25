@@ -59,9 +59,21 @@ Stable MCP/profile contracts, migration guarantees, installers, npm package,
 complete documentation, verifiable release artifacts where practical, security
 and accessibility reviews, and release material.
 
-## Post-1.0 candidates
+## 1.1 — Resilience, self-healing and automatic maintenance (complete)
+
+Stable structured errors, bounded retries and circuit breakers, stale-cache
+fallback and quarantine, verified database recovery and safe mode, persistent
+automatic catalogue scheduling, central diagnostics, twelve additive MCP tools,
+read-only GitHub release checks, scheduled live contract monitoring, and tested
+Node.js 22/24 support.
+
+## Version 1.2 candidates
 
 - OAuth/OIDC for private hosted profiles.
+- Persisted cross-process provider-circuit state and an operator dashboard for
+  multi-replica hosted deployments.
+- Optional, deduplicated issue creation after repeated confirmed live-contract
+  failures.
 - Signed dynamic provider discovery with an explicit package trust policy.
 - Maintainer certificate-backed Authenticode, Apple notarization, and a signed
   rollback-capable updater.

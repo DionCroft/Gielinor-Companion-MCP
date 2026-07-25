@@ -26,6 +26,7 @@ function loadConfig(directory: string): HostedConfig {
     toolCallsPerMinute: 10_000,
     requestTimeoutMs: 10_000,
     shutdownTimeoutMs: 500,
+    maintenanceEnabled: false,
     userAgent: "Gielinor-Load-Test/1.0.0",
   };
 }

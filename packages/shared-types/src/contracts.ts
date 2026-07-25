@@ -1,4 +1,5 @@
 export const MCP_TOOL_CONTRACT_VERSION = "1.0";
+export const MCP_TOOL_CONTRACT_VERSION_V1_1 = "1.1";
 export const MCP_TOOL_SCHEMA_STABILITY = "stable";
 export const PROFILE_EXPORT_SCHEMA_VERSION = 1;
 
@@ -58,3 +59,19 @@ export const MCP_TOOL_NAMES_V1 = Object.freeze([
  * compare their prerelease snapshot without changing imports.
  */
 export const MCP_TOOL_NAMES_V0_9 = MCP_TOOL_NAMES_V1;
+
+export const MCP_TOOL_NAMES_V1_1 = Object.freeze([
+  ...MCP_TOOL_NAMES_V1,
+  "get_system_health",
+  "get_provider_health",
+  "get_catalogue_health",
+  "list_recent_errors",
+  "list_recovery_events",
+  "retry_failed_operation",
+  "refresh_stale_catalogues",
+  "run_database_integrity_check",
+  "export_redacted_diagnostics",
+  "check_for_software_updates",
+  "clear_expired_quarantine_records",
+  "reset_provider_circuit",
+] as const);

@@ -3,6 +3,44 @@
 All notable changes follow [Keep a Changelog](https://keepachangelog.com/) and
 semantic versioning.
 
+## [1.1.0] - 2026-07-24
+
+### Added
+
+- Shared 62-code structured error registry with trace IDs, bounded cause chains,
+  public redaction, and generated troubleshooting documentation.
+- Bounded retry policies, per-provider circuit breakers, validated provider
+  fallback, visible stale-cache fallback, invalid-data quarantine, and bounded
+  automatic recovery history.
+- Verified SQLite backups, integrity checks, migration rollback,
+  interrupted-upgrade recovery, read-only safe mode, and persistent scheduler
+  leases with configurable permanent-failure limits.
+- First-run catalogue population, startup stale checks, configurable background
+  refresh, central health aggregation, a desktop diagnostics centre, and
+  redacted diagnostic export.
+- MCP contract 1.1 with twelve additive strict tools while preserving the
+  original 48-tool Version 1.0 prefix.
+- Read-only GitHub Releases update checks, a weekly live-provider contract
+  monitor, deterministic fault injection, and Node.js 22/24 CI coverage.
+
+### Changed
+
+- Application, package, desktop, hosted, container, and User-Agent versions are
+  now `1.1.0`.
+- The minimum Node.js version is 22; Node.js 22 and 24 are the complete supported
+  matrix.
+- Desktop and hosted production packaging now use pnpm's lockfile-backed,
+  injected-workspace deploy path instead of the legacy deploy implementation.
+- Background jobs stop automatic retries after five failures by default and
+  remain manually recoverable.
+
+### Security
+
+- Automatic recovery remains local, bounded, observable, and non-destructive.
+- No gameplay control, credentials, private player payloads, absolute paths,
+  unredacted headers, or stack traces were added to public surfaces.
+- Software updates are never downloaded or installed automatically.
+
 ## [1.0.0] - 2026-07-24
 
 ### Added

@@ -1,0 +1,65 @@
+name: Live provider monitor
+
+on:
+  schedule:
+    - cron: "17 5 * * 3"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: live-provider-monitor
+  cancel-in-progress: false
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.5
+          run_install: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build validated provider clients
+        run: pnpm build
+
+      - name: Monitor live public contracts
+        id: monitor
+        continue-on-error: true
+        run: node scripts/run-live-monitor.mjs
+
+      - name: Publish redacted monitor summary
+        if: always()
+        shell: bash
+        run: |
+          if [ -f artifacts/live-provider-monitor/summary.md ]; then
+            cat artifacts/live-provider-monitor/summary.md >> "$GITHUB_STEP_SUMMARY"
+          else
+            printf '%s\n' 'Live monitor stopped before producing a redacted summary.' >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload redacted monitor diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: live-provider-monitor-${{ github.run_id }}
+          path: artifacts/live-provider-monitor/
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Fail confirmed contract or application regressions
+        if: steps.monitor.outcome == 'failure'
+        run: exit 1

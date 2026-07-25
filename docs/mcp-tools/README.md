@@ -1,4 +1,4 @@
-# MCP tool reference — Version 1.0
+# MCP tool reference — Version 1.1
 
 Version 1.0 freezes the 48 tool names, strict input schemas, effect metadata,
 success envelope, and safe error envelope as MCP contract `1.0`. The generated
@@ -25,6 +25,37 @@ Errors set MCP `isError: true` and return
 `MALFORMED_PROVIDER_RESPONSE`, `EMPTY_PROVIDER_RESPONSE`,
 `QUEST_PREREQUISITE_CYCLE`, `MISSING_QUEST_DATA`, and `INTERNAL_ERROR`. Schema
 violations are reported by the MCP SDK before a handler runs.
+
+## Version 1.1 additive diagnostics
+
+Version 1.1 preserves the complete Version 1.0 prefix and appends twelve strict,
+backward-compatible tools:
+
+| Tool                               | Effect      | Purpose                                              |
+| ---------------------------------- | ----------- | ---------------------------------------------------- |
+| `get_system_health`                | Read-only   | Aggregate central component health                   |
+| `get_provider_health`              | Read-only   | Read provider and circuit state                      |
+| `get_catalogue_health`             | Read-only   | Read catalogue freshness and schedules               |
+| `list_recent_errors`               | Read-only   | List redacted stable errors                          |
+| `list_recovery_events`             | Read-only   | List bounded recovery history                        |
+| `retry_failed_operation`           | Local state | Retry one safe catalogue refresh                     |
+| `refresh_stale_catalogues`         | Local state | Refresh stale, failed, or missing data               |
+| `run_database_integrity_check`     | Read-only   | Run SQLite `quick_check` without repair              |
+| `export_redacted_diagnostics`      | Read-only   | Export sanitised operational diagnostics             |
+| `check_for_software_updates`       | Read-only   | Compare validated GitHub release metadata            |
+| `clear_expired_quarantine_records` | Local state | Delete only expired invalid-cache quarantine records |
+| `reset_provider_circuit`           | Local state | Reset one selected circuit after confirmation        |
+
+Every response retains the Version 1.0 `{ data, meta }` envelope. These new
+tools add `meta.traceId` and `meta.recoveryStatus`; existing fields and tool
+schemas do not change. The generated manifest is
+[`mcp-tools-v1.1.json`](../../data/contracts/mcp-tools-v1.1.json).
+
+Hosted deployments restrict all twelve methods to the operator because their
+histories describe shared service state. The local stdio and desktop runtimes
+expose them to the local user. Circuit reset requires `confirmed: true`, and
+quarantine cleanup accepts only a bounded retention period. Destructive database
+repair and broad resets are not MCP operations.
 
 Levelling-specific errors include `VIRTUAL_LEVEL_OPT_IN_REQUIRED`,
 `UNREACHABLE_LEVEL_TARGET`, `MISSING_TRAINING_RATE`,

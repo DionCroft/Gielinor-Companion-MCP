@@ -3,6 +3,8 @@ import type { z } from "zod";
 import {
   CalculateTrainingCostToolInputSchema,
   CalculateXpRemainingToolInputSchema,
+  CheckForSoftwareUpdatesToolInputSchema,
+  ClearExpiredQuarantineToolInputSchema,
   CompareItemPricesToolInputSchema,
   CompareQuestXpRewardsToolInputSchema,
   CompareTrainingMethodsToolInputSchema,
@@ -18,11 +20,16 @@ import {
   ImportPlayerProfileToolInputSchema,
   ItemIdentifierInputSchema,
   ItemPriceHistoryToolInputSchema,
+  ListRecentErrorsToolInputSchema,
+  ListRecoveryEventsToolInputSchema,
   ListTrainingMethodsToolInputSchema,
   ProfileIdInputSchema,
   ProfileQuestInputSchema,
   QuestIdentifierInputSchema,
   RefreshPriceDataToolInputSchema,
+  RefreshStaleCataloguesToolInputSchema,
+  ResetProviderCircuitToolInputSchema,
+  RetryFailedOperationToolInputSchema,
   SearchItemsToolInputSchema,
   SearchQuestsToolInputSchema,
   SetMultipleQuestStatusesToolInputSchema,
@@ -287,6 +294,90 @@ export const COMPANION_TOOL_NAMES = Object.freeze(
   Object.keys(COMPANION_TOOL_DEFINITIONS) as CompanionToolName[],
 );
 
+export const COMPANION_TOOL_DEFINITIONS_V1_1_ADDITIONS = {
+  get_system_health: {
+    description:
+      "Read the central database, provider, catalogue, scheduler, update, and recovery health snapshot.",
+    inputSchema: EmptyInputSchema,
+    effect: "read-only",
+  },
+  get_provider_health: {
+    description:
+      "Read provider health counters and circuit-breaker states without probing upstreams.",
+    inputSchema: EmptyInputSchema,
+    effect: "read-only",
+  },
+  get_catalogue_health: {
+    description: "Read local catalogue freshness, counts, failures, and next scheduled refreshes.",
+    inputSchema: EmptyInputSchema,
+    effect: "read-only",
+  },
+  list_recent_errors: {
+    description: "List recent redacted structured errors with stable codes and trace identifiers.",
+    inputSchema: ListRecentErrorsToolInputSchema,
+    effect: "read-only",
+  },
+  list_recovery_events: {
+    description: "List recent bounded automatic and manual recovery attempts.",
+    inputSchema: ListRecoveryEventsToolInputSchema,
+    effect: "read-only",
+  },
+  retry_failed_operation: {
+    description: "Safely retry one failed catalogue refresh through the persistent scheduler.",
+    inputSchema: RetryFailedOperationToolInputSchema,
+    effect: "local-state",
+  },
+  refresh_stale_catalogues: {
+    description: "Refresh only selected catalogues that are stale, missing, or failed.",
+    inputSchema: RefreshStaleCataloguesToolInputSchema,
+    effect: "local-state",
+  },
+  run_database_integrity_check: {
+    description: "Run SQLite's read-only quick integrity check and return structured health.",
+    inputSchema: EmptyInputSchema,
+    effect: "read-only",
+  },
+  export_redacted_diagnostics: {
+    description:
+      "Export system health, safe configuration, error codes, and recovery history with sensitive data removed.",
+    inputSchema: EmptyInputSchema,
+    effect: "read-only",
+  },
+  check_for_software_updates: {
+    description:
+      "Read validated GitHub Releases metadata and report updates without downloading or installing code.",
+    inputSchema: CheckForSoftwareUpdatesToolInputSchema,
+    effect: "read-only",
+  },
+  clear_expired_quarantine_records: {
+    description:
+      "Delete only expired invalid-cache quarantine records while preserving active and retained records.",
+    inputSchema: ClearExpiredQuarantineToolInputSchema,
+    effect: "local-state",
+  },
+  reset_provider_circuit: {
+    description:
+      "Reset one provider capability circuit after explicit confirmation so a bounded probe can run.",
+    inputSchema: ResetProviderCircuitToolInputSchema,
+    effect: "local-state",
+  },
+} as const satisfies Record<string, CompanionToolDefinition>;
+
+export const CURRENT_COMPANION_TOOL_DEFINITIONS = {
+  ...COMPANION_TOOL_DEFINITIONS,
+  ...COMPANION_TOOL_DEFINITIONS_V1_1_ADDITIONS,
+} as const satisfies Record<string, CompanionToolDefinition>;
+
+export type CurrentCompanionToolName = keyof typeof CURRENT_COMPANION_TOOL_DEFINITIONS;
+
+export const CURRENT_COMPANION_TOOL_NAMES = Object.freeze(
+  Object.keys(CURRENT_COMPANION_TOOL_DEFINITIONS) as CurrentCompanionToolName[],
+);
+
 export function isCompanionToolName(value: string): value is CompanionToolName {
   return Object.hasOwn(COMPANION_TOOL_DEFINITIONS, value);
+}
+
+export function isCurrentCompanionToolName(value: string): value is CurrentCompanionToolName {
+  return Object.hasOwn(CURRENT_COMPANION_TOOL_DEFINITIONS, value);
 }

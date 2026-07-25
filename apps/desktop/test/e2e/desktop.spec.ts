@@ -55,9 +55,10 @@ test("offline mode keeps cached data visible", async ({ page }) => {
   await page.goto("/?fixture=offline");
   await page.getByRole("button", { name: "Settings" }).click();
   await page.getByRole("switch", { name: /use retained local data only/i }).check();
-  await page.getByRole("button", { name: "Data sources" }).click();
-  await expect(page.getByText(/offline mode is active/i)).toBeVisible();
-  await expect(page.getByText("7,310")).toBeVisible();
+  await page.getByRole("button", { name: "Diagnostics" }).click();
+  await expect(page.getByRole("heading", { name: "Network mode" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Offline", exact: true })).toBeVisible();
+  await expect(page.getByText(/7,310 records/i)).toBeVisible();
 });
 
 test("provider failures are explicit and retained profile setup still succeeds", async ({
@@ -67,7 +68,7 @@ test("provider failures are explicit and retained profile setup still succeeds",
   await page.getByLabel(/runescape display name/i).fill("Offline Hero");
   await page.getByRole("button", { name: /continue to companion/i }).click();
   await expect(page.getByRole("heading", { name: /welcome back, offline hero/i })).toBeVisible();
-  await page.getByRole("button", { name: "Data sources" }).click();
+  await page.getByRole("button", { name: "Diagnostics" }).click();
   await page.getByRole("button", { name: /refresh quest catalogue/i }).click();
   await expect(page.getByRole("alert")).toContainText(/temporarily unavailable/i);
 });

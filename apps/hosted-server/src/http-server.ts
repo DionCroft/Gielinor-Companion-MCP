@@ -3,6 +3,12 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import { isIP } from "node:net";
 
 import { createCompanionServer } from "@gielinor/mcp-server/library";
+import {
+  APPLICATION_VERSION,
+  createGielinorError,
+  mapLegacyErrorCode,
+  type GielinorErrorCode,
+} from "@gielinor/shared-types";
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { z } from "zod";
@@ -79,7 +85,30 @@ function publicError(
   code: string,
   message: string,
 ): void {
-  writeJson(response, status, { error: { code, message, requestId } });
+  const hostedCode: GielinorErrorCode =
+    code === "AUTH_REQUIRED" || code === "INVALID_ACCESS_TOKEN" || code === "INVALID_AUTHORIZATION"
+      ? "GC-HOSTED-001"
+      : code === "INVALID_OPERATOR_TOKEN" || code === "OPERATOR_REQUIRED"
+        ? "GC-HOSTED-002"
+        : code === "RATE_LIMITED" || code === "TOOL_RATE_LIMITED"
+          ? "GC-HOSTED-003"
+          : code === "HOST_NOT_ALLOWED" ||
+              code === "ORIGIN_NOT_ALLOWED" ||
+              code === "HTTPS_REQUIRED" ||
+              code === "REQUEST_TOO_LARGE"
+            ? "GC-SEC-003"
+            : mapLegacyErrorCode(code);
+  writeJson(response, status, {
+    error: createGielinorError(hostedCode, {
+      message,
+      source: "hosted-server",
+      operation: "http-request",
+      traceId: requestId,
+      requestId,
+      legacyCode: code,
+      retryable: status === 408 || status === 425 || status === 429 || status >= 500,
+    }),
+  });
 }
 
 function requestPath(request: IncomingMessage): string {
@@ -326,7 +355,7 @@ export function createHostedHttpServer(
         return;
       }
       if (request.method === "GET" && (path === "/health" || path === "/health/live")) {
-        writeJson(response, 200, { status: "ok", version: "1.0.0" });
+        writeJson(response, 200, { status: "ok", version: APPLICATION_VERSION });
         return;
       }
       if (request.method === "GET" && path === "/health/ready") {
@@ -335,7 +364,7 @@ export function createHostedHttpServer(
         }
         writeJson(response, 200, {
           status: "ready",
-          version: "1.0.0",
+          version: APPLICATION_VERSION,
           ...(await services.readiness()),
         });
         return;
@@ -464,7 +493,9 @@ export function createHostedHttpServer(
           }
         }
         const session = services.createSession(actor);
-        const mcpServer = createCompanionServer(session.tools);
+        const mcpServer = createCompanionServer(session.tools, {
+          recordError: (error) => session.diagnostics?.recordError(error),
+        });
         const transport = new StreamableHTTPServerTransport({
           enableJsonResponse: true,
         });
@@ -512,8 +543,9 @@ export function createHostedHttpServer(
 
   return {
     server,
-    start: () =>
-      new Promise((resolvePromise, reject) => {
+    start: async () => {
+      await services.startMaintenance();
+      return new Promise((resolvePromise, reject) => {
         server.once("error", reject);
         server.listen(config.port, config.host, () => {
           server.off("error", reject);
@@ -524,7 +556,8 @@ export function createHostedHttpServer(
           }
           resolvePromise({ host: config.host, port: address.port });
         });
-      }),
+      });
+    },
     close: async () => {
       if (closing) {
         return;
@@ -540,7 +573,7 @@ export function createHostedHttpServer(
         });
         setTimeout(() => server.closeAllConnections(), config.shutdownTimeoutMs).unref();
       });
-      services.close();
+      await services.close();
       accounts.close();
     },
   };

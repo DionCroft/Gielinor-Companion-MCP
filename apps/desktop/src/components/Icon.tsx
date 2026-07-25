@@ -17,6 +17,7 @@ export type IconName =
   | "menu"
   | "search"
   | "refresh"
+  | "download"
   | "chevron"
   | "check"
   | "warning"
@@ -117,6 +118,12 @@ const paths: Record<IconName, ReactNode> = {
     <>
       <path d="M20 7v5h-5" />
       <path d="M19 12a7 7 0 1 1-2-5" />
+    </>
+  ),
+  download: (
+    <>
+      <path d="M12 3v12M7 10l5 5 5-5" />
+      <path d="M4 19h16" />
     </>
   ),
   chevron: <path d="m9 18 6-6-6-6" />,

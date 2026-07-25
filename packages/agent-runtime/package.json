@@ -1,6 +1,6 @@
 {
   "name": "@gielinor/agent-runtime",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Bounded, model-independent local AI runtime for Gielinor Companion.",
   "type": "module",
   "main": "./dist/index.js",
@@ -24,7 +24,7 @@
     "zod-to-json-schema": "^3.25.2"
   },
   "engines": {
-    "node": ">=20"
+    "node": "^22.0.0 || ^24.0.0"
   },
   "repository": {
     "type": "git",

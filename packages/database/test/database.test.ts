@@ -135,7 +135,7 @@ describe("SQLite migrations and repositories", () => {
   it("applies migrations transactionally to a new database", () => {
     const database = openDatabase(":memory:");
     databases.push(database);
-    expect(getDatabaseSchemaVersion(database)).toBe(5);
+    expect(getDatabaseSchemaVersion(database)).toBe(6);
     expect(
       database
         .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'player_profiles'")
@@ -170,19 +170,21 @@ describe("SQLite migrations and repositories", () => {
   it("plans an upgrade and rolls back a failed migration atomically", () => {
     const database = openDatabase(":memory:", { targetVersion: 4 });
     databases.push(database);
-    expect(pendingDatabaseMigrations(database).map((migration) => migration.version)).toEqual([5]);
-    expect(applyDatabaseMigrations(database)).toEqual([5]);
+    expect(pendingDatabaseMigrations(database).map((migration) => migration.version)).toEqual([
+      5, 6,
+    ]);
+    expect(applyDatabaseMigrations(database)).toEqual([5, 6]);
 
     const brokenMigration: DatabaseMigration = {
-      version: 6,
+      version: 7,
       name: "injected-failure",
       sql: `
         CREATE TABLE migration_should_rollback (id INTEGER PRIMARY KEY);
         INSERT INTO table_that_does_not_exist (id) VALUES (1);
       `,
     };
-    expect(() => applyDatabaseMigrations(database, [brokenMigration], 6)).toThrow();
-    expect(getDatabaseSchemaVersion(database)).toBe(5);
+    expect(() => applyDatabaseMigrations(database, [brokenMigration], 7)).toThrow();
+    expect(getDatabaseSchemaVersion(database)).toBe(6);
     expect(
       database
         .prepare(
@@ -216,13 +218,123 @@ describe("SQLite migrations and repositories", () => {
     databases.push(database);
     const cache = new SqliteCacheStore(database);
     const entry = {
+      metadataVersion: 1 as const,
       value: { valid: true },
+      provider: "test-provider",
+      fetchedAt: 1,
       storedAt: 1,
       freshUntil: 2,
       staleUntil: 3,
+      lastSuccessfulRefreshAt: 1,
     };
     await cache.set("test", entry);
     expect(await cache.get("test")).toEqual(entry);
+  });
+
+  it("persists cache quarantine metadata and supports explicit restoration", async () => {
+    const database = openDatabase(":memory:");
+    databases.push(database);
+    const cache = new SqliteCacheStore(database);
+    const entry = {
+      metadataVersion: 1 as const,
+      value: { displayName: "Private Hero", invalid: true },
+      provider: "fixture-provider",
+      fetchedAt: 1,
+      storedAt: 1,
+      freshUntil: 2,
+      staleUntil: 3,
+      lastSuccessfulRefreshAt: 1,
+    };
+    await cache.set("private-key", entry);
+    await cache.quarantine(
+      "private-key",
+      entry,
+      {
+        quarantineId: "00000000-0000-4000-8000-000000000001",
+        provider: "fixture-provider",
+        quarantinedAt: 4,
+        storedAt: 1,
+        errorCode: "GC-CACHE-005",
+        reason: "Cached data failed validation",
+        sample: { displayName: "[redacted]" },
+      },
+      true,
+    );
+    expect(await cache.get("private-key")).toBeNull();
+    expect(await cache.listQuarantined()).toEqual([
+      {
+        quarantineId: "00000000-0000-4000-8000-000000000001",
+        provider: "fixture-provider",
+        quarantinedAt: 4,
+        storedAt: 1,
+        errorCode: "GC-CACHE-005",
+        reason: "Cached data failed validation",
+        sample: { displayName: "[redacted]" },
+      },
+    ]);
+    expect(await cache.restoreQuarantined("00000000-0000-4000-8000-000000000001")).toBe(true);
+    expect(await cache.get("private-key")).toEqual(entry);
+    expect(await cache.listQuarantined()).toEqual([]);
+  });
+
+  it("deletes only expired cache quarantine records", async () => {
+    const database = openDatabase(":memory:");
+    databases.push(database);
+    const cache = new SqliteCacheStore(database);
+    const entry = {
+      metadataVersion: 1 as const,
+      value: "invalid",
+      provider: "fixture-provider",
+      fetchedAt: 1,
+      storedAt: 1,
+      freshUntil: 2,
+      staleUntil: 3,
+      lastSuccessfulRefreshAt: 1,
+    };
+    for (const [suffix, quarantinedAt] of [
+      ["1", 100],
+      ["2", 200],
+    ] as const) {
+      await cache.quarantine(`key-${suffix}`, entry, {
+        quarantineId: `00000000-0000-4000-8000-00000000000${suffix}`,
+        provider: "fixture-provider",
+        quarantinedAt,
+        storedAt: 1,
+        errorCode: "GC-CACHE-005",
+        reason: "fixture record",
+      });
+    }
+
+    expect(await cache.clearExpiredQuarantine(200)).toBe(1);
+    expect(await cache.listQuarantined()).toEqual([
+      expect.objectContaining({
+        quarantineId: "00000000-0000-4000-8000-000000000002",
+      }),
+    ]);
+  });
+
+  it("quarantines malformed cache JSON instead of silently deleting it", async () => {
+    const database = openDatabase(":memory:");
+    databases.push(database);
+    database
+      .prepare(
+        `INSERT INTO provider_cache
+           (cache_key, value_json, metadata_version, provider, fetched_at,
+            stored_at, fresh_until, stale_until, last_successful_refresh_at)
+         VALUES (?, ?, 1, ?, 1, 1, 2, 3, 1)`,
+      )
+      .run("corrupt", "{not-json", "fixture-provider");
+    const cache = new SqliteCacheStore(database);
+
+    expect(await cache.get("corrupt")).toBeNull();
+    expect(await cache.listQuarantined()).toEqual([
+      expect.objectContaining({
+        provider: "fixture-provider",
+        errorCode: "GC-CACHE-005",
+        reason: "Cached JSON could not be parsed and was quarantined",
+        sample: { payload: "[invalid-json]" },
+      }),
+    ]);
   });
 
   it("creates a consistent pre-migration database backup", async () => {

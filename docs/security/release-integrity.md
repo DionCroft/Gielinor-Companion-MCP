@@ -27,8 +27,8 @@ Compare the displayed hash with `SHA256SUMS.txt`. GitHub CLI can verify release
 assets and attestations where supported:
 
 ```sh
-gh release verify v1.0.0
-gh release verify-asset v1.0.0 ./artifact-name
+gh release verify v1.1.0
+gh release verify-asset v1.1.0 ./artifact-name
 gh attestation verify ./artifact-name --repo DionCroft/Gielinor-Companion-MCP
 ```
 
@@ -58,7 +58,7 @@ certificate or expose key material. Refer to Tauri's official
 
 ## Updates
 
-Version 1.0 does not install updates in the background. Users deliberately
+Version 1.1 does not install updates in the background. Users deliberately
 download a release, verify it, close the app, and run the chosen installer.
 This avoids creating an unsigned update channel. Adding an automatic updater
 later requires a durable Tauri updater key, public-key pinning, rollback tests,

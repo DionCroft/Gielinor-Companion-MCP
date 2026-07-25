@@ -223,12 +223,30 @@ export class JagexGrandExchangeProvider implements GrandExchangeDataProvider {
       },
       requestOptions.forceRefresh ?? false,
       requestOptions.offline ?? false,
+      {
+        provider: "Jagex Grand Exchange ItemDB",
+        scope: "public-grand-exchange",
+        validate: (value) => GrandExchangeItemSchema.parse(value),
+      },
     );
 
     return GrandExchangeItemSchema.parse({
       ...result.value,
       cacheStatus: result.status,
       cacheStoredAt: new Date(result.storedAt).toISOString(),
+      cacheAgeSeconds: Math.floor(result.metadata.ageMs / 1_000),
+      cacheFreshUntil: new Date(result.metadata.freshUntil).toISOString(),
+      cacheStaleUntil: new Date(result.metadata.staleUntil).toISOString(),
+      lastSuccessfulRefreshAt: new Date(result.metadata.lastSuccessfulRefreshAt).toISOString(),
+      ...(result.metadata.lastFailedRefreshAt === undefined
+        ? {}
+        : {
+            lastFailedRefreshAt: new Date(result.metadata.lastFailedRefreshAt).toISOString(),
+          }),
+      ...(result.metadata.lastFailureCode === undefined
+        ? {}
+        : { lastRefreshErrorCode: result.metadata.lastFailureCode }),
+      ...(result.staleReason === undefined ? {} : { staleReason: result.staleReason }),
     });
   }
 
@@ -402,6 +420,11 @@ export class JagexGrandExchangeProvider implements GrandExchangeDataProvider {
       },
       requestOptions.forceRefresh ?? false,
       requestOptions.offline ?? false,
+      {
+        provider: "Jagex Grand Exchange ItemDB graph",
+        scope: "public-grand-exchange",
+        validate: (value) => z.array(PricePointSchema).parse(value),
+      },
     );
 
     const latestTimestamp = Date.parse(fullHistory.value.at(-1)?.timestamp ?? "");

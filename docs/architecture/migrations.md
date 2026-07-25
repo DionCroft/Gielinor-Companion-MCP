@@ -2,24 +2,27 @@
 
 ## SQLite
 
-`DATABASE_MIGRATIONS` contains ordered, named migrations. Version 1.0 stabilizes
-schema version 5:
+`DATABASE_MIGRATIONS` contains ordered, named migrations. Version 1.1 uses
+schema version 6 while preserving every Version 1.0 row:
 
 1. profiles and provider cache;
 2. quest catalogue;
 3. training methods;
 4. Grand Exchange catalogue and history;
-5. operational query indexes.
+5. operational query indexes;
+6. resilience state, provider-cache metadata, persistent quarantine, and
+   recovery events, plus persistent maintenance jobs, attempts, and leases.
 
 `pendingDatabaseMigrations` validates the target and contiguous version chain.
 `applyDatabaseMigrations` runs each migration and `user_version` update in one
 SQLite transaction. A failed statement rolls back the complete migration.
 Downgrades are rejected.
 
-File databases should be backed up with `backupDatabase` before an operator
-runs a manual upgrade. Normal application startup applies forward-only,
-non-destructive migrations. Tests open version 4, plan/apply version 5, inject a
-failing version 6, and prove both schema and version roll back.
+`openResilientDatabase` verifies integrity and creates a verified backup before
+upgrading a file database. It restores that backup after a failed migration or
+enters read-only safe mode when an unambiguous restore is not possible. Tests
+open version 4, plan/apply versions 5 and 6, inject a failing version 7, and
+prove both schema and version roll back.
 
 The exported `DATABASE_SCHEMA_VERSION` must equal the final migration version.
 Stable releases never edit SQL already shipped under an existing number. A

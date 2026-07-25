@@ -2,7 +2,7 @@
 
 The stable local stdio transport for Gielinor Companion MCP.
 
-After npm publication, run the package with Node.js 20 or later:
+After npm publication, run the package with Node.js 22 or 24 LTS:
 
 ```sh
 npx -y @gielinor/mcp-server@1

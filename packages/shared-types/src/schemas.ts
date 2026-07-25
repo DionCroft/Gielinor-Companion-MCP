@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { GielinorErrorCodeSchema } from "./errors.js";
 import { SKILL_IDS } from "./skills.js";
 
 const isoDateTime = z.string().datetime({ offset: true });
@@ -512,6 +513,15 @@ export const GrandExchangeItemSchema = z
       .optional(),
     cacheStatus: z.enum(["miss", "fresh", "stale"]).optional(),
     cacheStoredAt: isoDateTime.optional(),
+    cacheAgeSeconds: nonNegativeInteger.optional(),
+    cacheFreshUntil: isoDateTime.optional(),
+    cacheStaleUntil: isoDateTime.optional(),
+    lastSuccessfulRefreshAt: isoDateTime.optional(),
+    lastFailedRefreshAt: isoDateTime.optional(),
+    lastRefreshErrorCode: GielinorErrorCodeSchema.optional(),
+    staleReason: z
+      .enum(["stale-while-revalidate", "provider-failure", "expired-fallback", "offline"])
+      .optional(),
   })
   .strict();
 export type GrandExchangeItem = z.infer<typeof GrandExchangeItemSchema>;
@@ -674,6 +684,15 @@ export const DataSourceSchema = z
     retrievedAt: isoDateTime,
     cacheStatus: z.enum(["miss", "fresh", "stale"]),
     cacheStoredAt: isoDateTime,
+    cacheAgeSeconds: nonNegativeInteger.optional(),
+    cacheFreshUntil: isoDateTime.optional(),
+    cacheStaleUntil: isoDateTime.optional(),
+    lastSuccessfulRefreshAt: isoDateTime.optional(),
+    lastFailedRefreshAt: isoDateTime.optional(),
+    lastRefreshErrorCode: GielinorErrorCodeSchema.optional(),
+    staleReason: z
+      .enum(["stale-while-revalidate", "provider-failure", "expired-fallback", "offline"])
+      .optional(),
   })
   .strict();
 export type DataSource = z.infer<typeof DataSourceSchema>;

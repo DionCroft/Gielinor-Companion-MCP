@@ -13,3 +13,5 @@ apps/desktop/test-results
 apps/desktop/playwright-report
 release
 data/contracts/mcp-tools-v1.json
+data/contracts/mcp-tools-v1.1.json
+docs/errors/error-codes.md

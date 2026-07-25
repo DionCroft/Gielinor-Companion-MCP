@@ -108,16 +108,30 @@ describe("MCP tool schemas", () => {
 
 describe("MCP error responses", () => {
   it("returns stable domain errors", () => {
-    expect(publicToolError(new CompanionError("Invalid level", "INVALID_LEVEL"))).toEqual({
-      code: "INVALID_LEVEL",
+    expect(publicToolError(new CompanionError("Invalid level", "INVALID_LEVEL"))).toMatchObject({
+      code: "GC-DATA-001",
+      category: "validation",
       message: "Invalid level",
+      userMessage: "Invalid level",
+      retryable: false,
+      recoverable: true,
+      legacyCode: "INVALID_LEVEL",
+      source: "core",
     });
   });
 
   it("does not expose unexpected error details", () => {
-    expect(publicToolError(new Error("C:\\secret\\profile.db"))).toEqual({
-      code: "INTERNAL_ERROR",
+    const error = publicToolError(new Error("C:\\secret\\profile.db token=do-not-leak"));
+    expect(error).toMatchObject({
+      code: "GC-MCP-003",
+      category: "mcp",
       message: "The request could not be completed",
+      userMessage: "The request could not be completed",
+      source: "mcp-server",
     });
+    expect(error.traceId).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+    );
+    expect(JSON.stringify(error)).not.toMatch(/secret|profile\.db|do-not-leak/i);
   });
 });

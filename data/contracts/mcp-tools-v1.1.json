@@ -1,0 +1,2530 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "contractVersion": "1.1",
+  "stability": "stable",
+  "profileExportSchemaVersion": 1,
+  "toolCount": 60,
+  "resultEnvelope": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "data",
+      "meta"
+    ],
+    "properties": {
+      "data": {},
+      "meta": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "generatedAt",
+          "source"
+        ],
+        "properties": {
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "source": {
+            "type": "string",
+            "minLength": 1
+          },
+          "traceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "recoveryStatus": {
+            "type": "string",
+            "enum": [
+              "not-required",
+              "not-attempted",
+              "succeeded",
+              "failed",
+              "partial"
+            ]
+          }
+        }
+      }
+    }
+  },
+  "errorEnvelope": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "error"
+    ],
+    "properties": {
+      "error": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "code",
+          "category",
+          "message",
+          "userMessage",
+          "severity",
+          "retryable",
+          "recoverable",
+          "timestamp",
+          "traceId"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "enum": [
+              "GC-CFG-001",
+              "GC-CFG-002",
+              "GC-CFG-003",
+              "GC-NET-001",
+              "GC-NET-002",
+              "GC-NET-003",
+              "GC-NET-004",
+              "GC-PROVIDER-001",
+              "GC-PROVIDER-002",
+              "GC-PROVIDER-003",
+              "GC-PROVIDER-004",
+              "GC-PROVIDER-005",
+              "GC-PROVIDER-006",
+              "GC-PROVIDER-007",
+              "GC-DATA-001",
+              "GC-DATA-002",
+              "GC-DATA-003",
+              "GC-DATA-004",
+              "GC-CACHE-001",
+              "GC-CACHE-002",
+              "GC-CACHE-003",
+              "GC-CACHE-004",
+              "GC-CACHE-005",
+              "GC-DB-001",
+              "GC-DB-002",
+              "GC-DB-003",
+              "GC-DB-004",
+              "GC-DB-005",
+              "GC-DB-006",
+              "GC-DB-007",
+              "GC-SYNC-001",
+              "GC-SYNC-002",
+              "GC-SYNC-003",
+              "GC-SYNC-004",
+              "GC-SYNC-005",
+              "GC-SCHED-001",
+              "GC-SCHED-002",
+              "GC-SCHED-003",
+              "GC-SCHED-004",
+              "GC-UPDATE-001",
+              "GC-UPDATE-002",
+              "GC-UPDATE-003",
+              "GC-UPDATE-004",
+              "GC-UPDATE-005",
+              "GC-MCP-001",
+              "GC-MCP-002",
+              "GC-MCP-003",
+              "GC-MCP-004",
+              "GC-MCP-005",
+              "GC-AI-001",
+              "GC-AI-002",
+              "GC-AI-003",
+              "GC-AI-004",
+              "GC-AI-005",
+              "GC-HOSTED-001",
+              "GC-HOSTED-002",
+              "GC-HOSTED-003",
+              "GC-HOSTED-004",
+              "GC-SEC-001",
+              "GC-SEC-002",
+              "GC-SEC-003",
+              "GC-UNKNOWN-999"
+            ]
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "configuration",
+              "network",
+              "provider",
+              "validation",
+              "cache",
+              "database",
+              "synchronisation",
+              "scheduler",
+              "update",
+              "mcp",
+              "ai-provider",
+              "hosted-service",
+              "security",
+              "unknown"
+            ]
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "userMessage": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "info",
+              "warning",
+              "error",
+              "critical"
+            ]
+          },
+          "retryable": {
+            "type": "boolean"
+          },
+          "recoverable": {
+            "type": "boolean"
+          },
+          "source": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "operation": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "traceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "retryAfterMs": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 86400000
+          },
+          "suggestedActions": {
+            "type": "array",
+            "maxItems": 10,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          },
+          "causeCode": {
+            "type": "string",
+            "enum": [
+              "GC-CFG-001",
+              "GC-CFG-002",
+              "GC-CFG-003",
+              "GC-NET-001",
+              "GC-NET-002",
+              "GC-NET-003",
+              "GC-NET-004",
+              "GC-PROVIDER-001",
+              "GC-PROVIDER-002",
+              "GC-PROVIDER-003",
+              "GC-PROVIDER-004",
+              "GC-PROVIDER-005",
+              "GC-PROVIDER-006",
+              "GC-PROVIDER-007",
+              "GC-DATA-001",
+              "GC-DATA-002",
+              "GC-DATA-003",
+              "GC-DATA-004",
+              "GC-CACHE-001",
+              "GC-CACHE-002",
+              "GC-CACHE-003",
+              "GC-CACHE-004",
+              "GC-CACHE-005",
+              "GC-DB-001",
+              "GC-DB-002",
+              "GC-DB-003",
+              "GC-DB-004",
+              "GC-DB-005",
+              "GC-DB-006",
+              "GC-DB-007",
+              "GC-SYNC-001",
+              "GC-SYNC-002",
+              "GC-SYNC-003",
+              "GC-SYNC-004",
+              "GC-SYNC-005",
+              "GC-SCHED-001",
+              "GC-SCHED-002",
+              "GC-SCHED-003",
+              "GC-SCHED-004",
+              "GC-UPDATE-001",
+              "GC-UPDATE-002",
+              "GC-UPDATE-003",
+              "GC-UPDATE-004",
+              "GC-UPDATE-005",
+              "GC-MCP-001",
+              "GC-MCP-002",
+              "GC-MCP-003",
+              "GC-MCP-004",
+              "GC-MCP-005",
+              "GC-AI-001",
+              "GC-AI-002",
+              "GC-AI-003",
+              "GC-AI-004",
+              "GC-AI-005",
+              "GC-HOSTED-001",
+              "GC-HOSTED-002",
+              "GC-HOSTED-003",
+              "GC-HOSTED-004",
+              "GC-SEC-001",
+              "GC-SEC-002",
+              "GC-SEC-003",
+              "GC-UNKNOWN-999"
+            ]
+          },
+          "details": {
+            "type": "object"
+          },
+          "legacyCode": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      }
+    }
+  },
+  "tools": [
+    {
+      "name": "create_player_profile",
+      "description": "Create a local profile from a public RuneScape display name.",
+      "effect": "local-state",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "displayName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 12,
+            "pattern": "^[A-Za-z0-9 _-]+$"
+          },
+          "gameMode": {
+            "type": "string",
+            "enum": [
+              "normal",
+              "ironman",
+              "hardcore-ironman",
+              "unknown"
+            ]
+          },
+          "availableGp": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "preferredPlayStyle": {
+            "type": "string",
+            "enum": [
+              "fastest",
+              "cheapest",
+              "balanced",
+              "afk"
+            ]
+          },
+          "availableHoursPerDay": {
+            "type": "number",
+            "exclusiveMinimum": true,
+            "minimum": 0,
+            "maximum": 24
+          }
+        },
+        "required": [
+          "displayName"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "get_player_profile",
+      "description": "Read a locally stored player profile by UUID.",
+      "effect": "read-only",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "profileId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "profileId"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "list_player_profiles",
+      "description": "List locally stored player profiles.",
+      "effect": "read-only",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "get_player_stats",
+      "description": "Read public RuneScape Hiscores for a display name.",
+      "effect": "read-only",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "displayName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 12,
+            "pattern": "^[A-Za-z0-9 _-]+$"
+          },
+          "gameMode": {
+            "type": "string",
+            "enum": [
+              "normal",
+              "ironman",
+              "hardcore-ironman",
+              "unknown"
+            ]
+          },
+          "forceRefresh": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "displayName"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "refresh_player_stats",
+      "description": "Refresh public Hiscores and retain the validated local snapshot.",
+      "effect": "local-state",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "profileId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "profileId"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "update_player_preferences",
+      "description": "Update local planning preferences for a profile.",
+      "effect": "local-state",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "profileId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "availableGp": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "preferredPlayStyle": {
+            "type": "string",
+            "enum": [
+              "fastest",
+              "cheapest",
+              "balanced",
+              "afk"
+            ]
+          },
+          "availableHoursPerDay": {
+            "type": "number",
+            "exclusiveMinimum": true,
+            "minimum": 0,
+            "maximum": 24
+          }
+        },
+        "required": [
+          "profileId"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "export_player_profile",
+      "description": "Export a portable, schema-versioned local profile.",
+      "effect": "read-only",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "profileId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "profileId"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "import_player_profile",
+      "description": "Validate and import a schema-versioned local profile.",
+      "effect": "local-state",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "profile": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "schemaVersion": {
+                    "type": "number",
+                    "enum": [
+                      1
+                    ]
+                  },
+                  "displayName": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 12,
+                    "pattern": "^[A-Za-z0-9 _-]+$"
+                  },
+                  "gameMode": {
+                    "type": "string",
+                    "enum": [
+                      "normal",
+                      "ironman",
+                      "hardcore-ironman",
+                      "unknown"
+                    ]
+                  },
+                  "availableGp": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "preferredPlayStyle": {
+                    "type": "string",
+                    "enum": [
+                      "fastest",
+                      "cheapest",
+                      "balanced",
+                      "afk"
+                    ]
+                  },
+                  "availableHoursPerDay": {
+                    "type": "number",
+                    "exclusiveMinimum": true,
+                    "minimum": 0,
+                    "maximum": 24
+                  },
+                  "completedQuestIds": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "inProgressQuestIds": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "goals": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "enum": [
+                            "level",
+                            "experience",
+                            "quest",
+                            "quest-cape",
+                            "item",
+                            "custom"
+                          ]
+                        },
+                        "targetId": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "targetLevel": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 126
+                        },
+                        "targetExperience": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "targetQuantity": {
+                          "type": "integer",
+                          "exclusiveMinimum": true,
+                          "minimum": 0
+                        },
+                        "targetDate": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      },
+                      "required": [
+                        "type"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "required": [
+                  "schemaVersion",
+                  "displayName",
+                  "gameMode",
+                  "completedQuestIds",
+                  "inProgressQuestIds",
+                  "goals"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "schemaVersion": {
+                    "type": "number",
+                    "enum": [
+                      0
+                    ]
+                  },
+                  "displayName": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 12,
+                    "pattern": "^[A-Za-z0-9 _-]+$"
+                  },
+                  "gameMode": {
+                    "type": "string",
+                    "enum": [
+                      "normal",
+                      "ironman",
+                      "hardcore-ironman",
+                      "unknown"
+                    ]
+                  },
+                  "availableGp": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "preferredPlayStyle": {
+                    "type": "string",
+                    "enum": [
+                      "fastest",
+                      "cheapest",
+                      "balanced",
+                      "afk"
+                    ]
+                  },
+                  "availableHoursPerDay": {
+                    "type": "number",
+                    "exclusiveMinimum": true,
+                    "minimum": 0,
+                    "maximum": 24
+                  },
+                  "completedQuestIds": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "inProgressQuestIds": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "goals": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "enum": [
+                            "level",
+                            "experience",
+                            "quest",
+                            "quest-cape",
+                            "item",
+                            "custom"
+                          ]
+                        },
+                        "targetId": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "targetLevel": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 126
+                        },
+                        "targetExperience": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "targetQuantity": {
+                          "type": "integer",
+                          "exclusiveMinimum": true,
+                          "minimum": 0
+                        },
+                        "targetDate": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      },
+                      "required": [
+                        "type"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "required": [
+                  "schemaVersion",
+                  "displayName"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          }
+        },
+        "required": [
+          "profile"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "calculate_xp_remaining",
+      "description": "Calculate level, target XP, XP remaining, and progress deterministically.",
+      "effect": "read-only",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "currentExperience": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 5800000000
+          },
+          "targetLevel": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 150
+          },
+          "skillId": {
+            "type": "string",
+            "enum": [
+              "attack",
+              "defence",
+              "strength",
+              "constitution",
+              "ranged",
+              "prayer",
+              "magic",
+              "cooking",
+              "woodcutting",
+              "fletching",
+              "fishing",
+              "firemaking",
+              "crafting",
+              "smithing",
+              "mining",
+              "herblore",
+              "agility",
+              "thieving",
+              "slayer",
+              "farming",
+              "runecrafting",
+              "hunter",
+              "construction",
+              "summoning",
+              "dungeoneering",
+              "divination",
+              "invention",
+              "archaeology",
+              "necromancy"
+            ]
+          }
+        },
+        "required": [
+          "currentExperience",
+          "targetLevel"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "get_skill_progress",
+      "description": "Calculate one profile skill's progress toward a target level.",
+      "effect": "read-only",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "profileId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "skillId": {
+            "type": "string",
+            "enum": [
+              "attack",
+              "defence",
+              "strength",
+              "constitution",
+              "ranged",
+              "prayer",
+              "magic",
+              "cooking",
+              "woodcutting",
+              "fletching",
+              "fishing",
+              "firemaking",
+              "crafting",
+              "smithing",
+              "mining",
+              "herblore",
+              "agility",
+              "thieving",
+              "slayer",
+              "farming",
+              "runecrafting",
+              "hunter",
+              "construction",
+              "summoning",
+              "dungeoneering",
+              "divination",
+              "invention",
+              "archaeology",
+              "necromancy"
+            ]
+          },
+          "targetLevel": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 150
+          }
+        },
+        "required": [
+          "profileId",
+          "skillId",
+          "targetLevel"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "get_item_price",
+      "description": "Get a current Jagex guide price with source and cache timestamps.",
+      "effect": "read-only",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "itemId": {
+            "type": "integer",
+            "exclusiveMinimum": true,
+            "minimum": 0
+          },
+          "forceRefresh": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "itemId"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "search_items",
+      "description": "Search the validated local Grand Exchange catalogue.",
+      "effect": "read-only",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "get_item_details",
+      "description": "Get guide price, limit, alchemy, volume, freshness, and provenance.",
+      "effect": "read-only",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "item": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": true,
+                "minimum": 0
+              },
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              }
+            ]
+          }
+        },
+        "required": [
+          "item"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "get_item_price_history",
+      "description": "Get validated, ordered, chart-ready guide-price history.",
+      "effect": "read-only",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "item": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": true,
+                "minimum": 0
+              },
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              }
+            ]
+          },
+          "range": {
+            "type": "string",
+            "enum": [
+              "24h",
+              "7d",
+              "30d",
+              "90d",
+              "180d"
+            ]
+          },
+          "forceRefresh": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "item"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "get_item_buy_limit",
+      "description": "Get the published Grand Exchange buy limit when available.",
+      "effect": "read-only",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "item": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": true,
+                "minimum": 0
+              },
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              }
+            ]
+          }
+        },
+        "required": [
+          "item"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "get_item_alchemy_value",
+      "description": "Get published high- and low-alchemy values when available.",
+      "effect": "read-only",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "item": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": true,
+                "minimum": 0
+              },
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              }
+            ]
+          }
+        },
+        "required": [
+          "item"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "get_item_price_summary",
+      "description": "Calculate changes, moving averages, volatility, and outliers.",
+      "effect": "read-only",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "item": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": true,
+                "minimum": 0
+              },
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              }
+            ]
+          },
+          "range": {
+            "type": "string",
+            "enum": [
+              "24h",
+              "7d",
+              "30d",
+              "90d",
+              "180d"
+            ]
+          },
+          "forceRefresh": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "item"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "compare_item_prices",
+      "description": "Compare sourced price analytics for up to twenty items.",
+      "effect": "read-only",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "exclusiveMinimum": true,
+                  "minimum": 0
+                },
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                }
+              ]
+            },
+            "minItems": 1,
+            "maxItems": 20
+          },
+          "range": {
+            "type": "string",
+            "enum": [
+              "24h",
+              "7d",
+              "30d",
+              "90d",
+              "180d"
+            ]
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "value_item_list",
+      "description": "Aggregate and value an item list with freshness warnings.",
+      "effect": "read-only",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "item": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "exclusiveMinimum": true,
+                      "minimum": 0
+                    },
+                    {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 200
+                    }
+                  ]
+                },
+                "quantity": {
+                  "type": "integer",
+                  "exclusiveMinimum": true,
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": [
+                "item",
+                "quantity"
+              ],
+              "additionalProperties": false
+            },
+            "minItems": 1,
+            "maxItems": 500
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "value_equipment_setup",
+      "description": "Value a named equipment-slot setup with explicit missing data.",
+      "effect": "read-only",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "item": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "exclusiveMinimum": true,
+                      "minimum": 0
+                    },
+                    {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 200
+                    }
+                  ]
+                },
+                "quantity": {
+                  "type": "integer",
+                  "exclusiveMinimum": true,
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "slot": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100
+                }
+              },
+              "required": [
+                "item",
+                "quantity",
+                "slot"
+              ],
+              "additionalProperties": false
+            },
+            "minItems": 1,
+            "maxItems": 100
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "calculate_quest_shopping_cost",
+      "description": "Value a profile-aware quest route's aggregated shopping list.",
+      "effect": "read-only",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "profileId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "quest": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "profileId",
+          "quest"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "calculate_training_cost",
+      "description": "Estimate a levelling plan's published GP range and materials.",
+      "effect": "read-only",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "profileId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "skillId": {
+            "type": "string",
+            "enum": [
+              "attack",
+              "defence",
+              "strength",
+              "constitution",
+              "ranged",
+              "prayer",
+              "magic",
+              "cooking",
+              "woodcutting",
+              "fletching",
+              "fishing",
+              "firemaking",
+              "crafting",
+              "smithing",
+              "mining",
+              "herblore",
+              "agility",
+              "thieving",
+              "slayer",
+              "farming",
+              "runecrafting",
+              "hunter",
+              "construction",
+              "summoning",
+              "dungeoneering",
+              "divination",
+              "invention",
+              "archaeology",
+              "necromancy"
+            ]
+          },
+          "targetLevel": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 150
+          },
+          "strategy": {
+            "type": "string",
+            "enum": [
+              "fastest",
+              "cheapest",
+              "balanced",
+              "afk"
+            ]
+          },
+          "methodId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300
+          },
+          "budgetGp": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "hoursPerDay": {
+            "type": "number",
+            "exclusiveMinimum": true,
+            "minimum": 0,
+            "maximum": 24
+          },
+          "targetDate": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "members": {
+            "type": "boolean"
+          },
+          "allowVirtualLevels": {
+            "type": "boolean"
+          },
+          "materials": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "item": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "exclusiveMinimum": true,
+                      "minimum": 0
+                    },
+                    {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 200
+                    }
+                  ]
+                },
+                "quantity": {
+                  "type": "integer",
+                  "exclusiveMinimum": true,
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": [
+                "item",
+                "quantity"
+              ],
+              "additionalProperties": false
+            },
+            "maxItems": 500
+          }
+        },
+        "required": [
+          "profileId",
+          "skillId",
+          "targetLevel"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "export_price_data",
+      "description": "Return validated price history as JSON or CSV content.",
+      "effect": "read-only",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "exclusiveMinimum": true,
+                  "minimum": 0
+                },
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                }
+              ]
+            },
+            "minItems": 1,
+            "maxItems": 20
+          },
+          "range": {
+            "type": "string",
+            "enum": [
+              "24h",
+              "7d",
+              "30d",
+              "90d",
+              "180d"
+            ]
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "json",
+              "csv"
+            ]
+          },
+          "forceRefresh": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "items",
+          "format"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "refresh_price_data",
+      "description": "Refresh validated price data while retaining previous valid records on failure.",
+      "effect": "local-state",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "itemIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "exclusiveMinimum": true,
+              "minimum": 0
+            },
+            "maxItems": 20
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "get_price_data_status",
+      "description": "Read price-data counts, timestamps, freshness, and safe errors.",
+      "effect": "read-only",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "search_quests",
+      "description": "Search the validated local quest catalogue.",
+      "effect": "read-only",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "get_quest",
+      "description": "Get one structured quest from the last valid snapshot.",
+      "effect": "read-only",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "quest": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "quest"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "get_quest_requirements",
+      "description": "Get a quest's skill, quest, item, and manual requirements.",
+      "effect": "read-only",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "quest": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "quest"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "get_quest_rewards",
+      "description": "Get structured quest points, XP, unlocks, and rewards.",
+      "effect": "read-only",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "quest": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "quest"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "get_quest_source",
+      "description": "Get quest source URL, revision, timestamps, and content hash.",
+      "effect": "read-only",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "quest": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "quest"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "set_quest_status",
+      "description": "Set a quest status in a local companion profile only.",
+      "effect": "local-state",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "profileId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "quest": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "not-started",
+              "in-progress",
+              "completed"
+            ]
+          }
+        },
+        "required": [
+          "profileId",
+          "quest",
+          "status"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "set_multiple_quest_statuses",
+      "description": "Atomically apply validated quest-status changes to a local profile.",
+      "effect": "local-state",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "profileId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "updates": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "quest": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "not-started",
+                    "in-progress",
+                    "completed"
+                  ]
+                }
+              },
+              "required": [
+                "quest",
+                "status"
+              ],
+              "additionalProperties": false
+            },
+            "minItems": 1,
+            "maxItems": 500
+          }
+        },
+        "required": [
+          "profileId",
+          "updates"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "list_available_quests",
+      "description": "List quests whose known requirements a local profile meets.",
+      "effect": "read-only",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "profileId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "profileId"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "list_missing_quest_requirements",
+      "description": "List missing requirements for a profile-aware target quest.",
+      "effect": "read-only",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "profileId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "quest": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "profileId",
+          "quest"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "create_quest_route",
+      "description": "Create a deterministic prerequisite-first target quest route.",
+      "effect": "read-only",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "profileId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "quest": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "profileId",
+          "quest"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "create_quest_shopping_list",
+      "description": "Aggregate required items across an uncompleted quest route.",
+      "effect": "read-only",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "profileId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "quest": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "profileId",
+          "quest"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "refresh_quest_data",
+      "description": "Refresh revision-aware quest data transactionally.",
+      "effect": "local-state",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "get_quest_data_status",
+      "description": "Read quest-data count, revision, timestamps, and safe errors.",
+      "effect": "read-only",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "list_training_methods",
+      "description": "List structured training methods with optional filters.",
+      "effect": "read-only",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "skillId": {
+            "type": "string",
+            "enum": [
+              "attack",
+              "defence",
+              "strength",
+              "constitution",
+              "ranged",
+              "prayer",
+              "magic",
+              "cooking",
+              "woodcutting",
+              "fletching",
+              "fishing",
+              "firemaking",
+              "crafting",
+              "smithing",
+              "mining",
+              "herblore",
+              "agility",
+              "thieving",
+              "slayer",
+              "farming",
+              "runecrafting",
+              "hunter",
+              "construction",
+              "summoning",
+              "dungeoneering",
+              "divination",
+              "invention",
+              "archaeology",
+              "necromancy"
+            ]
+          },
+          "level": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 150
+          },
+          "members": {
+            "type": "boolean"
+          },
+          "ironman": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "get_training_method",
+      "description": "Get a sourced training method with rates and requirements.",
+      "effect": "read-only",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "methodId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300
+          }
+        },
+        "required": [
+          "methodId"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "compare_training_methods",
+      "description": "Compare applicable training time, cost, access, and uncertainty.",
+      "effect": "read-only",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "profileId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "skillId": {
+            "type": "string",
+            "enum": [
+              "attack",
+              "defence",
+              "strength",
+              "constitution",
+              "ranged",
+              "prayer",
+              "magic",
+              "cooking",
+              "woodcutting",
+              "fletching",
+              "fishing",
+              "firemaking",
+              "crafting",
+              "smithing",
+              "mining",
+              "herblore",
+              "agility",
+              "thieving",
+              "slayer",
+              "farming",
+              "runecrafting",
+              "hunter",
+              "construction",
+              "summoning",
+              "dungeoneering",
+              "divination",
+              "invention",
+              "archaeology",
+              "necromancy"
+            ]
+          },
+          "targetLevel": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 150
+          },
+          "methodIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 300
+            },
+            "minItems": 1,
+            "maxItems": 100
+          },
+          "members": {
+            "type": "boolean"
+          },
+          "allowVirtualLevels": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "profileId",
+          "skillId",
+          "targetLevel"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "create_levelling_plan",
+      "description": "Create a deterministic, explainable multi-stage levelling plan.",
+      "effect": "read-only",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "profileId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "skillId": {
+            "type": "string",
+            "enum": [
+              "attack",
+              "defence",
+              "strength",
+              "constitution",
+              "ranged",
+              "prayer",
+              "magic",
+              "cooking",
+              "woodcutting",
+              "fletching",
+              "fishing",
+              "firemaking",
+              "crafting",
+              "smithing",
+              "mining",
+              "herblore",
+              "agility",
+              "thieving",
+              "slayer",
+              "farming",
+              "runecrafting",
+              "hunter",
+              "construction",
+              "summoning",
+              "dungeoneering",
+              "divination",
+              "invention",
+              "archaeology",
+              "necromancy"
+            ]
+          },
+          "targetLevel": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 150
+          },
+          "strategy": {
+            "type": "string",
+            "enum": [
+              "fastest",
+              "cheapest",
+              "balanced",
+              "afk"
+            ]
+          },
+          "methodId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300
+          },
+          "budgetGp": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "hoursPerDay": {
+            "type": "number",
+            "exclusiveMinimum": true,
+            "minimum": 0,
+            "maximum": 24
+          },
+          "targetDate": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "members": {
+            "type": "boolean"
+          },
+          "allowVirtualLevels": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "profileId",
+          "skillId",
+          "targetLevel"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "create_weekly_goal_plan",
+      "description": "Convert a levelling plan into weekly XP and play-time goals.",
+      "effect": "read-only",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "profileId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "skillId": {
+            "type": "string",
+            "enum": [
+              "attack",
+              "defence",
+              "strength",
+              "constitution",
+              "ranged",
+              "prayer",
+              "magic",
+              "cooking",
+              "woodcutting",
+              "fletching",
+              "fishing",
+              "firemaking",
+              "crafting",
+              "smithing",
+              "mining",
+              "herblore",
+              "agility",
+              "thieving",
+              "slayer",
+              "farming",
+              "runecrafting",
+              "hunter",
+              "construction",
+              "summoning",
+              "dungeoneering",
+              "divination",
+              "invention",
+              "archaeology",
+              "necromancy"
+            ]
+          },
+          "targetLevel": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 150
+          },
+          "strategy": {
+            "type": "string",
+            "enum": [
+              "fastest",
+              "cheapest",
+              "balanced",
+              "afk"
+            ]
+          },
+          "methodId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300
+          },
+          "budgetGp": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "hoursPerDay": {
+            "type": "number",
+            "exclusiveMinimum": true,
+            "minimum": 0,
+            "maximum": 24
+          },
+          "targetDate": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "members": {
+            "type": "boolean"
+          },
+          "allowVirtualLevels": {
+            "type": "boolean"
+          },
+          "weeks": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 520
+          }
+        },
+        "required": [
+          "profileId",
+          "skillId",
+          "targetLevel"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "estimate_time_to_level",
+      "description": "Estimate a sourced best/worst time range to a target level.",
+      "effect": "read-only",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "profileId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "skillId": {
+            "type": "string",
+            "enum": [
+              "attack",
+              "defence",
+              "strength",
+              "constitution",
+              "ranged",
+              "prayer",
+              "magic",
+              "cooking",
+              "woodcutting",
+              "fletching",
+              "fishing",
+              "firemaking",
+              "crafting",
+              "smithing",
+              "mining",
+              "herblore",
+              "agility",
+              "thieving",
+              "slayer",
+              "farming",
+              "runecrafting",
+              "hunter",
+              "construction",
+              "summoning",
+              "dungeoneering",
+              "divination",
+              "invention",
+              "archaeology",
+              "necromancy"
+            ]
+          },
+          "targetLevel": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 150
+          },
+          "strategy": {
+            "type": "string",
+            "enum": [
+              "fastest",
+              "cheapest",
+              "balanced",
+              "afk"
+            ]
+          },
+          "methodId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300
+          },
+          "budgetGp": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "hoursPerDay": {
+            "type": "number",
+            "exclusiveMinimum": true,
+            "minimum": 0,
+            "maximum": 24
+          },
+          "targetDate": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "members": {
+            "type": "boolean"
+          },
+          "allowVirtualLevels": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "profileId",
+          "skillId",
+          "targetLevel"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "estimate_cost_to_level",
+      "description": "Estimate cost or profit where reliable training data exists.",
+      "effect": "read-only",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "profileId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "skillId": {
+            "type": "string",
+            "enum": [
+              "attack",
+              "defence",
+              "strength",
+              "constitution",
+              "ranged",
+              "prayer",
+              "magic",
+              "cooking",
+              "woodcutting",
+              "fletching",
+              "fishing",
+              "firemaking",
+              "crafting",
+              "smithing",
+              "mining",
+              "herblore",
+              "agility",
+              "thieving",
+              "slayer",
+              "farming",
+              "runecrafting",
+              "hunter",
+              "construction",
+              "summoning",
+              "dungeoneering",
+              "divination",
+              "invention",
+              "archaeology",
+              "necromancy"
+            ]
+          },
+          "targetLevel": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 150
+          },
+          "strategy": {
+            "type": "string",
+            "enum": [
+              "fastest",
+              "cheapest",
+              "balanced",
+              "afk"
+            ]
+          },
+          "methodId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300
+          },
+          "budgetGp": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "hoursPerDay": {
+            "type": "number",
+            "exclusiveMinimum": true,
+            "minimum": 0,
+            "maximum": 24
+          },
+          "targetDate": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "members": {
+            "type": "boolean"
+          },
+          "allowVirtualLevels": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "profileId",
+          "skillId",
+          "targetLevel"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "compare_quest_xp_rewards",
+      "description": "Rank structured quest XP rewards for a skill.",
+      "effect": "read-only",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "skillId": {
+            "type": "string",
+            "enum": [
+              "attack",
+              "defence",
+              "strength",
+              "constitution",
+              "ranged",
+              "prayer",
+              "magic",
+              "cooking",
+              "woodcutting",
+              "fletching",
+              "fishing",
+              "firemaking",
+              "crafting",
+              "smithing",
+              "mining",
+              "herblore",
+              "agility",
+              "thieving",
+              "slayer",
+              "farming",
+              "runecrafting",
+              "hunter",
+              "construction",
+              "summoning",
+              "dungeoneering",
+              "divination",
+              "invention",
+              "archaeology",
+              "necromancy"
+            ]
+          },
+          "profileId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          }
+        },
+        "required": [
+          "skillId"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "refresh_training_data",
+      "description": "Refresh revision-aware training data transactionally.",
+      "effect": "local-state",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "get_training_data_status",
+      "description": "Read training-data coverage, revision, timestamps, and safe errors.",
+      "effect": "read-only",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "get_system_health",
+      "description": "Read the central database, provider, catalogue, scheduler, update, and recovery health snapshot.",
+      "effect": "read-only",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "get_provider_health",
+      "description": "Read provider health counters and circuit-breaker states without probing upstreams.",
+      "effect": "read-only",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "get_catalogue_health",
+      "description": "Read local catalogue freshness, counts, failures, and next scheduled refreshes.",
+      "effect": "read-only",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "list_recent_errors",
+      "description": "List recent redacted structured errors with stable codes and trace identifiers.",
+      "effect": "read-only",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "activeOnly": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "list_recovery_events",
+      "description": "List recent bounded automatic and manual recovery attempts.",
+      "effect": "read-only",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "retry_failed_operation",
+      "description": "Safely retry one failed catalogue refresh through the persistent scheduler.",
+      "effect": "local-state",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "operation": {
+            "type": "string",
+            "enum": [
+              "quest-refresh",
+              "training-refresh",
+              "price-refresh"
+            ]
+          }
+        },
+        "required": [
+          "operation"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "refresh_stale_catalogues",
+      "description": "Refresh only selected catalogues that are stale, missing, or failed.",
+      "effect": "local-state",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "catalogues": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "quests",
+                "training",
+                "prices"
+              ]
+            },
+            "minItems": 1,
+            "maxItems": 3
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "run_database_integrity_check",
+      "description": "Run SQLite's read-only quick integrity check and return structured health.",
+      "effect": "read-only",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "export_redacted_diagnostics",
+      "description": "Export system health, safe configuration, error codes, and recovery history with sensitive data removed.",
+      "effect": "read-only",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "check_for_software_updates",
+      "description": "Read validated GitHub Releases metadata and report updates without downloading or installing code.",
+      "effect": "read-only",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "includePrereleases": {
+            "type": "boolean"
+          },
+          "forceRefresh": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "clear_expired_quarantine_records",
+      "description": "Delete only expired invalid-cache quarantine records while preserving active and retained records.",
+      "effect": "local-state",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "retentionDays": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 3650
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "reset_provider_circuit",
+      "description": "Reset one provider capability circuit after explicit confirmation so a bounded probe can run.",
+      "effect": "local-state",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "providerId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "pattern": "^[a-z0-9._-]+$"
+          },
+          "capability": {
+            "type": "string",
+            "enum": [
+              "player-stats",
+              "current-price",
+              "price-history",
+              "price-snapshot",
+              "quest-snapshot",
+              "training-snapshot"
+            ]
+          },
+          "confirmed": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          }
+        },
+        "required": [
+          "providerId",
+          "capability",
+          "confirmed"
+        ],
+        "additionalProperties": false
+      }
+    }
+  ]
+}

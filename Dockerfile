@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 
-FROM node:22-bookworm-slim AS build
+FROM node:24-bookworm-slim AS build
 
 WORKDIR /workspace
 RUN corepack enable
@@ -8,9 +8,9 @@ RUN corepack enable
 COPY . .
 RUN corepack pnpm install --frozen-lockfile
 RUN corepack pnpm --filter @gielinor/hosted-server... build
-RUN corepack pnpm --filter @gielinor/hosted-server deploy --prod --legacy /opt/gielinor
+RUN corepack pnpm --filter @gielinor/hosted-server deploy --prod /opt/gielinor
 
-FROM node:22-bookworm-slim AS runtime
+FROM node:24-bookworm-slim AS runtime
 
 ENV NODE_ENV=production
 ENV GIELINOR_HOST=0.0.0.0
