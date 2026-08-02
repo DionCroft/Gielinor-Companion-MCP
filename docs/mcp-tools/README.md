@@ -26,10 +26,10 @@ Errors set MCP `isError: true` and return
 `QUEST_PREREQUISITE_CYCLE`, `MISSING_QUEST_DATA`, and `INTERNAL_ERROR`. Schema
 violations are reported by the MCP SDK before a handler runs.
 
-## Version 1.1 additive diagnostics
+## Version 1.1 additions
 
-Version 1.1 preserves the complete Version 1.0 prefix and appends twelve strict,
-backward-compatible tools:
+Version 1.1 preserves the complete Version 1.0 prefix and appends 45 strict,
+backward-compatible tools. The first twelve cover diagnostics and maintenance:
 
 | Tool                               | Effect      | Purpose                                              |
 | ---------------------------------- | ----------- | ---------------------------------------------------- |
@@ -51,7 +51,14 @@ tools add `meta.traceId` and `meta.recoveryStatus`; existing fields and tool
 schemas do not change. The generated manifest is
 [`mcp-tools-v1.1.json`](../../data/contracts/mcp-tools-v1.1.json).
 
-Hosted deployments restrict all twelve methods to the operator because their
+The remaining 33 tools cover selected-profile state, holdings/import/export,
+trade journals, market preferences/watchlists, deterministic analysis and
+manual plans, portfolio/backtesting/paper trading, real-data status/refresh,
+provider disagreement, backend offline mode, and account-aware quest shopping.
+Their exact names and strict schemas are in
+[`mcp-tools-v1.1.json`](../../data/contracts/mcp-tools-v1.1.json).
+
+Hosted deployments restrict the twelve maintenance methods to the operator because their
 histories describe shared service state. The local stdio and desktop runtimes
 expose them to the local user. Circuit reset requires `confirmed: true`, and
 quarantine cleanup accepts only a bounded retention period. Destructive database

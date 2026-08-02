@@ -7,7 +7,17 @@ import { desktopError } from "../lib/errors.js";
 import { CreateProfileFormSchema, firstError } from "../lib/validation.js";
 
 type SetupStageId =
-  "database" | "statistics" | "quests" | "training" | "prices" | "validation" | "ready";
+  | "database"
+  | "profile"
+  | "statistics"
+  | "quest-check"
+  | "quest-refresh"
+  | "training-check"
+  | "training-refresh"
+  | "price-check"
+  | "price-refresh"
+  | "validation"
+  | "ready";
 
 type SetupStage = {
   id: SetupStageId;
@@ -17,30 +27,40 @@ type SetupStage = {
 };
 
 const INITIAL_STAGES: readonly SetupStage[] = [
-  { id: "database", label: "Preparing local database", status: "pending" },
+  { id: "database", label: "Validating local database", status: "pending" },
+  { id: "profile", label: "Creating player profile", status: "pending" },
   { id: "statistics", label: "Refreshing player statistics", status: "pending" },
-  { id: "quests", label: "Synchronising quest catalogue", status: "pending" },
-  { id: "training", label: "Synchronising training methods", status: "pending" },
-  { id: "prices", label: "Synchronising Grand Exchange item catalogue", status: "pending" },
-  { id: "validation", label: "Validating local data", status: "pending" },
-  { id: "ready", label: "Ready", status: "pending" },
+  { id: "quest-check", label: "Checking quest catalogue", status: "pending" },
+  { id: "quest-refresh", label: "Synchronising quest data", status: "pending" },
+  { id: "training-check", label: "Checking training catalogue", status: "pending" },
+  { id: "training-refresh", label: "Synchronising training data", status: "pending" },
+  { id: "price-check", label: "Checking Grand Exchange catalogue", status: "pending" },
+  { id: "price-refresh", label: "Synchronising Grand Exchange data", status: "pending" },
+  { id: "validation", label: "Validating snapshot coverage", status: "pending" },
+  { id: "ready", label: "Opening dashboard", status: "pending" },
 ];
 
 const CATALOGUES = [
   {
     id: "quests",
+    checkStage: "quest-check",
+    refreshStage: "quest-refresh",
     statusTool: "get_quest_data_status",
     refreshTool: "refresh_quest_data",
     count: (status: DataStatus) => status.questCount ?? 0,
   },
   {
     id: "training",
+    checkStage: "training-check",
+    refreshStage: "training-refresh",
     statusTool: "get_training_data_status",
     refreshTool: "refresh_training_data",
     count: (status: DataStatus) => status.methodCount ?? 0,
   },
   {
     id: "prices",
+    checkStage: "price-check",
+    refreshStage: "price-refresh",
     statusTool: "get_price_data_status",
     refreshTool: "refresh_price_data",
     count: (status: DataStatus) => status.itemCount ?? 0,
@@ -82,20 +102,25 @@ export function FirstRunView({
   }
 
   async function populateCatalogue(catalogue: (typeof CATALOGUES)[number]): Promise<boolean> {
-    updateStage(catalogue.id, "active");
+    updateStage(catalogue.checkStage, "active");
+    let refreshing = false;
     try {
       const status = await bridge.callTool<DataStatus>(catalogue.statusTool, {});
       if (status.data.state === "ready" && catalogue.count(status.data) > 0) {
-        updateStage(catalogue.id, "complete", "Validated local catalogue retained");
+        updateStage(catalogue.checkStage, "complete", "Validated local catalogue found");
+        updateStage(catalogue.refreshStage, "complete", "Retained current validated snapshot");
         return true;
       }
+      updateStage(catalogue.checkStage, "complete", "Synchronisation required");
+      updateStage(catalogue.refreshStage, "active");
+      refreshing = true;
       await bridge.callTool(catalogue.refreshTool, {});
-      updateStage(catalogue.id, "complete", "Catalogue synchronised");
+      updateStage(catalogue.refreshStage, "complete", "Catalogue synchronised");
       return true;
     } catch (caught) {
       const failure = desktopError(caught, `first-run-${catalogue.id}`, "GC-SYNC-001");
       updateStage(
-        catalogue.id,
+        refreshing ? catalogue.refreshStage : catalogue.checkStage,
         "failed",
         `${failure.code}; trace ${failure.traceId}. Other sections remain available.`,
       );
@@ -117,7 +142,9 @@ export function FirstRunView({
         updateStage("statistics", "complete", "Public Hiscores refreshed");
         return;
       }
-      const catalogue = CATALOGUES.find(({ id }) => id === stageId);
+      const catalogue = CATALOGUES.find(
+        ({ checkStage, refreshStage }) => checkStage === stageId || refreshStage === stageId,
+      );
       if (catalogue !== undefined) {
         await populateCatalogue(catalogue);
       }
@@ -143,11 +170,13 @@ export function FirstRunView({
     setError(undefined);
     try {
       updateStage("database", "active");
+      updateStage("database", "complete", "SQLite runtime opened and migrations validated");
+      updateStage("profile", "active");
       const created = await bridge.callTool<DesktopProfile>("create_player_profile", parsed.data);
       let profile = created.data;
       setProfile(profile);
       await bridge.callTool("set_selected_player_profile", { profileId: profile.id });
-      updateStage("database", "complete", "Local profile storage is ready");
+      updateStage("profile", "complete", "Selected local profile persisted");
       updateStage("statistics", "active");
       try {
         const refreshed = await bridge.callTool<DesktopProfile>("refresh_player_stats", {
@@ -164,9 +193,10 @@ export function FirstRunView({
           `${failure.code}; trace ${failure.traceId}. The local profile remains usable.`,
         );
       }
-      const catalogueResults = await Promise.all(
-        CATALOGUES.map((catalogue) => populateCatalogue(catalogue)),
-      );
+      const catalogueResults: boolean[] = [];
+      for (const catalogue of CATALOGUES) {
+        catalogueResults.push(await populateCatalogue(catalogue));
+      }
       updateStage("validation", "active");
       const completed = catalogueResults.filter(Boolean).length;
       updateStage(
@@ -186,7 +216,7 @@ export function FirstRunView({
       continueWith(profile);
     } catch (caught) {
       const failure = desktopError(caught, "first-run-profile", "GC-DB-001");
-      updateStage("database", "failed", `${failure.code}; trace ${failure.traceId}`);
+      updateStage("profile", "failed", `${failure.code}; trace ${failure.traceId}`);
       setError(`${failure.userMessage} (${failure.code}; trace ${failure.traceId})`);
     } finally {
       setBusy(false);
@@ -269,7 +299,7 @@ export function FirstRunView({
                   <strong>{stage.label}</strong>
                   {stage.detail === undefined ? null : <small>{stage.detail}</small>}
                 </span>
-                {stage.status === "failed" && stage.id !== "database" ? (
+                {stage.status === "failed" && stage.id !== "database" && stage.id !== "profile" ? (
                   <button
                     className="secondary-button"
                     type="button"

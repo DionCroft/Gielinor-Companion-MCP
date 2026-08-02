@@ -148,6 +148,8 @@ export class CompanionToolService {
     private readonly playerPrivateData?: PlayerPrivateDataService,
     private readonly marketIntelligence?: MarketIntelligenceService,
     private readonly offlineMode?: OfflineModeBackend,
+    private readonly realRuntimeMode:
+      "native-real" | "local-stdio-real" | "hosted-real" = "local-stdio-real",
   ) {}
 
   private questService(): QuestService {
@@ -742,11 +744,11 @@ export class CompanionToolService {
     }
     return envelope(
       {
-        runtimeMode: "native-real",
+        runtimeMode: this.realRuntimeMode,
         offline: this.offlineMode?.isOffline() ?? false,
         selectedProfile,
         catalogues: { quests, training, prices },
-        truthfulness: "No fixture data is available in native-real mode.",
+        truthfulness: `No fixture data is available in ${this.realRuntimeMode} mode.`,
       },
       "real providers, retained SQLite catalogues, and private local state",
     );
@@ -817,7 +819,7 @@ export class CompanionToolService {
     );
     return envelope(
       results.filter((result) => (result.indicators?.providerDifferencePercent ?? 0) >= 10),
-      "Jagex guide values compared with Weird Gloop RS3 history",
+      "Weird Gloop RS3 exchange history compared with the independent Jagex ItemDB graph",
     );
   }
 

@@ -8,16 +8,17 @@
 
 Gielinor Companion MCP is a safe, model-independent foundation for deterministic
 RuneScape 3 planning. Version 1.1 preserves the frozen 48-tool Version 1.0
-surface while extending it with health, recovery, maintenance, and update
-diagnostics. It combines
+surface while extending it with health, real-data status, private holdings,
+trade journals, deterministic market intelligence, backtesting, and paper
+trading. It combines
 hosted/local MCP servers, an accessible Tauri/React no-AI desktop, optional
 Ollama/LM Studio conversations, and optional Alt1 guidance. It never controls
 the game client.
 
 ## Release status
 
-**Current version: 1.1.0 — Resilience, Self-Healing and Automatic Maintenance.**
-Sixty trusted tools are available over local stdio and stateless Streamable HTTP,
+**Current version: 1.1.0 — Real Data, Player Intelligence and Grand Exchange Adviser.**
+Ninety-three trusted tools are available over local stdio and stateless Streamable HTTP,
 with the original 48 names and schemas preserved as the frozen Version 1.0
 prefix. Public JSON contracts,
 profile migration fixtures, clean npm installation, forward-only database
@@ -32,6 +33,8 @@ Read the [1.1.0 release notes](docs/releases/v1.1.0.md) and
 - Strict TypeScript and Zod domain schemas for profiles, skills, quests, training
   methods, goals, requirements, and GE items.
 - Multiple local player profiles in SQLite; no Jagex login or credentials.
+- Persistent selected profiles, manually confirmed holdings/cash, acquisition
+  prices, trade journals, watchlists, preferences, and isolated paper portfolios.
 - Public normal, Ironman, and Hardcore Ironman Hiscores adapters.
 - Exact standard levels 1–126 and Invention levels 1–150, true skill caps,
   virtual targets, and current level 99/110/120 boundaries.
@@ -43,6 +46,10 @@ Read the [1.1.0 release notes](docs/releases/v1.1.0.md) and
 - Overflow-safe inventory, equipment, quest-shopping, and training-material
   valuation plus JSON/CSV export and explicit freshness.
 - Persistent cache-first, stale-while-revalidate provider data.
+- Independent Weird Gloop RS3 price/volume history and source-backed RuneScape
+  news adapters with explicit provider-disagreement reporting.
+- Versioned deterministic market scores, held-only sell candidates, transparent
+  manual zones/position sizing, portfolio analytics, and leakage-safe backtests.
 - Stable structured error codes, trace IDs, redaction, bounded retries,
   provider circuit breakers, validated fallback, quarantine, and visible stale
   data provenance.
@@ -67,7 +74,7 @@ Read the [1.1.0 release notes](docs/releases/v1.1.0.md) and
   available GP, daily play time, target dates, quest gates, Ironman checks, and
   explicit missing-data behavior.
 - Quest-XP reward comparison and weekly goal schedules.
-- Sixty local MCP tools over stdio, including twelve additive Version 1.1
+- Ninety-three local MCP tools over stdio, including forty-five additive Version 1.1
   health and maintenance tools; the original 48-tool contract remains frozen.
 - Tauri 2 and React desktop application with first-run setup, multiple profiles,
   skills, quest routes/checklists, levelling plans, GE charts, shopping lists,

@@ -168,6 +168,20 @@ describe("Jagex Grand Exchange provider", () => {
     ]);
     await provider.getPriceHistory(4151, "24h");
     expect(calls).toBe(1);
+    const marketHistory = await provider.getHistory(4151, "7d");
+    expect(marketHistory).toMatchObject({
+      itemId: 4151,
+      sourceName: "Jagex Grand Exchange ItemDB graph",
+      dataState: "retained-cached-data",
+      cacheStatus: "fresh",
+    });
+    expect(marketHistory.sourceUrl).toBe("https://example.test/graph/4151.json");
+    expect(await provider.getLatest(4151)).toMatchObject({
+      itemId: 4151,
+      price: 120,
+      dataState: "retained-cached-data",
+    });
+    expect(calls).toBe(1);
   });
 
   it("rejects suspiciously incomplete bulk snapshots", async () => {

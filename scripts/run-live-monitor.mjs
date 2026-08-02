@@ -10,6 +10,8 @@ import {
   ResilientHttpClient,
   RuneScapeWikiQuestProvider,
   RuneScapeWikiTrainingProvider,
+  WeirdGloopExchangeHistoryProvider,
+  WeirdGloopRuneScapeNewsProvider,
 } from "../packages/providers/dist/index.js";
 import { SoftwareUpdateService } from "../apps/mcp-server/dist/library.js";
 
@@ -117,6 +119,39 @@ const checks = [
       const result = await geProvider.fetchSnapshot();
       contract(result.items.length > 7_000, "Grand Exchange catalogue shrank suspiciously");
       return { recordCount: result.items.length };
+    },
+  },
+  {
+    id: "weird-gloop-rs3-history",
+    run: async () => {
+      const result = await new WeirdGloopExchangeHistoryProvider({
+        httpClient,
+        cacheStore,
+      }).getHistory(4151, "30d", { forceRefresh: true });
+      contract(result.points.length > 20, "Weird Gloop RS3 history became empty or incomplete");
+      contract(
+        result.points.every((point) => point.price > 0),
+        "Weird Gloop RS3 history contains an invalid price",
+      );
+      return {
+        pointCount: result.points.length,
+        volumePointCount: result.points.filter((point) => point.volume !== undefined).length,
+      };
+    },
+  },
+  {
+    id: "runescape-news",
+    run: async () => {
+      const result = await new WeirdGloopRuneScapeNewsProvider({
+        httpClient,
+        cacheStore,
+      }).fetchNews({ forceRefresh: true });
+      contract(result.items.length > 0, "RuneScape news feed became empty");
+      contract(
+        result.items.every((item) => item.sourceName.includes("RuneScape")),
+        "RuneScape news provenance changed",
+      );
+      return { recordCount: result.items.length, latestPublishedAt: result.items[0]?.publishedAt };
     },
   },
   {

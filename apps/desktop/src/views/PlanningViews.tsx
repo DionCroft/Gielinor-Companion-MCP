@@ -1,8 +1,12 @@
 import { useMemo, useState, type FormEvent } from "react";
 import type {
+  GeTradeRecord,
+  ManualGeOrderPlan,
   MarketBacktestResult,
   MarketRecommendation,
+  MarketWatchlist,
   PaperPortfolio,
+  PlayerHoldingsSnapshot,
   PortfolioSummary,
 } from "@gielinor/shared-types";
 
@@ -600,15 +604,34 @@ export function ExchangeView({
   const [summary, setSummary] = useState<PriceSummary>();
   const [analysis, setAnalysis] = useState<MarketRecommendation>();
   const [scan, setScan] = useState<MarketRecommendation[]>([]);
+  const [orderPlans, setOrderPlans] = useState<Record<number, ManualGeOrderPlan>>({});
   const [portfolio, setPortfolio] = useState<PortfolioSummary>();
+  const [holdings, setHoldings] = useState<PlayerHoldingsSnapshot | null>();
   const [paper, setPaper] = useState<PaperPortfolio>();
   const [backtest, setBacktest] = useState<MarketBacktestResult>();
-  const [journal, setJournal] = useState<Array<Record<string, unknown>>>([]);
+  const [journal, setJournal] = useState<GeTradeRecord[]>([]);
+  const [watchlists, setWatchlists] = useState<MarketWatchlist[]>([]);
   const [dataStatus, setDataStatus] = useState<Record<string, unknown>>();
   const [tab, setTab] = useState<ExchangeTab>("Market overview");
   const [selectedItemId, setSelectedItemId] = useState<number>();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
+  const [holdingItemId, setHoldingItemId] = useState(4151);
+  const [holdingQuantity, setHoldingQuantity] = useState(1);
+  const [holdingCost, setHoldingCost] = useState("");
+  const [holdingCash, setHoldingCash] = useState("");
+  const [holdingsFormat, setHoldingsFormat] = useState<"csv" | "json">("json");
+  const [holdingsTransfer, setHoldingsTransfer] = useState("");
+  const [tradeItemId, setTradeItemId] = useState(4151);
+  const [tradeSide, setTradeSide] = useState<"buy" | "sell">("buy");
+  const [tradeQuantity, setTradeQuantity] = useState(1);
+  const [tradePrice, setTradePrice] = useState(0);
+  const [paperItemId, setPaperItemId] = useState(4151);
+  const [paperSide, setPaperSide] = useState<"buy" | "sell">("buy");
+  const [paperQuantity, setPaperQuantity] = useState(1);
+  const [paperPrice, setPaperPrice] = useState(0);
+  const [watchlistName, setWatchlistName] = useState("My watchlist");
+  const [watchlistItems, setWatchlistItems] = useState("");
 
   async function search(event: FormEvent) {
     event.preventDefault();
@@ -672,19 +695,47 @@ export function ExchangeView({
             { profileId: profile.id, items: results.map(({ itemId }) => itemId) },
           );
           setScan(response.data);
+          const planned = await Promise.allSettled(
+            response.data.map((candidate) =>
+              bridge.callTool<ManualGeOrderPlan>("create_manual_ge_order_plan", {
+                profileId: profile.id,
+                item: candidate.itemId,
+              }),
+            ),
+          );
+          setOrderPlans(
+            Object.fromEntries(
+              planned.flatMap((result) =>
+                result.status === "fulfilled"
+                  ? [[result.value.data.analysis.itemId, result.value.data] as const]
+                  : [],
+              ),
+            ),
+          );
         }
       } else if (next === "Portfolio") {
-        setPortfolio(
+        const [portfolioResponse, holdingsResponse] = await Promise.all([
+          bridge.callTool<PortfolioSummary>("get_portfolio_summary", {
+            profileId: profile.id,
+          }),
+          bridge.callTool<PlayerHoldingsSnapshot | null>("get_player_holdings", {
+            profileId: profile.id,
+          }),
+        ]);
+        setPortfolio(portfolioResponse.data);
+        setHoldings(holdingsResponse.data);
+      } else if (next === "Trade journal") {
+        setJournal(
           (
-            await bridge.callTool<PortfolioSummary>("get_portfolio_summary", {
+            await bridge.callTool<GeTradeRecord[]>("list_ge_trades", {
               profileId: profile.id,
             })
           ).data,
         );
-      } else if (next === "Trade journal") {
-        setJournal(
+      } else if (next === "Watchlist") {
+        setWatchlists(
           (
-            await bridge.callTool<Array<Record<string, unknown>>>("list_ge_trades", {
+            await bridge.callTool<MarketWatchlist[]>("get_market_watchlist", {
               profileId: profile.id,
             })
           ).data,
@@ -714,6 +765,156 @@ export function ExchangeView({
       }
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "The market view could not be loaded");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function saveHolding(event: FormEvent) {
+    event.preventDefault();
+    if (!Number.isSafeInteger(holdingItemId) || holdingItemId <= 0) {
+      setError("Enter a positive Grand Exchange item ID.");
+      return;
+    }
+    if (!Number.isSafeInteger(holdingQuantity) || holdingQuantity <= 0) {
+      setError("Enter a positive whole-number holding quantity.");
+      return;
+    }
+    setBusy(true);
+    setError(undefined);
+    try {
+      const response = await bridge.callTool<PlayerHoldingsSnapshot>("upsert_player_holding", {
+        profileId: profile.id,
+        holding: {
+          itemId: holdingItemId,
+          quantity: holdingQuantity,
+          ...(holdingCost.trim() === "" ? {} : { averageAcquisitionPrice: Number(holdingCost) }),
+        },
+        ...(holdingCash.trim() === "" ? {} : { cashGp: Number(holdingCash) }),
+        source: "manual",
+      });
+      setHoldings(response.data);
+      setPortfolio(
+        (
+          await bridge.callTool<PortfolioSummary>("get_portfolio_summary", {
+            profileId: profile.id,
+          })
+        ).data,
+      );
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "The holding could not be saved");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function transferHoldings(action: "import" | "export") {
+    setBusy(true);
+    setError(undefined);
+    try {
+      if (action === "import") {
+        const response = await bridge.callTool<PlayerHoldingsSnapshot>("import_player_holdings", {
+          profileId: profile.id,
+          format: holdingsFormat,
+          content: holdingsTransfer,
+          confirmReplace: true,
+        });
+        setHoldings(response.data);
+      } else {
+        const response = await bridge.callTool<{ content: string }>("export_player_holdings", {
+          profileId: profile.id,
+          format: holdingsFormat,
+        });
+        setHoldingsTransfer(response.data.content);
+      }
+      setPortfolio(
+        (
+          await bridge.callTool<PortfolioSummary>("get_portfolio_summary", {
+            profileId: profile.id,
+          })
+        ).data,
+      );
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Holdings transfer failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function recordTrade(event: FormEvent) {
+    event.preventDefault();
+    setBusy(true);
+    setError(undefined);
+    try {
+      await bridge.callTool<GeTradeRecord>("record_ge_trade", {
+        profileId: profile.id,
+        itemId: tradeItemId,
+        side: tradeSide,
+        quantity: tradeQuantity,
+        unitPrice: tradePrice,
+        occurredAt: new Date().toISOString(),
+        source: "manual",
+      });
+      setJournal(
+        (
+          await bridge.callTool<GeTradeRecord[]>("list_ge_trades", {
+            profileId: profile.id,
+          })
+        ).data,
+      );
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "The trade could not be recorded");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function recordPaperTrade(event: FormEvent) {
+    event.preventDefault();
+    setBusy(true);
+    setError(undefined);
+    try {
+      setPaper(
+        (
+          await bridge.callTool<PaperPortfolio>("record_paper_trade", {
+            profileId: profile.id,
+            itemId: paperItemId,
+            side: paperSide,
+            quantity: paperQuantity,
+            unitPrice: paperPrice,
+          })
+        ).data,
+      );
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "The paper trade could not be recorded");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function createWatchlist(event: FormEvent) {
+    event.preventDefault();
+    const itemIds = watchlistItems
+      .split(",")
+      .map((value) => Number(value.trim()))
+      .filter((value) => Number.isSafeInteger(value) && value > 0);
+    setBusy(true);
+    setError(undefined);
+    try {
+      await bridge.callTool<MarketWatchlist>("create_market_watchlist", {
+        profileId: profile.id,
+        name: watchlistName,
+        itemIds: [...new Set(itemIds)],
+      });
+      setWatchlists(
+        (
+          await bridge.callTool<MarketWatchlist[]>("get_market_watchlist", {
+            profileId: profile.id,
+          })
+        ).data,
+      );
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "The watchlist could not be saved");
     } finally {
       setBusy(false);
     }
@@ -787,9 +988,73 @@ export function ExchangeView({
                 <h2>{candidate.itemName}</h2>
                 <strong>{candidate.scores.overallOpportunity.score}/100 opportunity</strong>
                 <p>{candidate.topReasons[0]}</p>
+                {candidate.indicators === undefined ? (
+                  <InlineAlert tone="warning">
+                    Validated market history is insufficient.
+                  </InlineAlert>
+                ) : (
+                  <dl className="diagnostic-list compact-list">
+                    <div>
+                      <dt>Guide price</dt>
+                      <dd>{formatGp(candidate.indicators.currentGuidePrice)}</dd>
+                    </div>
+                    <div>
+                      <dt>Trend / volatility</dt>
+                      <dd>
+                        {candidate.scores.trend.score}/100 /{" "}
+                        {candidate.indicators.dailyReturnVolatilityPercent?.toFixed(2) ?? "?"}%
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>Volume / buy limit</dt>
+                      <dd>
+                        {candidate.indicators.latestVolume === undefined
+                          ? "Unknown"
+                          : formatNumber(candidate.indicators.latestVolume)}
+                        {" / "}
+                        {candidate.indicators.buyLimit === undefined
+                          ? "Unknown"
+                          : formatNumber(candidate.indicators.buyLimit)}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>Source timestamp</dt>
+                      <dd>{formatDate(candidate.indicators.historyTimestamp)}</dd>
+                    </div>
+                  </dl>
+                )}
+                {orderPlans[candidate.itemId] === undefined ? null : (
+                  <dl className="diagnostic-list compact-list">
+                    <div>
+                      <dt>Entry estimate</dt>
+                      <dd>
+                        {formatGp(orderPlans[candidate.itemId]?.suggestedEntryZone.low)} to{" "}
+                        {formatGp(orderPlans[candidate.itemId]?.suggestedEntryZone.high)}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>Profit-taking estimate</dt>
+                      <dd>
+                        {formatGp(orderPlans[candidate.itemId]?.suggestedProfitTakingZone.low)} to{" "}
+                        {formatGp(orderPlans[candidate.itemId]?.suggestedProfitTakingZone.high)}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>Maximum quantity</dt>
+                      <dd>
+                        {formatNumber(orderPlans[candidate.itemId]?.maximumSuggestedQuantity)}
+                      </dd>
+                    </div>
+                  </dl>
+                )}
                 <small>
                   {candidate.confidence}/100 confidence · {candidate.heldQuantity} recorded held
                 </small>
+                {candidate.warnings.map((warning) => (
+                  <InlineAlert tone="warning" key={warning}>
+                    {warning}
+                  </InlineAlert>
+                ))}
               </article>
             ))}
           </section>
@@ -798,56 +1063,272 @@ export function ExchangeView({
         portfolio === undefined ? (
           <LoadingBlock label="Loading local portfolio" />
         ) : (
-          <section className="metrics-grid exchange-metrics">
-            <MetricCard
-              label="Guide value"
-              value={formatGp(portfolio.guideValue)}
-              detail="Estimated public guide value"
-              accent="mint"
-            />
-            <MetricCard
-              label="Known cost basis"
-              value={formatGp(portfolio.knownCostBasis)}
-              detail="User-entered acquisition prices"
-              accent="gold"
-            />
-            <MetricCard
-              label="Unrealised estimate"
-              value={formatGp(portfolio.unrealisedGuideValueGainLoss)}
-              detail="Not realised until manually recorded"
-              accent="blue"
-            />
-            <MetricCard
-              label="Concentration"
-              value={`${portfolio.concentrationRiskPercent.toFixed(1)}%`}
-              detail="Largest item allocation"
-              accent="rose"
-            />
-          </section>
+          <>
+            <section className="metrics-grid exchange-metrics">
+              <MetricCard
+                label="Guide value"
+                value={formatGp(portfolio.guideValue)}
+                detail="Estimated public guide value"
+                accent="mint"
+              />
+              <MetricCard
+                label="Known cost basis"
+                value={formatGp(portfolio.knownCostBasis)}
+                detail="User-entered acquisition prices"
+                accent="gold"
+              />
+              <MetricCard
+                label="Unrealised estimate"
+                value={formatGp(portfolio.unrealisedGuideValueGainLoss)}
+                detail="Not realised until manually recorded"
+                accent="blue"
+              />
+              <MetricCard
+                label="Concentration"
+                value={`${portfolio.concentrationRiskPercent.toFixed(1)}%`}
+                detail="Largest item allocation"
+                accent="rose"
+              />
+            </section>
+            <section className="content-grid two-thirds">
+              <form className="surface-card planner-form" onSubmit={saveHolding}>
+                <p className="eyebrow">User-entered local data</p>
+                <h2>Add or replace one holding</h2>
+                <div className="form-columns">
+                  <label>
+                    Item ID
+                    <input
+                      type="number"
+                      min={1}
+                      value={holdingItemId}
+                      onChange={(event) => setHoldingItemId(event.currentTarget.valueAsNumber)}
+                    />
+                  </label>
+                  <label>
+                    Quantity
+                    <input
+                      type="number"
+                      min={1}
+                      value={holdingQuantity}
+                      onChange={(event) => setHoldingQuantity(event.currentTarget.valueAsNumber)}
+                    />
+                  </label>
+                  <label>
+                    Average acquisition price
+                    <input
+                      inputMode="numeric"
+                      value={holdingCost}
+                      onChange={(event) => setHoldingCost(event.currentTarget.value)}
+                      placeholder="Optional GP"
+                    />
+                  </label>
+                  <label>
+                    Confirmed cash
+                    <input
+                      inputMode="numeric"
+                      value={holdingCash}
+                      onChange={(event) => setHoldingCash(event.currentTarget.value)}
+                      placeholder="Optional GP"
+                    />
+                  </label>
+                </div>
+                <button className="primary-button" type="submit" disabled={busy}>
+                  Save confirmed holding
+                </button>
+                <small>
+                  This is private local data. Jagex does not expose your bank, inventory or active
+                  offers through these public APIs.
+                </small>
+              </form>
+              <section className="surface-card planner-form">
+                <p className="eyebrow">CSV / JSON</p>
+                <h2>Import or export holdings</h2>
+                <label>
+                  Format
+                  <select
+                    value={holdingsFormat}
+                    onChange={(event) =>
+                      setHoldingsFormat(event.currentTarget.value as "csv" | "json")
+                    }
+                  >
+                    <option value="json">JSON</option>
+                    <option value="csv">CSV</option>
+                  </select>
+                </label>
+                <label>
+                  Transfer data
+                  <textarea
+                    rows={8}
+                    value={holdingsTransfer}
+                    onChange={(event) => setHoldingsTransfer(event.currentTarget.value)}
+                    placeholder="Paste a complete holdings export here"
+                  />
+                </label>
+                <div className="tag-row">
+                  <button
+                    className="secondary-button"
+                    type="button"
+                    disabled={busy || holdingsTransfer.trim() === ""}
+                    onClick={() => void transferHoldings("import")}
+                  >
+                    Confirm and replace
+                  </button>
+                  <button
+                    className="secondary-button"
+                    type="button"
+                    disabled={busy || holdings === null}
+                    onClick={() => void transferHoldings("export")}
+                  >
+                    Export current snapshot
+                  </button>
+                </div>
+              </section>
+            </section>
+            <section className="surface-card">
+              <h2>Latest confirmed snapshot</h2>
+              {holdings === null ? (
+                <p>No holdings snapshot has been recorded.</p>
+              ) : (
+                <p>
+                  {holdings?.items.length ?? 0} item lines; captured{" "}
+                  {formatDate(holdings?.capturedAt)}; source {holdings?.source}
+                </p>
+              )}
+            </section>
+          </>
         )
       ) : tab === "Trade journal" ? (
-        journal.length === 0 ? (
-          <EmptyState
-            title="No recorded trades"
-            description="Trades are private local records and are never imported from Jagex automatically."
-          />
-        ) : (
+        <section className="content-grid two-thirds">
+          <form className="surface-card planner-form" onSubmit={recordTrade}>
+            <p className="eyebrow">Private local journal</p>
+            <h2>Record a completed trade</h2>
+            <div className="form-columns">
+              <label>
+                Item ID
+                <input
+                  type="number"
+                  min={1}
+                  value={tradeItemId}
+                  onChange={(event) => setTradeItemId(event.currentTarget.valueAsNumber)}
+                />
+              </label>
+              <label>
+                Side
+                <select
+                  value={tradeSide}
+                  onChange={(event) => setTradeSide(event.currentTarget.value as "buy" | "sell")}
+                >
+                  <option value="buy">Buy</option>
+                  <option value="sell">Sell</option>
+                </select>
+              </label>
+              <label>
+                Quantity
+                <input
+                  type="number"
+                  min={1}
+                  value={tradeQuantity}
+                  onChange={(event) => setTradeQuantity(event.currentTarget.valueAsNumber)}
+                />
+              </label>
+              <label>
+                Unit price
+                <input
+                  type="number"
+                  min={0}
+                  value={tradePrice}
+                  onChange={(event) => setTradePrice(event.currentTarget.valueAsNumber)}
+                />
+              </label>
+            </div>
+            <button className="primary-button" type="submit" disabled={busy}>
+              Record manual trade
+            </button>
+            <small>No offer is placed, edited or cancelled.</small>
+          </form>
           <section className="surface-card">
-            <h2>Manual trade journal</h2>
-            <pre>{JSON.stringify(journal, null, 2)}</pre>
+            <h2>Recorded trades</h2>
+            {journal.length === 0 ? (
+              <p>No trades have been recorded.</p>
+            ) : (
+              <div className="shopping-table">
+                {journal.map((trade) => (
+                  <div className="shopping-row" key={trade.id}>
+                    <span className="item-orb">{trade.side === "buy" ? "B" : "S"}</span>
+                    <div>
+                      <strong>Item #{trade.itemId}</strong>
+                      <small>
+                        {formatDate(trade.occurredAt)}; {trade.source}
+                      </small>
+                    </div>
+                    <b>
+                      {formatNumber(trade.quantity)} at {formatGp(trade.unitPrice)}
+                    </b>
+                  </div>
+                ))}
+              </div>
+            )}
           </section>
-        )
+        </section>
       ) : tab === "Paper trading" ? (
         paper === undefined ? (
           <LoadingBlock label="Loading paper portfolio" />
         ) : (
-          <section className="surface-card">
-            <p className="eyebrow">Hypothetical only</p>
-            <h2>{formatGp(paper.cashGp)} simulated cash</h2>
-            <p>
-              {paper.holdings.length} simulated holdings · {paper.trades.length} paper trades
-            </p>
-            <InlineAlert tone="info">{paper.disclaimer}</InlineAlert>
+          <section className="content-grid two-thirds">
+            <form className="surface-card planner-form" onSubmit={recordPaperTrade}>
+              <p className="eyebrow">Hypothetical only</p>
+              <h2>Record a paper trade</h2>
+              <div className="form-columns">
+                <label>
+                  Item ID
+                  <input
+                    type="number"
+                    min={1}
+                    value={paperItemId}
+                    onChange={(event) => setPaperItemId(event.currentTarget.valueAsNumber)}
+                  />
+                </label>
+                <label>
+                  Side
+                  <select
+                    value={paperSide}
+                    onChange={(event) => setPaperSide(event.currentTarget.value as "buy" | "sell")}
+                  >
+                    <option value="buy">Buy</option>
+                    <option value="sell">Sell</option>
+                  </select>
+                </label>
+                <label>
+                  Quantity
+                  <input
+                    type="number"
+                    min={1}
+                    value={paperQuantity}
+                    onChange={(event) => setPaperQuantity(event.currentTarget.valueAsNumber)}
+                  />
+                </label>
+                <label>
+                  Unit price
+                  <input
+                    type="number"
+                    min={0}
+                    value={paperPrice}
+                    onChange={(event) => setPaperPrice(event.currentTarget.valueAsNumber)}
+                  />
+                </label>
+              </div>
+              <button className="primary-button" type="submit" disabled={busy}>
+                Record hypothetical trade
+              </button>
+            </form>
+            <section className="surface-card">
+              <p className="eyebrow">Paper portfolio</p>
+              <h2>{formatGp(paper.cashGp)} simulated cash</h2>
+              <p>
+                {paper.holdings.length} simulated holdings · {paper.trades.length} paper trades
+              </p>
+              <InlineAlert tone="info">{paper.disclaimer}</InlineAlert>
+            </section>
           </section>
         )
       ) : tab === "Backtests" ? (
@@ -859,32 +1340,61 @@ export function ExchangeView({
         ) : backtest === undefined ? (
           <LoadingBlock label="Running chronological backtest" />
         ) : (
-          <section className="metrics-grid exchange-metrics">
-            <MetricCard
-              label="Signals"
-              value={formatNumber(backtest.signalCount)}
-              detail={`${backtest.completedTradeCount} simulated trades`}
-              accent="mint"
-            />
-            <MetricCard
-              label="Hit rate"
-              value={`${backtest.hitRatePercent.toFixed(1)}%`}
-              detail="Evaluation period only"
-              accent="gold"
-            />
-            <MetricCard
-              label="Mean return"
-              value={`${backtest.meanReturnPercent.toFixed(2)}%`}
-              detail="After assumed slippage"
-              accent="blue"
-            />
-            <MetricCard
-              label="Max drawdown"
-              value={`${backtest.maximumDrawdownPercent.toFixed(2)}%`}
-              detail="Hypothetical evaluation"
-              accent="rose"
-            />
-          </section>
+          <>
+            <section className="metrics-grid exchange-metrics">
+              <MetricCard
+                label="Signals"
+                value={formatNumber(backtest.signalCount)}
+                detail={`${backtest.completedTradeCount} simulated trades`}
+                accent="mint"
+              />
+              <MetricCard
+                label="Hit rate"
+                value={`${backtest.hitRatePercent.toFixed(1)}%`}
+                detail="Evaluation period only"
+                accent="gold"
+              />
+              <MetricCard
+                label="Mean return"
+                value={`${backtest.meanReturnPercent.toFixed(2)}%`}
+                detail="After assumed slippage"
+                accent="blue"
+              />
+              <MetricCard
+                label="Max drawdown"
+                value={`${backtest.maximumDrawdownPercent.toFixed(2)}%`}
+                detail="Hypothetical evaluation"
+                accent="rose"
+              />
+            </section>
+            <section className="surface-card">
+              <h2>Walk-forward evaluation</h2>
+              <p>
+                {formatNumber(backtest.walkForwardWindowCount)} sequential expanding-history
+                windows; {formatNumber(backtest.insufficientDataCount)} unavailable/failed fills.
+              </p>
+              <div className="shopping-table">
+                {backtest.resultsByConfidenceBand.map((result) => (
+                  <div className="shopping-row" key={result.band}>
+                    <span className="item-orb">{result.band.slice(0, 1).toUpperCase()}</span>
+                    <div>
+                      <strong>{titleCase(result.band)} confidence</strong>
+                      <small>
+                        {formatNumber(result.signalCount)} signals;{" "}
+                        {formatNumber(result.completedTradeCount)}
+                        completed trades
+                      </small>
+                    </div>
+                    <b>
+                      {result.hitRatePercent.toFixed(1)}% hit /{" "}
+                      {result.meanReturnPercent.toFixed(2)}% mean
+                    </b>
+                  </div>
+                ))}
+              </div>
+              <InlineAlert tone="info">{backtest.disclaimer}</InlineAlert>
+            </section>
+          </>
         )
       ) : tab === "Data status" ? (
         dataStatus === undefined ? (
@@ -896,10 +1406,49 @@ export function ExchangeView({
           </section>
         )
       ) : tab === "Watchlist" ? (
-        <EmptyState
-          title="Private watchlists"
-          description="Create and update private watchlists through the MCP tools; item signals remain read-only and never place offers."
-        />
+        <section className="content-grid two-thirds">
+          <form className="surface-card planner-form" onSubmit={createWatchlist}>
+            <p className="eyebrow">Private local data</p>
+            <h2>Create a watchlist</h2>
+            <label>
+              Name
+              <input
+                value={watchlistName}
+                onChange={(event) => setWatchlistName(event.currentTarget.value)}
+              />
+            </label>
+            <label>
+              Item IDs
+              <input
+                value={watchlistItems}
+                onChange={(event) => setWatchlistItems(event.currentTarget.value)}
+                placeholder="4151, 2363, 453"
+              />
+            </label>
+            <button className="primary-button" type="submit" disabled={busy}>
+              Save watchlist
+            </button>
+          </form>
+          <section className="surface-card">
+            <h2>Saved watchlists</h2>
+            {watchlists.length === 0 ? (
+              <p>No watchlists have been recorded.</p>
+            ) : (
+              <div className="shopping-table">
+                {watchlists.map((watchlist) => (
+                  <div className="shopping-row" key={watchlist.id}>
+                    <span className="item-orb">W</span>
+                    <div>
+                      <strong>{watchlist.name}</strong>
+                      <small>{watchlist.itemIds.join(", ") || "No items"}</small>
+                    </div>
+                    <b>{watchlist.itemIds.length} items</b>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+        </section>
       ) : summary === undefined ? (
         <EmptyState
           title="Search for an item"

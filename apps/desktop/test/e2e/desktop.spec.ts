@@ -120,5 +120,5 @@ test("local AI provider failures are actionable", async ({ page }) => {
   await page.getByRole("radio", { name: /Ollama/i }).check();
   await page.getByRole("button", { name: /test and discover models/i }).click();
   await expect(page.getByRole("alert")).toContainText(/HTTP 503/i);
-  await expect(page.getByText("Not connected")).toBeVisible();
+  await expect(page.getByText("Not connected", { exact: true })).toBeVisible();
 });

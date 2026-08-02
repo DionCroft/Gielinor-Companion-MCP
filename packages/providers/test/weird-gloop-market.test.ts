@@ -59,10 +59,13 @@ describe("Weird Gloop RS3 exchange history", () => {
     const history = await provider.getHistory(4151, "7d");
     expect(history.points).toHaveLength(2);
     expect(history.sourceName).toContain("Weird Gloop");
+    expect(history).toMatchObject({ dataState: "live-public-data", cacheStatus: "miss" });
     expect(await provider.getLatest(4151, { offline: true })).toMatchObject({
       itemId: 4151,
       price: 72_000,
       volume: 1_300,
+      dataState: "retained-cached-data",
+      cacheStatus: "fresh",
     });
     expect(calls).toBe(1);
   });
@@ -77,7 +80,7 @@ describe("RuneScape news provider", () => {
             id: "news-1",
             title: "A game update",
             url: "https://www.runescape.com/community/a-game-update",
-            published_at: "2026-08-01T10:00:00Z",
+            datePublished: "2026-08-01T10:00:00Z",
             summary: "Published summary",
             tags: ["game-update", "boss"],
           },
@@ -102,6 +105,35 @@ describe("RuneScape news provider", () => {
     });
     await expect(provider.fetchNews()).rejects.toMatchObject({
       code: "MALFORMED_PROVIDER_RESPONSE",
+    });
+  });
+
+  it("labels refreshed and retained news snapshots truthfully", async () => {
+    const provider = new WeirdGloopRuneScapeNewsProvider({
+      httpClient: new ResilientHttpClient({
+        userAgent: "test",
+        fetchImplementation: async () =>
+          Response.json({
+            data: [
+              {
+                id: "news-1",
+                title: "A game update",
+                url: "https://www.runescape.com/community/a-game-update",
+                datePublished: "2026-08-01T10:00:00Z",
+              },
+            ],
+          }),
+      }),
+      cacheStore: new MemoryCacheStore(),
+      endpoint: "https://example.test/runescape/social",
+    });
+    expect(await provider.fetchNews({ forceRefresh: true })).toMatchObject({
+      dataState: "live-public-data",
+      cacheStatus: "miss",
+    });
+    expect(await provider.fetchNews({ offline: true })).toMatchObject({
+      dataState: "retained-cached-data",
+      cacheStatus: "fresh",
     });
   });
 });

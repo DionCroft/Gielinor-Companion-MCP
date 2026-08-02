@@ -97,6 +97,9 @@ export const MarketIndicatorsSchema = z
     distanceFromLowPercent: percent,
     outlierScore: finite,
     providerDifferencePercent: finite.nonnegative(),
+    comparisonHistoryPrice: safeGp.optional(),
+    comparisonHistoryTimestamp: isoDateTime.optional(),
+    comparisonProviderName: z.string().min(1).optional(),
     historyPointCount: z.number().int().nonnegative(),
     buyLimit: safeGp.optional(),
     guidePriceTimestamp: isoDateTime,
@@ -132,6 +135,21 @@ export const MarketSourceEvidenceSchema = z
   })
   .strict();
 
+export const MarketEventContextSchema = z
+  .object({
+    newsItemId: z.string().min(1),
+    title: z.string().min(1),
+    url: z.string().url(),
+    publishedAt: isoDateTime,
+    tags: z.array(z.string().min(1)).max(50),
+    matchBasis: z.enum(["exact-source-tag", "exact-item-name-in-title"]),
+    correlationDisclaimer: z.literal(
+      "The published update mentions this item; correlation does not prove that it caused a market move.",
+    ),
+  })
+  .strict();
+export type MarketEventContext = z.infer<typeof MarketEventContextSchema>;
+
 export const MarketRecommendationSchema = z
   .object({
     strategyVersion: z.literal("1.1.0-strategy-v1"),
@@ -147,6 +165,7 @@ export const MarketRecommendationSchema = z
     topReasons: z.array(z.string().min(1)).min(1).max(10),
     warnings: z.array(z.string().min(1)).max(30),
     sources: z.array(MarketSourceEvidenceSchema).min(1),
+    eventContext: z.array(MarketEventContextSchema).max(20).optional(),
     analysedAt: isoDateTime,
     disclaimer: z.string().min(1),
   })
@@ -230,6 +249,20 @@ export const MarketBacktestResultSchema = z
     turnoverGp: safeGp,
     averageHoldingDays: finite.nonnegative(),
     insufficientDataCount: z.number().int().nonnegative(),
+    walkForwardWindowCount: z.number().int().nonnegative(),
+    resultsByConfidenceBand: z
+      .array(
+        z
+          .object({
+            band: z.enum(["low", "medium", "high"]),
+            signalCount: z.number().int().nonnegative(),
+            completedTradeCount: z.number().int().nonnegative(),
+            hitRatePercent: finite.min(0).max(100),
+            meanReturnPercent: percent,
+          })
+          .strict(),
+      )
+      .length(3),
     trainingPeriod: z.object({ from: isoDateTime, to: isoDateTime }).strict(),
     evaluationPeriod: z.object({ from: isoDateTime, to: isoDateTime }).strict(),
     protections: z.array(z.string().min(1)).min(4),

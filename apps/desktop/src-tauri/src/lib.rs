@@ -2,7 +2,9 @@ use serde::Serialize;
 use serde_json::{json, Value};
 use std::env;
 use std::io::{BufRead, BufReader, Write};
-use std::path::{Path, PathBuf};
+#[cfg(any(debug_assertions, test))]
+use std::path::Path;
+use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
 use tauri::{AppHandle, Manager};
 
@@ -147,6 +149,7 @@ fn is_allowed_tool(tool: &str) -> bool {
     ALLOWED_TOOLS.contains(&tool)
 }
 
+#[cfg(any(debug_assertions, test))]
 fn development_entry() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../../mcp-server/dist/index.js")
 }
@@ -458,7 +461,7 @@ mod tests {
     }
 
     #[test]
-    fn invokes_a_deterministic_mcp_tool_over_stdio() {
+    fn invokes_real_mcp_and_sqlite_state_over_stdio() {
         let entry = development_entry();
         assert!(
             entry.is_file(),
@@ -469,12 +472,13 @@ mod tests {
             std::process::id()
         ));
         env::set_var("GIELINOR_DB_PATH", &database_path);
+        let runtime = || RuntimeCommand {
+            executable: PathBuf::from(if cfg!(windows) { "node.exe" } else { "node" }),
+            entry: entry.clone(),
+            mode: "development",
+        };
         let result = invoke_tool(
-            RuntimeCommand {
-                executable: PathBuf::from(if cfg!(windows) { "node.exe" } else { "node" }),
-                entry,
-                mode: "development",
-            },
+            runtime(),
             "calculate_xp_remaining",
             json!({
                 "currentExperience": 0,
@@ -482,12 +486,75 @@ mod tests {
                 "skillId": "mining"
             }),
         );
-        env::remove_var("GIELINOR_DB_PATH");
-        let _ = std::fs::remove_file(database_path);
         let response = result.expect("the deterministic MCP tool should return structured content");
 
         assert_eq!(response["data"]["currentLevel"], 1);
         assert_eq!(response["data"]["targetLevel"], 10);
         assert_eq!(response["data"]["experienceRemaining"], 1_154);
+
+        let created = invoke_tool(
+            runtime(),
+            "create_player_profile",
+            json!({ "displayName": "Native Hero", "gameMode": "normal" }),
+        )
+        .expect("the native boundary should create a local profile");
+        let profile_id = created["data"]["id"]
+            .as_str()
+            .expect("the created profile should expose an ID");
+
+        invoke_tool(
+            runtime(),
+            "set_selected_player_profile",
+            json!({ "profileId": profile_id }),
+        )
+        .expect("the native boundary should persist selected-profile state");
+        invoke_tool(
+            runtime(),
+            "replace_player_holdings",
+            json!({
+                "profileId": profile_id,
+                "cashGp": 1_000_000,
+                "items": [{ "itemId": 4151, "quantity": 2, "averageAcquisitionPrice": 80_000 }],
+                "source": "manual",
+                "confirmReplace": true
+            }),
+        )
+        .expect("the native boundary should persist confirmed holdings");
+        let selected = invoke_tool(runtime(), "get_selected_player_snapshot", json!({}))
+            .expect("the native boundary should read persisted private state");
+        assert_eq!(selected["data"]["profile"]["id"], profile_id);
+        assert_eq!(selected["data"]["holdings"]["cashGp"], 1_000_000);
+        assert_eq!(selected["data"]["holdings"]["items"][0]["quantity"], 2);
+
+        invoke_tool(
+            runtime(),
+            "record_paper_trade",
+            json!({
+                "profileId": profile_id,
+                "itemId": 4151,
+                "side": "buy",
+                "quantity": 1,
+                "unitPrice": 80_000,
+                "initialCashGp": 1_000_000
+            }),
+        )
+        .expect("the native boundary should persist an isolated paper trade");
+        let paper = invoke_tool(
+            runtime(),
+            "get_paper_portfolio",
+            json!({ "profileId": profile_id }),
+        )
+        .expect("the native boundary should read the paper portfolio");
+        assert_eq!(paper["data"]["cashGp"], 920_000);
+        assert_eq!(paper["data"]["holdings"][0]["quantity"], 1);
+
+        env::remove_var("GIELINOR_DB_PATH");
+        for path in [
+            database_path.clone(),
+            PathBuf::from(format!("{}-wal", database_path.display())),
+            PathBuf::from(format!("{}-shm", database_path.display())),
+        ] {
+            let _ = std::fs::remove_file(path);
+        }
     }
 }

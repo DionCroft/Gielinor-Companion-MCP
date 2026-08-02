@@ -564,6 +564,14 @@ export function DataStatusView({
           ).map(([key, detail]) => {
             const status = statuses[key];
             const count = status?.questCount ?? status?.methodCount ?? status?.itemCount ?? 0;
+            const sourceClass = status?.provider?.toLocaleLowerCase("en-GB").includes("fixture")
+              ? "fixture"
+              : status?.state === "ready"
+                ? "retained cached data"
+                : "unavailable";
+            const parseWarningCount = Object.values(
+              status?.coverage?.parseWarningsByField ?? {},
+            ).reduce((total, value) => total + value, 0);
             return (
               <article className="source-card" key={key}>
                 <div className="source-card-top">
@@ -601,9 +609,35 @@ export function DataStatusView({
                     <dt>Provider</dt>
                     <dd>{status?.provider ?? "Not yet synchronized"}</dd>
                   </div>
+                  <div>
+                    <dt>Data class</dt>
+                    <dd>{titleCase(sourceClass)}</dd>
+                  </div>
+                  <div>
+                    <dt>Last attempted</dt>
+                    <dd>{formatDate(status?.lastAttemptAt)}</dd>
+                  </div>
+                  <div>
+                    <dt>Revision</dt>
+                    <dd>{status?.sourceRevision ?? "Unavailable"}</dd>
+                  </div>
                 </dl>
+                {status?.coverage === undefined ? null : (
+                  <p>
+                    Quest coverage: {formatNumber(status.coverage.questsWithPrerequisiteData)} with
+                    prerequisites; {formatNumber(status.coverage.questsWithSkillRequirements)} with
+                    skill requirements; {formatNumber(status.coverage.questsWithItemRequirements)}
+                    with item requirements;{" "}
+                    {formatNumber(status.coverage.questsWithStructuredRewards)}
+                    with structured rewards. {formatNumber(parseWarningCount)} explicit parse
+                    warnings retained.
+                  </p>
+                )}
                 {status?.lastErrorMessage === undefined ? null : (
-                  <InlineAlert tone="warning">{status.lastErrorMessage}</InlineAlert>
+                  <InlineAlert tone="warning">
+                    {status.lastErrorCode === undefined ? "" : `${status.lastErrorCode}: `}
+                    {status.lastErrorMessage}
+                  </InlineAlert>
                 )}
                 <button
                   className="secondary-button wide"

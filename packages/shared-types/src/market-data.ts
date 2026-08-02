@@ -12,6 +12,8 @@ export const MarketPriceObservationSchema = z
     retrievedAt: isoDateTime,
     sourceName: z.string().min(1),
     sourceUrl: z.string().url(),
+    dataState: z.enum(["live-public-data", "retained-cached-data"]).optional(),
+    cacheStatus: z.enum(["miss", "fresh", "stale"]).optional(),
   })
   .strict();
 export type MarketPriceObservation = z.infer<typeof MarketPriceObservationSchema>;
@@ -33,6 +35,8 @@ export const MarketHistorySeriesSchema = z
     retrievedAt: isoDateTime,
     sourceName: z.string().min(1),
     sourceUrl: z.string().url(),
+    dataState: z.enum(["live-public-data", "retained-cached-data"]).optional(),
+    cacheStatus: z.enum(["miss", "fresh", "stale"]).optional(),
   })
   .strict();
 export type MarketHistorySeries = z.infer<typeof MarketHistorySeriesSchema>;
@@ -58,6 +62,8 @@ export const RuneScapeNewsSnapshotSchema = z
     retrievedAt: isoDateTime,
     sourceName: z.string().min(1),
     sourceUrl: z.string().url(),
+    dataState: z.enum(["live-public-data", "retained-cached-data"]).optional(),
+    cacheStatus: z.enum(["miss", "fresh", "stale"]).optional(),
   })
   .strict();
 export type RuneScapeNewsSnapshot = z.infer<typeof RuneScapeNewsSnapshotSchema>;

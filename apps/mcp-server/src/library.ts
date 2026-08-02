@@ -12,6 +12,7 @@ export {
 } from "./maintenance-runtime.js";
 export { CompanionToolService, publicToolError } from "./tool-service.js";
 export type { DiagnosticsToolBackend, ToolEnvelope, ToolError } from "./tool-service.js";
+export { OfflineModeController } from "./offline-mode.js";
 export {
   SoftwareUpdateService,
   softwareUpdateChecksEnabled,

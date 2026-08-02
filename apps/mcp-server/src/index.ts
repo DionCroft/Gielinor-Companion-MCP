@@ -80,6 +80,9 @@ async function main(): Promise<void> {
     priceRepository,
     providers.marketHistory,
     playerPrivateData,
+    Date.now,
+    providers.news,
+    providers.jagexMarketHistory,
   );
   const diagnosticsRepository =
     databaseRuntime.state.status === "safe-mode"
@@ -147,6 +150,7 @@ async function main(): Promise<void> {
     playerPrivateData,
     marketIntelligence,
     offlineMode,
+    process.env.GIELINOR_RUNTIME_MODE === "desktop-ephemeral" ? "native-real" : "local-stdio-real",
   );
   const server = createCompanionServer(tools, {
     recordError: (error) => diagnostics.recordError(error),

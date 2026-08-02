@@ -14,6 +14,7 @@ export type DefaultProviderStack = {
   registry: ProviderRegistry;
   ports: ProviderPortAdapter;
   marketHistory: WeirdGloopExchangeHistoryProvider;
+  jagexMarketHistory: JagexGrandExchangeProvider;
   news: WeirdGloopRuneScapeNewsProvider;
 };
 
@@ -70,6 +71,7 @@ export function createDefaultProviderStack(
     registry,
     ports: new ProviderPortAdapter(registry, offline),
     marketHistory,
+    jagexMarketHistory: prices,
     news,
   };
 }

@@ -15,7 +15,11 @@ import {
   calculateMarketIndicators,
   scoreMarketIndicators,
 } from "../src/market-intelligence-service.js";
-import type { MarketHistoryProvider, PriceRepository } from "../src/ports.js";
+import type {
+  MarketHistoryProvider,
+  PriceRepository,
+  RuneScapeNewsProvider,
+} from "../src/ports.js";
 import type { PlayerPrivateDataService } from "../src/player-private-data-service.js";
 
 const NOW = Date.parse("2026-08-02T00:00:00.000Z");
@@ -60,11 +64,21 @@ function services(options: {
   holdings?: PlayerHoldingsSnapshot | null;
   trades?: GeTradeRecord[];
   preferenceOverrides?: Partial<typeof DEFAULT_MARKET_PREFERENCES>;
+  newsTitle?: string;
+  comparisonSeries?: MarketHistorySeries;
+  failPrimaryHistory?: boolean;
 }) {
   const prices = { getByIdOrAlias: async () => options.catalogue } as unknown as PriceRepository;
   const marketHistory = {
-    getHistory: async () => options.series,
+    getHistory: async () => {
+      if (options.failPrimaryHistory === true) throw new Error("primary unavailable");
+      return options.series;
+    },
   } as unknown as MarketHistoryProvider;
+  const comparisonHistory =
+    options.comparisonSeries === undefined
+      ? undefined
+      : ({ getHistory: async () => options.comparisonSeries } as unknown as MarketHistoryProvider);
   const privateData = {
     getHoldings: async () => options.holdings ?? null,
     getMarketPreferences: async () => ({
@@ -73,7 +87,35 @@ function services(options: {
     }),
     listTrades: async () => options.trades ?? [],
   } as unknown as PlayerPrivateDataService;
-  return new MarketIntelligenceService(prices, marketHistory, privateData, () => NOW);
+  const news =
+    options.newsTitle === undefined
+      ? undefined
+      : ({
+          fetchNews: async () => ({
+            items: [
+              {
+                id: "news-1",
+                title: options.newsTitle,
+                url: "https://example.test/news-1",
+                publishedAt: new Date(NOW - 86_400_000).toISOString(),
+                sourceName: "fixture RuneScape news",
+                retrievedAt: new Date(NOW).toISOString(),
+                tags: [],
+              },
+            ],
+            retrievedAt: new Date(NOW).toISOString(),
+            sourceName: "fixture RuneScape news",
+            sourceUrl: "https://example.test/news",
+          }),
+        } as RuneScapeNewsProvider);
+  return new MarketIntelligenceService(
+    prices,
+    marketHistory,
+    privateData,
+    () => NOW,
+    news,
+    comparisonHistory,
+  );
 }
 
 describe("market indicators and deterministic scoring", () => {
@@ -101,9 +143,76 @@ describe("market indicators and deterministic scoring", () => {
     expect(scores.freshness.score).toBe(0);
     expect(scores.sourceConfidence.score).toBeLessThan(10);
   });
+
+  it("links only an exact source-backed item mention and penalises event volatility", async () => {
+    const series = history(
+      Array.from({ length: 180 }, (_, index) => (index % 2 === 0 ? 900 : 1_300)),
+    );
+    const baseline = await services({ catalogue: item(1_100), series }).analyseGeItem(
+      "profile-1",
+      1,
+    );
+    const eventLinked = await services({
+      catalogue: item(1_100),
+      series,
+      newsTitle: "Test item balance update",
+    }).analyseGeItem("profile-1", 1);
+
+    expect(eventLinked.eventContext).toMatchObject([
+      {
+        newsItemId: "news-1",
+        matchBasis: "exact-item-name-in-title",
+      },
+    ]);
+    expect(eventLinked.confidence).toBe(Math.max(0, baseline.confidence - 15));
+    expect(eventLinked.warnings.join(" ")).toMatch(/correlation does not prove/i);
+  });
+
+  it("compares independent histories and falls back to the Jagex graph", async () => {
+    const primary = history(Array.from({ length: 180 }, () => 1_000));
+    const jagex = history(Array.from({ length: 180 }, () => 1_250));
+    jagex.sourceName = "fixture Jagex graph";
+    jagex.sourceUrl = "https://example.test/jagex-graph/1.json";
+    const compared = await services({
+      catalogue: item(1_100),
+      series: primary,
+      comparisonSeries: jagex,
+    }).analyseGeItem("profile-1", 1);
+    expect(compared.indicators).toMatchObject({
+      comparisonHistoryPrice: 1_250,
+      comparisonProviderName: "fixture Jagex graph",
+      providerDifferencePercent: 20,
+    });
+    expect(compared.sources.map((source) => source.provider)).toContain("fixture Jagex graph");
+
+    const fallback = await services({
+      catalogue: item(1_100),
+      series: primary,
+      comparisonSeries: jagex,
+      failPrimaryHistory: true,
+    }).analyseGeItem("profile-1", 1);
+    expect(fallback.indicators?.latestHistoryPrice).toBe(1_250);
+    expect(fallback.warnings.join(" ")).toMatch(/used as fallback/i);
+  });
 });
 
 describe("market recommendations and sizing", () => {
+  it("rejects extreme volatility and user-defined low liquidity", async () => {
+    const volatile = await services({
+      catalogue: item(1_100),
+      series: history(Array.from({ length: 180 }, (_, index) => (index % 2 === 0 ? 500 : 1_500))),
+    }).analyseGeItem("profile-1", 1);
+    expect(volatile.recommendation).toBe("avoid");
+
+    const lowLiquidity = await services({
+      catalogue: item(1_100),
+      series: history(Array.from({ length: 180 }, (_, index) => 900 + index)),
+      preferenceOverrides: { minimumVolume: 100_000 },
+    }).analyseGeItem("profile-1", 1);
+    expect(lowLiquidity.recommendation).toBe("avoid");
+    expect(lowLiquidity.scores.userFit.reasons.join(" ")).toMatch(/does not meet/i);
+  });
+
   it("never emits a sell recommendation for an unheld item", async () => {
     const prices = [
       ...Array.from({ length: 170 }, () => 1_000),
@@ -202,6 +311,13 @@ describe("portfolio and backtesting", () => {
     expect(first).toEqual(second);
     expect(first.trainingPointCount + first.evaluationPointCount).toBe(180);
     expect(first.protections.join(" ")).toMatch(/only observations at or before/);
+    expect(first.protections.join(" ")).toMatch(/walk-forward/i);
+    expect(first.walkForwardWindowCount).toBeGreaterThan(0);
+    expect(first.resultsByConfidenceBand.map((result) => result.band)).toEqual([
+      "low",
+      "medium",
+      "high",
+    ]);
     expect(first.assumptions.fillDelayDays).toBe(2);
   });
 });
