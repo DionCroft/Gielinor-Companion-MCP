@@ -1,7 +1,13 @@
 import type {
   GameMode,
   GrandExchangeItem,
+  GeTradeRecord,
+  MarketPreferences,
+  MarketHistorySeries,
+  MarketPriceObservation,
+  MarketWatchlist,
   PlayerProfile,
+  PlayerHoldingsSnapshot,
   PlayerStatsResult,
   PriceCatalogueItem,
   PriceDataSnapshot,
@@ -10,6 +16,7 @@ import type {
   PricePoint,
   PriceSyncResult,
   Quest,
+  RuneScapeNewsSnapshot,
   QuestDataSnapshot,
   QuestDataStatus,
   QuestSyncResult,
@@ -47,6 +54,19 @@ export interface GrandExchangeDataProvider extends PriceProvider {
   fetchSnapshot(): Promise<PriceDataSnapshot>;
 }
 
+export interface MarketHistoryProvider {
+  getLatest(itemId: number, options?: ProviderRequestOptions): Promise<MarketPriceObservation>;
+  getHistory(
+    itemId: number,
+    range: PriceHistoryRange,
+    options?: ProviderRequestOptions,
+  ): Promise<MarketHistorySeries>;
+}
+
+export interface RuneScapeNewsProvider {
+  fetchNews(options?: ProviderRequestOptions): Promise<RuneScapeNewsSnapshot>;
+}
+
 export interface PriceRepository {
   getByIdOrAlias(identifier: number | string): Promise<PriceCatalogueItem | null>;
   search(query: string, limit: number): Promise<PriceCatalogueItem[]>;
@@ -67,6 +87,26 @@ export interface PlayerProfileRepository {
   getById(id: string): Promise<PlayerProfile | null>;
   list(): Promise<PlayerProfile[]>;
   save(profile: PlayerProfile): Promise<PlayerProfile>;
+}
+
+export interface PlayerPrivateDataRepository {
+  getLatestHoldings(profileId: string): Promise<PlayerHoldingsSnapshot | null>;
+  saveHoldings(snapshot: PlayerHoldingsSnapshot): Promise<PlayerHoldingsSnapshot>;
+  getTrade(profileId: string, tradeId: string): Promise<GeTradeRecord | null>;
+  listTrades(profileId: string): Promise<GeTradeRecord[]>;
+  saveTrade(record: GeTradeRecord): Promise<GeTradeRecord>;
+  removeTrade(profileId: string, tradeId: string): Promise<boolean>;
+  getMarketPreferences(profileId: string): Promise<MarketPreferences | null>;
+  saveMarketPreferences(
+    profileId: string,
+    preferences: MarketPreferences,
+    updatedAt: string,
+  ): Promise<MarketPreferences>;
+  getWatchlist(profileId: string, watchlistId: string): Promise<MarketWatchlist | null>;
+  listWatchlists(profileId: string): Promise<MarketWatchlist[]>;
+  saveWatchlist(watchlist: MarketWatchlist): Promise<MarketWatchlist>;
+  getSelectedProfile(): Promise<{ profileId: string; selectedAt: string } | null>;
+  setSelectedProfile(profileId: string, selectedAt: string): Promise<void>;
 }
 
 export interface QuestDataProvider {

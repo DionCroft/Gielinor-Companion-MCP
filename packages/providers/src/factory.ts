@@ -7,10 +7,14 @@ import { JagexHiscoresProvider } from "./jagex-hiscores.js";
 import { ProviderPortAdapter, ProviderRegistry } from "./plugin.js";
 import { RuneScapeWikiQuestProvider } from "./runescape-wiki-quests.js";
 import { RuneScapeWikiTrainingProvider } from "./runescape-wiki-training.js";
+import { WeirdGloopExchangeHistoryProvider } from "./weird-gloop-exchange.js";
+import { WeirdGloopRuneScapeNewsProvider } from "./weird-gloop-news.js";
 
 export type DefaultProviderStack = {
   registry: ProviderRegistry;
   ports: ProviderPortAdapter;
+  marketHistory: WeirdGloopExchangeHistoryProvider;
+  news: WeirdGloopRuneScapeNewsProvider;
 };
 
 export function createDefaultProviderStack(
@@ -47,10 +51,24 @@ export function createDefaultProviderStack(
     apiUrl: config.wikiApiUrl,
     pageUrl: config.wikiPageUrl,
   });
+  const marketHistory = new WeirdGloopExchangeHistoryProvider({
+    httpClient,
+    cacheStore,
+    cachePolicy: config.geHistoryCache,
+    endpoint: config.weirdGloopHistoryUrl,
+  });
+  const news = new WeirdGloopRuneScapeNewsProvider({
+    httpClient,
+    cacheStore,
+    cachePolicy: config.newsCache,
+    endpoint: config.newsUrl,
+  });
   const registry = new ProviderRegistry();
   registry.register(createBuiltinProviderPlugin({ stats, prices, quests, training }));
   return {
     registry,
     ports: new ProviderPortAdapter(registry, config.offline),
+    marketHistory,
+    news,
   };
 }

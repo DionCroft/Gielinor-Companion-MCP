@@ -171,9 +171,9 @@ describe("MCP 1.1 diagnostics tools through the protocol boundary", () => {
       ],
     ] as const;
     const listed = await client.listTools();
-    expect(listed.tools).toHaveLength(60);
-    expect(listed.tools.slice(-12).map((tool) => tool.name)).toEqual(
-      additive.map(([name]) => name),
+    expect(listed.tools).toHaveLength(84);
+    expect(listed.tools.map((tool) => tool.name)).toEqual(
+      expect.arrayContaining(additive.map(([name]) => name)),
     );
 
     for (const [name, arguments_] of additive) {

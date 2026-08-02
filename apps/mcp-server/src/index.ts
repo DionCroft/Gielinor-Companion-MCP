@@ -6,6 +6,8 @@ import { join } from "node:path";
 import {
   GrandExchangeService,
   LevellingPlannerService,
+  MarketIntelligenceService,
+  PlayerPrivateDataService,
   ProfileService,
   QuestService,
 } from "@gielinor/core";
@@ -14,6 +16,7 @@ import {
   SqliteCacheStore,
   SqliteDiagnosticsRepository,
   SqlitePriceRepository,
+  SqlitePlayerPrivateDataRepository,
   SqlitePlayerProfileRepository,
   SqliteQuestRepository,
   SqliteTrainingMethodRepository,
@@ -52,7 +55,12 @@ async function main(): Promise<void> {
   const providers = createDefaultProviderStack(config, cacheStore);
   const statsProvider = providers.ports;
   const priceProvider = providers.ports;
-  const profiles = new ProfileService(new SqlitePlayerProfileRepository(database), statsProvider);
+  const profileRepository = new SqlitePlayerProfileRepository(database);
+  const profiles = new ProfileService(profileRepository, statsProvider);
+  const playerPrivateData = new PlayerPrivateDataService(
+    new SqlitePlayerPrivateDataRepository(database),
+    profileRepository,
+  );
   const quests = new QuestService(
     new SqliteQuestRepository(database),
     profiles,
@@ -64,11 +72,12 @@ async function main(): Promise<void> {
     quests,
     providers.ports.training,
   );
-  const exchange = new GrandExchangeService(
-    new SqlitePriceRepository(database),
-    priceProvider,
-    quests,
-    planner,
+  const priceRepository = new SqlitePriceRepository(database);
+  const exchange = new GrandExchangeService(priceRepository, priceProvider, quests, planner);
+  const marketIntelligence = new MarketIntelligenceService(
+    priceRepository,
+    providers.marketHistory,
+    playerPrivateData,
   );
   const diagnosticsRepository =
     databaseRuntime.state.status === "safe-mode"
@@ -133,6 +142,8 @@ async function main(): Promise<void> {
     planner,
     exchange,
     diagnostics,
+    playerPrivateData,
+    marketIntelligence,
   );
   const server = createCompanionServer(tools, {
     recordError: (error) => diagnostics.recordError(error),

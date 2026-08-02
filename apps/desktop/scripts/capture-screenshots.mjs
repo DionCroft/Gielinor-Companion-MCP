@@ -30,7 +30,7 @@ try {
     viewport: { width: 1440, height: 1000 },
   });
 
-  await page.goto("http://127.0.0.1:1420/?fixture=returning");
+  await page.goto("http://127.0.0.1:1420/?mode=browser-preview&fixture=returning");
   await page.getByRole("heading", { name: /welcome back/i }).waitFor();
   await page.screenshot({
     animations: "disabled",
@@ -47,7 +47,7 @@ try {
     path: path.join(imageDirectory, "quest-route.png"),
   });
 
-  await page.goto("http://127.0.0.1:1420/?fixture=returning");
+  await page.goto("http://127.0.0.1:1420/?mode=browser-preview&fixture=returning");
   await page.getByRole("button", { name: "Grand Exchange" }).click();
   await page.getByLabel("Search Grand Exchange items").fill("whip");
   await page.getByRole("button", { name: "Search", exact: true }).click();

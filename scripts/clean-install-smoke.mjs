@@ -131,7 +131,7 @@ try {
     await client.close();
   }
   process.stdout.write(
-    "Clean packed npm installation exposed all 60 tools with the frozen 48-tool Version 1.0 prefix.\n",
+    `Clean packed npm installation exposed all ${MCP_TOOL_NAMES_V1_1.length} tools with the frozen 48-tool Version 1.0 prefix.\n`,
   );
 } finally {
   await rm(installationDirectory, { recursive: true, force: true });

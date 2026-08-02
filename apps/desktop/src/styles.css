@@ -2631,6 +2631,27 @@ legend {
   text-align: center;
 }
 
+.runtime-data-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.75rem 1rem;
+  color: #291d00;
+  background: #f7c95e;
+  border-bottom: 1px solid #d69f21;
+  font-size: 0.9rem;
+  z-index: 5;
+}
+
+.runtime-data-banner span {
+  opacity: 0.82;
+}
+
+.onboarding-shell > .runtime-data-banner {
+  position: fixed;
+  inset: 0 0 auto 0;
+}
+
 @media (max-width: 1120px) {
   .metrics-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));

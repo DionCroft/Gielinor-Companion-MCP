@@ -8,6 +8,8 @@ import {
   type ItemReference,
   type LevellingPlanInput,
   type LevellingPlannerService,
+  type MarketIntelligenceService,
+  type PlayerPrivateDataService,
   type PriceProvider,
   type ProfileService,
   type QuestService,
@@ -22,6 +24,10 @@ import {
   type GameMode,
   type GielinorError,
   type MaintenanceJobName,
+  type MarketPreferences,
+  type MarketBacktestInput,
+  type PlayerHolding,
+  type PlayerPrivateDataSource,
   type ProviderDiagnosticHealth,
   type ProfileExport,
   type QuestStatus,
@@ -134,6 +140,8 @@ export class CompanionToolService {
     private readonly planner?: LevellingPlannerService,
     private readonly exchange?: GrandExchangeService,
     private readonly diagnostics?: DiagnosticsToolBackend,
+    private readonly playerPrivateData?: PlayerPrivateDataService,
+    private readonly marketIntelligence?: MarketIntelligenceService,
   ) {}
 
   private questService(): QuestService {
@@ -165,6 +173,23 @@ export class CompanionToolService {
       throw new CompanionError("Diagnostics are not configured", "UNSUPPORTED_FEATURE");
     }
     return this.diagnostics;
+  }
+
+  private privateDataService(): PlayerPrivateDataService {
+    if (this.playerPrivateData === undefined) {
+      throw new CompanionError("Player-private data is not configured", "UNSUPPORTED_FEATURE");
+    }
+    return this.playerPrivateData;
+  }
+
+  private marketIntelligenceService(): MarketIntelligenceService {
+    if (this.marketIntelligence === undefined) {
+      throw new CompanionError(
+        "Deterministic market intelligence is not configured",
+        "UNSUPPORTED_FEATURE",
+      );
+    }
+    return this.marketIntelligence;
   }
 
   public async getSystemHealth(): Promise<ToolEnvelope<SystemHealth>> {
@@ -378,6 +403,255 @@ export class CompanionToolService {
     profile: unknown,
   ): Promise<ToolEnvelope<Awaited<ReturnType<ProfileService["import"]>>>> {
     return envelope(await this.profiles.import(profile), "local SQLite profile");
+  }
+
+  public async getSelectedPlayerSnapshot() {
+    return envelope(
+      await this.privateDataService().getSelectedPlayerSnapshot(),
+      "selected local profile and private SQLite data",
+    );
+  }
+
+  public async setSelectedPlayerProfile(profileId: string) {
+    return envelope(
+      await this.privateDataService().setSelectedProfile(profileId),
+      "local SQLite selected-profile state",
+    );
+  }
+
+  public async getPlayerHoldings(profileId: string) {
+    return envelope(
+      await this.privateDataService().getHoldings(profileId),
+      "user-entered local holdings snapshot",
+    );
+  }
+
+  public async replacePlayerHoldings(input: {
+    profileId: string;
+    cashGp?: number | undefined;
+    items: PlayerHolding[];
+    source?: PlayerPrivateDataSource | undefined;
+    capturedAt?: string | undefined;
+    confirmReplace: boolean;
+  }) {
+    return envelope(
+      await this.privateDataService().replaceHoldings(input),
+      "user-confirmed local holdings snapshot",
+    );
+  }
+
+  public async upsertPlayerHolding(input: {
+    profileId: string;
+    holding: PlayerHolding;
+    cashGp?: number | undefined;
+    source?: PlayerPrivateDataSource | undefined;
+  }) {
+    return envelope(
+      await this.privateDataService().upsertHolding(input),
+      "user-entered local holdings snapshot",
+    );
+  }
+
+  public async importPlayerHoldings(input: {
+    profileId: string;
+    format: "csv" | "json";
+    content: string;
+    confirmReplace: boolean;
+  }) {
+    return envelope(
+      await this.privateDataService().importHoldings(input),
+      `user-confirmed local ${input.format.toUpperCase()} import`,
+    );
+  }
+
+  public async exportPlayerHoldings(profileId: string, format: "csv" | "json") {
+    return envelope(
+      await this.privateDataService().exportHoldings(profileId, format),
+      "user-entered local holdings snapshot",
+    );
+  }
+
+  public async recordGeTrade(input: {
+    profileId: string;
+    itemId: number;
+    side: "buy" | "sell";
+    quantity: number;
+    unitPrice: number;
+    occurredAt: string;
+    source: PlayerPrivateDataSource;
+    notes?: string | undefined;
+  }) {
+    return envelope(
+      await this.privateDataService().recordTrade(input),
+      "user-entered local Grand Exchange trade journal",
+    );
+  }
+
+  public async listGeTrades(profileId: string) {
+    return envelope(
+      await this.privateDataService().listTrades(profileId),
+      "private local Grand Exchange trade journal",
+    );
+  }
+
+  public async updateGeTrade(
+    profileId: string,
+    tradeId: string,
+    updates: {
+      itemId?: number | undefined;
+      side?: "buy" | "sell" | undefined;
+      quantity?: number | undefined;
+      unitPrice?: number | undefined;
+      occurredAt?: string | undefined;
+      source?: PlayerPrivateDataSource | undefined;
+      notes?: string | undefined;
+    },
+  ) {
+    return envelope(
+      await this.privateDataService().updateTrade(profileId, tradeId, updates),
+      "user-entered local Grand Exchange trade journal",
+    );
+  }
+
+  public async removeGeTrade(profileId: string, tradeId: string) {
+    return envelope(
+      await this.privateDataService().removeTrade(profileId, tradeId),
+      "user-confirmed local Grand Exchange trade journal",
+    );
+  }
+
+  public async getMarketPreferences(profileId: string) {
+    return envelope(
+      await this.privateDataService().getMarketPreferences(profileId),
+      "private local market preferences",
+    );
+  }
+
+  public async updateMarketPreferences(
+    profileId: string,
+    updates: {
+      riskTolerance?: MarketPreferences["riskTolerance"] | undefined;
+      strategy?: MarketPreferences["strategy"] | undefined;
+      maximumAllocationPercent?: number | undefined;
+      minimumVolume?: number | undefined;
+      maximumVolatility?: number | undefined;
+      minimumDataConfidence?: number | undefined;
+      avoidNewOrUnstableItems?: boolean | undefined;
+    },
+  ) {
+    return envelope(
+      await this.privateDataService().updateMarketPreferences(profileId, updates),
+      "private local market preferences",
+    );
+  }
+
+  public async createMarketWatchlist(input: {
+    profileId: string;
+    name: string;
+    itemIds?: number[] | undefined;
+  }) {
+    return envelope(
+      await this.privateDataService().createWatchlist(input),
+      "private local market watchlist",
+    );
+  }
+
+  public async updateMarketWatchlist(
+    profileId: string,
+    watchlistId: string,
+    updates: { name?: string | undefined; itemIds?: number[] | undefined },
+  ) {
+    return envelope(
+      await this.privateDataService().updateWatchlist(profileId, watchlistId, updates),
+      "private local market watchlist",
+    );
+  }
+
+  public async getMarketWatchlist(profileId: string, watchlistId?: string) {
+    return envelope(
+      await this.privateDataService().getWatchlists(profileId, watchlistId),
+      "private local market watchlist",
+    );
+  }
+
+  public async analyseGeItem(profileId: string, item: ItemReference, forceRefresh = false) {
+    return envelope(
+      await this.marketIntelligenceService().analyseGeItem(profileId, item, { forceRefresh }),
+      "deterministic RS3 market intelligence over public guide-price sources",
+    );
+  }
+
+  public async scanGeOpportunities(
+    profileId: string,
+    items: ItemReference[],
+    forceRefresh = false,
+  ) {
+    return envelope(
+      await this.marketIntelligenceService().scanGeOpportunities(profileId, items, {
+        forceRefresh,
+      }),
+      "versioned deterministic RS3 market scoring",
+    );
+  }
+
+  public async getGeBuyCandidates(profileId: string, items: ItemReference[], forceRefresh = false) {
+    const results = await this.marketIntelligenceService().scanGeOpportunities(profileId, items, {
+      forceRefresh,
+    });
+    return envelope(
+      results.filter(
+        ({ recommendation }) =>
+          recommendation === "strong-buy-candidate" || recommendation === "buy-candidate",
+      ),
+      "versioned deterministic RS3 buy-candidate filter",
+    );
+  }
+
+  public async getGeSellCandidates(
+    profileId: string,
+    items: ItemReference[],
+    forceRefresh = false,
+  ) {
+    const results = await this.marketIntelligenceService().scanGeOpportunities(profileId, items, {
+      forceRefresh,
+    });
+    return envelope(
+      results.filter(
+        ({ recommendation }) => recommendation === "sell-candidate" || recommendation === "reduce",
+      ),
+      "confirmed-holdings-aware deterministic RS3 sell-candidate filter",
+    );
+  }
+
+  public async createManualGeOrderPlan(
+    profileId: string,
+    item: ItemReference,
+    forceRefresh = false,
+  ) {
+    return envelope(
+      await this.marketIntelligenceService().createManualOrderPlan(profileId, item, {
+        forceRefresh,
+      }),
+      "non-executing deterministic manual order plan",
+    );
+  }
+
+  public async backtestGeStrategy(
+    itemId: number,
+    input: MarketBacktestInput,
+    forceRefresh = false,
+  ) {
+    return envelope(
+      await this.marketIntelligenceService().backtestGeStrategy(itemId, input, { forceRefresh }),
+      "chronological public guide-price backtest",
+    );
+  }
+
+  public async getPortfolioSummary(profileId: string) {
+    return envelope(
+      await this.marketIntelligenceService().getPortfolioSummary(profileId),
+      "user-entered holdings and public guide-price valuation",
+    );
   }
 
   public calculateXpRemaining(

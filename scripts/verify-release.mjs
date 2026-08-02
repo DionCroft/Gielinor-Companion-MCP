@@ -75,7 +75,7 @@ invariant(
   "Profile export schema version changed unexpectedly",
 );
 invariant(PROVIDER_PLUGIN_API_VERSION === 1, "Provider plugin API version changed unexpectedly");
-invariant(DATABASE_SCHEMA_VERSION === 6, "Database schema version changed unexpectedly");
+invariant(DATABASE_SCHEMA_VERSION === 7, "Database schema version changed unexpectedly");
 invariant(
   DATABASE_MIGRATIONS.at(-1)?.version === DATABASE_SCHEMA_VERSION,
   "Database schema version does not match the migration chain",
@@ -85,7 +85,10 @@ invariant(
   JSON.stringify(COMPANION_TOOL_NAMES) === JSON.stringify(MCP_TOOL_NAMES_V1),
   "Runtime MCP tool order differs from the stable Version 1 contract",
 );
-invariant(CURRENT_COMPANION_TOOL_NAMES.length === 60, "Current MCP tool count is not 60");
+invariant(
+  CURRENT_COMPANION_TOOL_NAMES.length === MCP_TOOL_NAMES_V1_1.length,
+  "Current MCP tool count differs from the Version 1.1 contract",
+);
 invariant(
   JSON.stringify(CURRENT_COMPANION_TOOL_NAMES) === JSON.stringify(MCP_TOOL_NAMES_V1_1),
   "Runtime MCP tool order differs from the additive Version 1.1 contract",
@@ -108,8 +111,8 @@ invariant(
   "Generated current MCP manifest is not Version 1.1",
 );
 invariant(
-  currentContract.toolCount === 60,
-  "Generated current MCP manifest does not contain 60 tools",
+  currentContract.toolCount === MCP_TOOL_NAMES_V1_1.length,
+  "Generated current MCP manifest has the wrong tool count",
 );
 invariant(
   JSON.stringify(currentContract.tools.map((tool) => tool.name)) ===
@@ -184,5 +187,5 @@ for (const expected of [
 }
 
 process.stdout.write(
-  `Release metadata verified: ${expectedVersion}, 48 frozen Version 1.0 tools, 60 current tools, profile v1, database v${DATABASE_SCHEMA_VERSION}, provider API v${PROVIDER_PLUGIN_API_VERSION}.\n`,
+  `Release metadata verified: ${expectedVersion}, 48 frozen Version 1.0 tools, ${MCP_TOOL_NAMES_V1_1.length} current tools, profile v1, database v${DATABASE_SCHEMA_VERSION}, provider API v${PROVIDER_PLUGIN_API_VERSION}.\n`,
 );
