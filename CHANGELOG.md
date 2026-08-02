@@ -18,10 +18,25 @@ semantic versioning.
 - First-run catalogue population, startup stale checks, configurable background
   refresh, central health aggregation, a desktop diagnostics centre, and
   redacted diagnostic export.
-- MCP contract 1.1 with twelve additive strict tools while preserving the
+- MCP contract 1.1 with forty-five additive strict tools while preserving the
   original 48-tool Version 1.0 prefix.
 - Read-only GitHub Releases update checks, a weekly live-provider contract
   monitor, deterministic fault injection, and Node.js 22/24 CI coverage.
+- Explicit native-real, browser-live-development, browser-preview, and
+  automated-test boundaries with a persistent preview warning and native
+  no-demo regression gate.
+- Versioned private holdings, cash, acquisition costs, GE trade journal,
+  watchlists, market preferences, selected profile, and isolated paper portfolio.
+- Independent Weird Gloop RS3 price/volume history and RuneScape news adapters,
+  quest parse-coverage reporting, and backend-enforced offline mode.
+- Deterministic market indicators, component scoring, held-only sell logic,
+  manual order plans, portfolio analytics, and chronological delayed-fill
+  backtesting.
+- Thirty-three additional real-data/private-market MCP tools after the twelve
+  maintenance tools, for 93 tools total while retaining the frozen 48-tool
+  Version 1.0 contract.
+- Eleven-stage first-run synchronisation and real desktop market tabs with
+  manual holdings/import/export, trade journal, watchlists, and paper trading.
 
 ### Changed
 

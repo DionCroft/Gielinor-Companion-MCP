@@ -75,7 +75,7 @@ invariant(
   "Profile export schema version changed unexpectedly",
 );
 invariant(PROVIDER_PLUGIN_API_VERSION === 1, "Provider plugin API version changed unexpectedly");
-invariant(DATABASE_SCHEMA_VERSION === 7, "Database schema version changed unexpectedly");
+invariant(DATABASE_SCHEMA_VERSION === 8, "Database schema version changed unexpectedly");
 invariant(
   DATABASE_MIGRATIONS.at(-1)?.version === DATABASE_SCHEMA_VERSION,
   "Database schema version does not match the migration chain",
@@ -139,6 +139,9 @@ const requiredFiles = [
   "SECURITY.md",
   "docs/architecture/migrations.md",
   "docs/architecture/overview.md",
+  "docs/architecture/real-data-flow.md",
+  "docs/architecture/player-private-data.md",
+  "docs/architecture/market-intelligence.md",
   "docs/architecture/provider-plugins.md",
   "docs/architecture/resilience.md",
   "docs/architecture/scheduler.md",
@@ -156,12 +159,16 @@ const requiredFiles = [
   "docs/installation/local-mcp.md",
   "docs/installation/ollama.md",
   "docs/mcp-tools/README.md",
+  "docs/data-sources/ge-market-data.md",
+  "docs/guides/holdings-and-trade-journal.md",
+  "docs/guides/ge-recommendations.md",
   "docs/releases/v1.1.0-completion.md",
   "docs/releases/v1.1.0.md",
   "docs/security/release-integrity.md",
   "docs/testing/release-validation.md",
   "docs/testing/fault-injection.md",
   "docs/testing/live-provider-monitoring.md",
+  "docs/testing/market-backtesting.md",
   "docs/testing/node-compatibility.md",
 ];
 await Promise.all(requiredFiles.map((path) => access(resolve(root, path))));

@@ -17,7 +17,7 @@
     "url": "https://github.com/DionCroft/Gielinor-Companion-MCP/issues"
   },
   "scripts": {
-    "build": "corepack pnpm --filter @gielinor/shared-types build && corepack pnpm --filter @gielinor/core build && corepack pnpm --filter @gielinor/providers build && corepack pnpm --filter @gielinor/database build && corepack pnpm --filter @gielinor/mcp-server build && corepack pnpm --filter @gielinor/hosted-server build && corepack pnpm --filter @gielinor/alt1-overlay build && corepack pnpm --filter @gielinor/agent-runtime build && corepack pnpm --filter @gielinor/desktop build",
+    "build": "corepack pnpm --filter @gielinor/shared-types build && corepack pnpm --filter @gielinor/core build && corepack pnpm --filter @gielinor/providers build && corepack pnpm --filter @gielinor/database build && corepack pnpm --filter @gielinor/mcp-server build && corepack pnpm --filter @gielinor/hosted-server build && corepack pnpm --filter @gielinor/alt1-overlay build && corepack pnpm --filter @gielinor/agent-runtime build && corepack pnpm --filter @gielinor/desktop build && node scripts/verify-safety-boundary.mjs",
     "typecheck": "corepack pnpm build",
     "test": "corepack pnpm build && vitest run && corepack pnpm --filter @gielinor/desktop test",
     "test:unit": "corepack pnpm build && vitest run packages/core/test packages/providers/test packages/agent-runtime/test apps/mcp-server/test/schemas.test.ts",
@@ -43,7 +43,8 @@
     "test:desktop:rust": "cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml",
     "test:real-data-boundaries": "corepack pnpm --filter @gielinor/desktop exec vitest run src/lib/bridge.test.ts src/App.test.tsx -t \"runtime boundaries|Preview data\" && node scripts/verify-native-real-boundary.mjs",
     "test:no-demo-native": "corepack pnpm --filter @gielinor/desktop exec vitest run src/lib/bridge.test.ts && node scripts/verify-native-real-boundary.mjs",
-    "test:market-intelligence": "corepack pnpm build && vitest run packages/core/test/market-intelligence-service.test.ts packages/providers/test/weird-gloop-market.test.ts",
+    "test:safety": "node scripts/verify-safety-boundary.mjs && corepack pnpm --filter @gielinor/alt1-overlay test",
+    "test:market-intelligence": "corepack pnpm build && vitest run packages/core/test/market-intelligence-service.test.ts packages/providers/test/jagex-providers.test.ts packages/providers/test/weird-gloop-market.test.ts",
     "test:portfolio": "corepack pnpm build && vitest run packages/core/test/market-intelligence-service.test.ts -t portfolio",
     "test:backtesting": "corepack pnpm build && vitest run packages/core/test/market-intelligence-service.test.ts -t backtesting",
     "desktop:dev": "corepack pnpm --filter @gielinor/desktop tauri:dev",
@@ -56,6 +57,7 @@
     "test:live:training": "corepack pnpm build && node scripts/run-live-tests.mjs training",
     "test:live:prices": "corepack pnpm build && node scripts/run-live-tests.mjs prices",
     "test:live:updates": "corepack pnpm build && node scripts/run-live-tests.mjs updates",
+    "test:live:market": "corepack pnpm build && node scripts/run-live-tests.mjs market",
     "test:live:monitor": "corepack pnpm build && node scripts/run-live-monitor.mjs",
     "test:live:ollama": "corepack pnpm build && node scripts/run-local-ai-smoke.mjs ollama",
     "test:live:lm-studio": "corepack pnpm build && node scripts/run-local-ai-smoke.mjs lm-studio",
@@ -76,6 +78,7 @@
     "verify:error-docs": "corepack pnpm --filter @gielinor/shared-types build && node scripts/generate-error-docs.mjs --check",
     "verify:docs": "node scripts/verify-doc-links.mjs",
     "verify:release": "corepack pnpm build && node scripts/verify-release.mjs",
+    "verify:safety": "node scripts/verify-safety-boundary.mjs",
     "pack:release": "corepack pnpm build && node scripts/pack-release.mjs",
     "smoke:clean-install": "corepack pnpm build && node scripts/clean-install-smoke.mjs",
     "capture:screenshots": "corepack pnpm --filter @gielinor/desktop capture:screenshots"

@@ -70,7 +70,12 @@ export function parseWeirdGloopNews(payload: unknown, retrievedAt: string): Rune
     const title = text(record.title ?? record.name);
     const url = text(record.url ?? record.link);
     const publishedAt = dateTime(
-      record.publishedAt ?? record.published_at ?? record.date ?? record.timestamp,
+      record.publishedAt ??
+        record.published_at ??
+        record.datePublished ??
+        record.dateAdded ??
+        record.date ??
+        record.timestamp,
     );
     if (
       title === undefined ||
@@ -160,6 +165,10 @@ export class WeirdGloopRuneScapeNewsProvider implements RuneScapeNewsProvider {
         validate: (value) => RuneScapeNewsSnapshotSchema.parse(value),
       },
     );
-    return result.value;
+    return RuneScapeNewsSnapshotSchema.parse({
+      ...result.value,
+      dataState: result.status === "miss" ? "live-public-data" : "retained-cached-data",
+      cacheStatus: result.status,
+    });
   }
 }

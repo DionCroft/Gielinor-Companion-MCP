@@ -1,12 +1,20 @@
 import { createHash } from "node:crypto";
 
-import type { GrandExchangeDataProvider, ProviderRequestOptions } from "@gielinor/core";
+import type {
+  GrandExchangeDataProvider,
+  MarketHistoryProvider,
+  ProviderRequestOptions,
+} from "@gielinor/core";
 import {
   GrandExchangeItemSchema,
+  MarketHistorySeriesSchema,
+  MarketPriceObservationSchema,
   PriceCatalogueItemSchema,
   PriceDataSnapshotSchema,
   PricePointSchema,
   type GrandExchangeItem,
+  type MarketHistorySeries,
+  type MarketPriceObservation,
   type PriceCatalogueItem,
   type PriceDataSnapshot,
   type PriceHistoryRange,
@@ -17,6 +25,7 @@ import { z } from "zod";
 import {
   MemoryCacheStore,
   StaleWhileRevalidateCache,
+  type CachedLoadResult,
   type CachePolicy,
   type CacheStore,
 } from "./cache.js";
@@ -74,6 +83,7 @@ const HISTORY_RANGE_MS: Record<PriceHistoryRange, number> = {
 
 const BULK_SOURCE_NAME = "RuneScape Wiki Grand Exchange Market Watch bulk dump";
 const BULK_SOURCE_URL = "https://chisel.weirdgloop.org/gazproj/gazbot/rs_dump.json";
+const GRAPH_SOURCE_NAME = "Jagex Grand Exchange ItemDB graph";
 
 export type JagexGrandExchangeOptions = {
   httpClient: ResilientHttpClient;
@@ -150,7 +160,9 @@ export function parseCompactPrice(value: number | string): number {
   return price;
 }
 
-export class JagexGrandExchangeProvider implements GrandExchangeDataProvider {
+export class JagexGrandExchangeProvider
+  implements GrandExchangeDataProvider, MarketHistoryProvider
+{
   private readonly cache: StaleWhileRevalidateCache;
   private readonly cachePolicy: CachePolicy;
   private readonly historyCachePolicy: CachePolicy;
@@ -366,15 +378,14 @@ export class JagexGrandExchangeProvider implements GrandExchangeDataProvider {
     });
   }
 
-  public async getPriceHistory(
+  private async loadPriceHistory(
     itemId: number,
-    range: PriceHistoryRange,
     requestOptions: ProviderRequestOptions = {},
-  ): Promise<PricePoint[]> {
+  ): Promise<CachedLoadResult<PricePoint[]>> {
     if (!Number.isSafeInteger(itemId) || itemId <= 0) {
       throw new ProviderError("Item ID must be a positive integer", "INVALID_ITEM_ID", false);
     }
-    const fullHistory = await this.cache.load<PricePoint[]>(
+    return this.cache.load<PricePoint[]>(
       `ge:history:${itemId}`,
       this.historyCachePolicy,
       async () => {
@@ -421,14 +432,70 @@ export class JagexGrandExchangeProvider implements GrandExchangeDataProvider {
       requestOptions.forceRefresh ?? false,
       requestOptions.offline ?? false,
       {
-        provider: "Jagex Grand Exchange ItemDB graph",
+        provider: GRAPH_SOURCE_NAME,
         scope: "public-grand-exchange",
         validate: (value) => z.array(PricePointSchema).parse(value),
       },
     );
+  }
 
-    const latestTimestamp = Date.parse(fullHistory.value.at(-1)?.timestamp ?? "");
+  private filterHistory(points: PricePoint[], range: PriceHistoryRange): PricePoint[] {
+    const latestTimestamp = Date.parse(points.at(-1)?.timestamp ?? "");
     const cutoff = latestTimestamp - HISTORY_RANGE_MS[range];
-    return fullHistory.value.filter((point) => Date.parse(point.timestamp) >= cutoff);
+    return points.filter((point) => Date.parse(point.timestamp) >= cutoff);
+  }
+
+  public async getPriceHistory(
+    itemId: number,
+    range: PriceHistoryRange,
+    requestOptions: ProviderRequestOptions = {},
+  ): Promise<PricePoint[]> {
+    const loaded = await this.loadPriceHistory(itemId, requestOptions);
+    return this.filterHistory(loaded.value, range);
+  }
+
+  public async getHistory(
+    itemId: number,
+    range: PriceHistoryRange,
+    requestOptions: ProviderRequestOptions = {},
+  ): Promise<MarketHistorySeries> {
+    const loaded = await this.loadPriceHistory(itemId, requestOptions);
+    const points = this.filterHistory(loaded.value, range).map(({ timestamp, price }) => ({
+      timestamp,
+      price,
+    }));
+    return MarketHistorySeriesSchema.parse({
+      itemId,
+      points,
+      retrievedAt: new Date(loaded.metadata.lastSuccessfulRefreshAt).toISOString(),
+      sourceName: GRAPH_SOURCE_NAME,
+      sourceUrl: new URL(`${this.graphEndpoint.replace(/\/?$/, "/")}${itemId}.json`).toString(),
+      dataState: loaded.status === "miss" ? "live-public-data" : "retained-cached-data",
+      cacheStatus: loaded.status,
+    });
+  }
+
+  public async getLatest(
+    itemId: number,
+    requestOptions: ProviderRequestOptions = {},
+  ): Promise<MarketPriceObservation> {
+    const series = await this.getHistory(itemId, "180d", requestOptions);
+    const latest = series.points.at(-1);
+    if (latest === undefined) {
+      throw new ProviderError(
+        "Jagex ItemDB latest graph value is unavailable",
+        "PRICE_HISTORY_UNAVAILABLE",
+        false,
+      );
+    }
+    return MarketPriceObservationSchema.parse({
+      itemId,
+      ...latest,
+      retrievedAt: series.retrievedAt,
+      sourceName: series.sourceName,
+      sourceUrl: series.sourceUrl,
+      ...(series.dataState === undefined ? {} : { dataState: series.dataState }),
+      ...(series.cacheStatus === undefined ? {} : { cacheStatus: series.cacheStatus }),
+    });
   }
 }

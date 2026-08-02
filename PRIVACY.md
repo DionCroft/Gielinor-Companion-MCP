@@ -8,6 +8,8 @@ account, and do not collect telemetry.
 
 - A RuneScape display name and public Hiscores snapshot.
 - Manually selected account mode, quest state, planning preferences, and goals.
+- Versioned local holdings/cash snapshots, optional acquisition prices, GE
+  trade journal, watchlists, selected profile, and hypothetical paper trades.
 - Validated public quest, training, and Grand Exchange cache records.
 - Redacted error codes, provider health, scheduler attempts, recovery events,
   and bounded invalid-cache quarantine metadata.
@@ -64,8 +66,9 @@ deletion, legal-jurisdiction, and contact terms. See
 
 ## Exports and logs
 
-Profile export contains public and manually entered companion data. Treat it as
-personal data if a display name identifies you. Standard logs redact tokens,
+Profile and holdings exports contain public and manually entered companion
+data. Treat them as personal data if a display name or trading history identifies
+you. Standard logs redact tokens,
 tool arguments, display names, provider bodies, profile content, local paths,
 and stack traces.
 

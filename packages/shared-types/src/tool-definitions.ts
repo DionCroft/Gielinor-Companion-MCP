@@ -531,7 +531,7 @@ export const COMPANION_TOOL_DEFINITIONS_V1_1_ADDITIONS = {
     effect: "local-state",
   },
   get_provider_disagreements: {
-    description: "Identify material Jagex guide-price versus Weird Gloop RS3-history differences.",
+    description: "Identify material Weird Gloop RS3-history versus Jagex ItemDB-graph differences.",
     inputSchema: ScanGeOpportunitiesToolInputSchema,
     effect: "read-only",
   },

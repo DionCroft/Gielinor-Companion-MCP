@@ -11,6 +11,7 @@ import { z } from "zod";
 import {
   MemoryCacheStore,
   StaleWhileRevalidateCache,
+  type CacheStatus,
   type CachePolicy,
   type CacheStore,
 } from "./cache.js";
@@ -176,7 +177,7 @@ export class WeirdGloopExchangeHistoryProvider implements MarketHistoryProvider 
   private async loadHistory(
     itemId: number,
     options: ProviderRequestOptions,
-  ): Promise<NormalisedPoint[]> {
+  ): Promise<{ points: NormalisedPoint[]; status: CacheStatus }> {
     const loaded = await this.cache.load<NormalisedPoint[]>(
       `weird-gloop:history:${itemId}`,
       this.cachePolicy,
@@ -211,7 +212,7 @@ export class WeirdGloopExchangeHistoryProvider implements MarketHistoryProvider 
             })),
       },
     );
-    return loaded.value;
+    return { points: loaded.value, status: loaded.status };
   }
 
   public async getLatest(
@@ -219,7 +220,8 @@ export class WeirdGloopExchangeHistoryProvider implements MarketHistoryProvider 
     options: ProviderRequestOptions = {},
   ): Promise<MarketPriceObservation> {
     this.validateItemId(itemId);
-    const points = await this.loadHistory(itemId, options);
+    const loaded = await this.loadHistory(itemId, options);
+    const points = loaded.points;
     const latest = points.at(-1);
     if (latest === undefined) {
       throw new ProviderError(
@@ -234,6 +236,8 @@ export class WeirdGloopExchangeHistoryProvider implements MarketHistoryProvider 
       retrievedAt: new Date(this.now()).toISOString(),
       sourceName: SOURCE_NAME,
       sourceUrl: new URL(`all?id=${itemId}`, this.endpoint.replace(/\/?$/, "/")).toString(),
+      dataState: loaded.status === "miss" ? "live-public-data" : "retained-cached-data",
+      cacheStatus: loaded.status,
     });
   }
 
@@ -243,7 +247,8 @@ export class WeirdGloopExchangeHistoryProvider implements MarketHistoryProvider 
     options: ProviderRequestOptions = {},
   ): Promise<MarketHistorySeries> {
     this.validateItemId(itemId);
-    const points = await this.loadHistory(itemId, options);
+    const loaded = await this.loadHistory(itemId, options);
+    const points = loaded.points;
     const latest = Date.parse(points.at(-1)?.timestamp ?? "");
     const cutoff = latest - RANGE_MILLISECONDS[range];
     const filtered = points.filter((point) => Date.parse(point.timestamp) >= cutoff);
@@ -253,6 +258,8 @@ export class WeirdGloopExchangeHistoryProvider implements MarketHistoryProvider 
       retrievedAt: new Date(this.now()).toISOString(),
       sourceName: SOURCE_NAME,
       sourceUrl: new URL(`all?id=${itemId}`, this.endpoint.replace(/\/?$/, "/")).toString(),
+      dataState: loaded.status === "miss" ? "live-public-data" : "retained-cached-data",
+      cacheStatus: loaded.status,
     });
   }
 }

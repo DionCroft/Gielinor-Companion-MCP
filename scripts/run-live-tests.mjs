@@ -25,6 +25,7 @@ const selections = {
   ],
   training: ["packages/providers/test/runescape-wiki-training.live.test.ts"],
   updates: ["apps/mcp-server/test/update-service.live.test.ts"],
+  market: ["packages/providers/test/weird-gloop-market.live.test.ts"],
 };
 
 const selection = selections[suite];

@@ -15,6 +15,7 @@ import {
   type QuestDataProvider,
   type TrainingMethodProvider,
   type MarketHistoryProvider,
+  type RuneScapeNewsProvider,
 } from "@gielinor/core";
 import {
   openResilientDatabase,
@@ -33,6 +34,7 @@ import {
   CompanionToolService,
   createCatalogueMaintenanceRuntime,
   loadMaintenanceRuntimePolicy,
+  OfflineModeController,
   RuntimeDiagnosticsService,
   SoftwareUpdateService,
   softwareUpdateChecksEnabled,
@@ -116,7 +118,9 @@ export class HostedServiceFactory {
   private readonly questProvider: QuestDataProvider;
   private readonly trainingProvider: TrainingMethodProvider;
   private readonly marketHistoryProvider: MarketHistoryProvider;
-  private readonly offline: boolean;
+  private readonly comparisonHistoryProvider: MarketHistoryProvider;
+  private readonly newsProvider: RuneScapeNewsProvider;
+  private readonly offlineMode: OfflineModeController;
   private readonly maintenancePolicy: MaintenanceRuntimePolicy;
   private readonly diagnosticsRepository: SqliteDiagnosticsRepository | undefined;
   private readonly maintenanceQuests: QuestService;
@@ -136,7 +140,6 @@ export class HostedServiceFactory {
       ...environment,
       GIELINOR_USER_AGENT: config.userAgent,
     });
-    this.offline = providerConfig.offline;
     this.maintenancePolicy = loadMaintenanceRuntimePolicy({
       ...environment,
       GIELINOR_MAINTENANCE_ENABLED: String(config.maintenanceEnabled),
@@ -144,7 +147,10 @@ export class HostedServiceFactory {
     this.publicDatabaseRuntime = openResilientDatabase(config.publicDatabasePath);
     this.publicDatabase = this.publicDatabaseRuntime.database;
     this.cacheStore = new SqliteCacheStore(this.publicDatabase);
-    const providers = createDefaultProviderStack(providerConfig, this.cacheStore);
+    this.offlineMode = new OfflineModeController(this.publicDatabase, providerConfig.offline);
+    const providers = createDefaultProviderStack(providerConfig, this.cacheStore, () =>
+      this.offlineMode.isOffline(),
+    );
     this.providerRegistry = providers.registry;
     this.statsProvider = providers.ports;
     this.priceProvider = providers.ports;
@@ -154,6 +160,8 @@ export class HostedServiceFactory {
     this.questProvider = providers.ports.quests;
     this.trainingProvider = providers.ports.training;
     this.marketHistoryProvider = providers.marketHistory;
+    this.comparisonHistoryProvider = providers.jagexMarketHistory;
+    this.newsProvider = providers.news;
     this.diagnosticsRepository =
       this.publicDatabaseRuntime.state.status === "safe-mode"
         ? undefined
@@ -183,7 +191,7 @@ export class HostedServiceFactory {
       installedVersion: APPLICATION_VERSION,
       cacheStore: this.cacheStore,
       userAgent: config.userAgent,
-      offline: this.offline,
+      offline: () => this.offlineMode.isOffline(),
       enabled: softwareUpdateChecksEnabled(environment),
       checkIntervalMs: this.maintenancePolicy.intervals["software-update-check"],
     });
@@ -228,6 +236,9 @@ export class HostedServiceFactory {
             this.priceRepository,
             this.marketHistoryProvider,
             playerPrivateData,
+            Date.now,
+            this.newsProvider,
+            this.comparisonHistoryProvider,
           );
     const tools = restrictToolService(
       new CompanionToolService(
@@ -239,6 +250,8 @@ export class HostedServiceFactory {
         this.diagnostics,
         playerPrivateData,
         marketIntelligence,
+        this.offlineMode,
+        "hosted-real",
       ),
       actor,
     );
@@ -345,7 +358,7 @@ export class HostedServiceFactory {
       quests: this.maintenanceQuests,
       planner: this.maintenancePlanner,
       exchange: this.maintenanceExchange,
-      offline: this.offline,
+      offline: () => this.offlineMode.isOffline(),
       policy: this.maintenancePolicy,
       diagnostics: this.diagnosticsRepository,
       updateChecker: this.updateChecker,
@@ -394,7 +407,7 @@ export class HostedServiceFactory {
       maintenance: this.maintenance,
       maintenancePolicy: this.maintenancePolicy,
       updateChecker: this.updateChecker,
-      offline: this.offline,
+      offline: () => this.offlineMode.isOffline(),
       repository: this.diagnosticsRepository,
       configuration: {
         accountCreationEnabled: this.config.accountCreationEnabled,

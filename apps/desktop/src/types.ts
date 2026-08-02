@@ -48,14 +48,24 @@ export type DesktopSoftwareUpdateCheck = SoftwareUpdateCheck;
 export type DataStatus = {
   state: "never-synced" | "ready" | "failed";
   provider?: string;
+  sourceRevision?: string;
   lastSuccessfulSyncAt?: string;
   lastAttemptAt?: string;
+  lastErrorCode?: string;
   lastErrorMessage?: string;
   questCount?: number;
   methodCount?: number;
   itemCount?: number;
   historyPointCount?: number;
   coveredSkills?: string[];
+  coverage?: {
+    totalQuests: number;
+    questsWithPrerequisiteData: number;
+    questsWithSkillRequirements: number;
+    questsWithItemRequirements: number;
+    questsWithStructuredRewards: number;
+    parseWarningsByField: Record<string, number>;
+  };
 };
 
 export type QuestSummary = {

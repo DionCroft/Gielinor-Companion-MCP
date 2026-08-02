@@ -511,18 +511,6 @@ export function createCompanionServer(
   );
 
   server.registerTool(
-    "create_account_aware_quest_shopping_list",
-    {
-      description:
-        "Aggregate required quest items and optionally subtract the selected profile's confirmed user-entered holdings.",
-      inputSchema: CreateQuestShoppingListToolInputSchema.shape,
-      annotations: { readOnlyHint: true },
-    },
-    ({ profileId, quest, subtractOwned }) =>
-      run(() => tools.createQuestShoppingList(profileId, quest, subtractOwned)),
-  );
-
-  server.registerTool(
     "refresh_quest_data",
     {
       description:
@@ -1096,7 +1084,7 @@ export function createCompanionServer(
     "get_provider_disagreements",
     {
       description:
-        "List material differences between Jagex guide values and Weird Gloop RS3 history for explicit items.",
+        "List material differences between Weird Gloop RS3 history and the independent Jagex ItemDB graph for explicit items.",
       inputSchema: ScanGeOpportunitiesToolInputSchema,
       annotations: { readOnlyHint: true },
     },
@@ -1135,6 +1123,18 @@ export function createCompanionServer(
       annotations: { destructiveHint: false, idempotentHint: false },
     },
     (input) => run(() => tools.recordPaperTrade(input)),
+  );
+
+  server.registerTool(
+    "create_account_aware_quest_shopping_list",
+    {
+      description:
+        "Aggregate required quest items and optionally subtract the selected profile's confirmed user-entered holdings.",
+      inputSchema: CreateQuestShoppingListToolInputSchema.shape,
+      annotations: { readOnlyHint: true },
+    },
+    ({ profileId, quest, subtractOwned }) =>
+      run(() => tools.createQuestShoppingList(profileId, quest, subtractOwned)),
   );
 
   return server;

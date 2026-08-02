@@ -11,6 +11,7 @@ import {
   type MarketBacktestResult,
   type MarketComponentScores,
   type MarketHistorySeries,
+  type MarketEventContext,
   type MarketIndicators,
   type MarketPreferences,
   type MarketRecommendation,
@@ -19,12 +20,19 @@ import {
 } from "@gielinor/shared-types";
 
 import { CompanionError, NotFoundError } from "./errors.js";
-import type { MarketHistoryProvider, PriceRepository, ProviderRequestOptions } from "./ports.js";
+import type {
+  MarketHistoryProvider,
+  PriceRepository,
+  ProviderRequestOptions,
+  RuneScapeNewsProvider,
+} from "./ports.js";
 import type { PlayerPrivateDataService } from "./player-private-data-service.js";
 
 const DAY_MS = 24 * 60 * 60_000;
 const DISCLAIMER =
   "Manual analytical signal using public RS3 guide-price history; it is not a guaranteed instant-trade price and no Grand Exchange offer is placed.";
+const EVENT_CORRELATION_DISCLAIMER =
+  "The published update mentions this item; correlation does not prove that it caused a market move." as const;
 
 function clamp(value: number, minimum = 0, maximum = 100): number {
   return Math.min(maximum, Math.max(minimum, value));
@@ -96,6 +104,7 @@ function scoreComponent(score: number, ...reasons: string[]) {
 export function calculateMarketIndicators(
   item: PriceCatalogueItem,
   series: MarketHistorySeries,
+  comparisonSeries?: MarketHistorySeries,
 ): MarketIndicators {
   if (item.currentPrice === undefined) {
     throw new CompanionError("The item has no published guide price", "PRICE_UNAVAILABLE");
@@ -103,6 +112,7 @@ export function calculateMarketIndicators(
   const prices = series.points.map((point) => point.price);
   const current = item.currentPrice;
   const latest = series.points.at(-1);
+  const comparisonLatest = comparisonSeries?.points.at(-1);
   if (latest === undefined) {
     throw new CompanionError("No usable market history is available", "PRICE_HISTORY_UNAVAILABLE");
   }
@@ -160,7 +170,20 @@ export function calculateMarketIndicators(
     outlierScore:
       distributionDeviation === 0 ? 0 : round((current - distributionMean) / distributionDeviation),
     providerDifferencePercent:
-      latest.price === 0 ? 0 : round((Math.abs(current - latest.price) / latest.price) * 100),
+      (comparisonLatest?.price ?? latest.price) === 0
+        ? 0
+        : round(
+            (Math.abs(latest.price - (comparisonLatest?.price ?? current)) /
+              (comparisonLatest?.price ?? latest.price)) *
+              100,
+          ),
+    ...(comparisonLatest === undefined
+      ? {}
+      : {
+          comparisonHistoryPrice: comparisonLatest.price,
+          comparisonHistoryTimestamp: comparisonLatest.timestamp,
+          comparisonProviderName: comparisonSeries?.sourceName,
+        }),
     historyPointCount: prices.length,
     ...(item.buyLimit === undefined ? {} : { buyLimit: item.buyLimit }),
     guidePriceTimestamp: item.timestamp,
@@ -288,13 +311,15 @@ function classification(
   preferences: MarketPreferences,
   heldQuantity: number,
   acquisitionPrice?: number,
+  confidencePenalty = 0,
 ): MarketRecommendationType {
-  const confidence = Math.min(
-    scores.freshness.score,
-    scores.sourceConfidence.score,
-    scores.userFit.score,
+  const confidence = Math.max(
+    0,
+    Math.min(scores.freshness.score, scores.sourceConfidence.score, scores.userFit.score) -
+      confidencePenalty,
   );
   const overall = scores.overallOpportunity.score;
+  const volume = indicators.averageVolume30d ?? indicators.latestVolume;
   if (indicators.historyPointCount < MARKET_STRATEGY_CONFIGURATION_V1.minimumHistoryPoints)
     return "insufficient-data";
   if (
@@ -313,13 +338,70 @@ function classification(
       (indicators.change7dPercent ?? 0) < 0
     )
       return "sell-candidate";
-    if (scores.trend.score < 30 || scores.volatilityRisk.score < 20) return "reduce";
+    if (
+      scores.trend.score < 30 ||
+      scores.volatilityRisk.score < 20 ||
+      (indicators.dailyReturnVolatilityPercent ?? 0) >=
+        MARKET_STRATEGY_CONFIGURATION_V1.extremeVolatilityPercent
+    )
+      return "reduce";
     return "hold";
   }
+  if (preferences.avoidNewOrUnstableItems && indicators.historyPointCount < 90) return "avoid";
+  if (
+    (indicators.dailyReturnVolatilityPercent ?? 0) >=
+    MARKET_STRATEGY_CONFIGURATION_V1.extremeVolatilityPercent
+  )
+    return "avoid";
+  if (
+    preferences.minimumVolume !== undefined &&
+    (volume === undefined || volume < preferences.minimumVolume)
+  )
+    return "avoid";
   if (overall >= MARKET_STRATEGY_CONFIGURATION_V1.strongBuyThreshold && confidence >= 75)
     return "strong-buy-candidate";
   if (overall >= MARKET_STRATEGY_CONFIGURATION_V1.buyThreshold) return "buy-candidate";
   return "watch";
+}
+
+function normaliseNewsText(value: string): string {
+  return value
+    .normalize("NFKC")
+    .toLocaleLowerCase("en-GB")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function sourceBackedEventContext(
+  item: PriceCatalogueItem,
+  items: Awaited<ReturnType<RuneScapeNewsProvider["fetchNews"]>>["items"],
+  now: number,
+): MarketEventContext[] {
+  const names = [item.name, ...item.aliases]
+    .map(normaliseNewsText)
+    .filter((name) => name.length >= 3);
+  const oldest = now - 30 * DAY_MS;
+  return items.flatMap((newsItem) => {
+    if (Date.parse(newsItem.publishedAt) < oldest) return [];
+    const normalisedTags = newsItem.tags.map(normaliseNewsText);
+    const exactSourceTag = names.some((name) => normalisedTags.includes(name));
+    const normalisedTitle = ` ${normaliseNewsText(newsItem.title)} `;
+    const exactTitleName = names.some((name) => normalisedTitle.includes(` ${name} `));
+    if (!exactSourceTag && !exactTitleName) return [];
+    return [
+      {
+        newsItemId: newsItem.id,
+        title: newsItem.title,
+        url: newsItem.url,
+        publishedAt: newsItem.publishedAt,
+        tags: newsItem.tags,
+        matchBasis: exactSourceTag
+          ? ("exact-source-tag" as const)
+          : ("exact-item-name-in-title" as const),
+        correlationDisclaimer: EVENT_CORRELATION_DISCLAIMER,
+      },
+    ];
+  });
 }
 
 export class MarketIntelligenceService {
@@ -328,6 +410,8 @@ export class MarketIntelligenceService {
     private readonly history: MarketHistoryProvider,
     private readonly privateData: PlayerPrivateDataService,
     private readonly now: () => number = Date.now,
+    private readonly news?: RuneScapeNewsProvider,
+    private readonly comparisonHistory?: MarketHistoryProvider,
   ) {}
 
   public async analyseGeItem(
@@ -342,6 +426,26 @@ export class MarketIntelligenceService {
       this.privateData.getMarketPreferences(profileId),
     ]);
     const holding = holdings?.items.find((entry) => entry.itemId === item.itemId);
+    let eventContext: MarketEventContext[] = [];
+    let newsRetrievedAt: string | undefined;
+    let newsSourceName: string | undefined;
+    let newsSourceUrl: string | undefined;
+    let newsDataState: "live-public-data" | "retained-cached-data" | undefined;
+    let newsUnavailable = false;
+    if (this.news !== undefined) {
+      try {
+        const snapshot = await this.news.fetchNews(options);
+        eventContext = sourceBackedEventContext(item, snapshot.items, this.now());
+        if (eventContext.length > 0) {
+          newsRetrievedAt = snapshot.retrievedAt;
+          newsSourceName = snapshot.sourceName;
+          newsSourceUrl = snapshot.sourceUrl;
+          newsDataState = snapshot.dataState ?? "retained-cached-data";
+        }
+      } catch {
+        newsUnavailable = true;
+      }
+    }
     const base = {
       strategyVersion: MARKET_STRATEGY_CONFIGURATION_V1.version,
       profileId,
@@ -356,11 +460,12 @@ export class MarketIntelligenceService {
           provider: item.sourceName,
           url: item.sourceUrl,
           retrievedAt: item.retrievedAt,
-          state: "live-public-data" as const,
+          state: "retained-cached-data" as const,
         },
       ],
       analysedAt: new Date(this.now()).toISOString(),
       disclaimer: DISCLAIMER,
+      ...(eventContext.length === 0 ? {} : { eventContext }),
     };
     if (item.currentPrice === undefined) {
       return MarketRecommendationSchema.parse({
@@ -373,22 +478,61 @@ export class MarketIntelligenceService {
       });
     }
     let series: MarketHistorySeries;
+    let comparisonSeries: MarketHistorySeries | undefined;
+    let primaryHistoryUnavailable = false;
+    let comparisonHistoryUnavailable = false;
     try {
       series = await this.history.getHistory(item.itemId, "180d", options);
     } catch (error) {
-      return MarketRecommendationSchema.parse({
-        ...base,
-        recommendation: "insufficient-data",
-        confidence: 0,
-        topReasons: ["Validated public history is unavailable."],
-        warnings: [error instanceof Error ? error.message : "History provider failed."],
-        scores: emptyScores("History unavailable."),
-      });
+      primaryHistoryUnavailable = true;
+      if (this.comparisonHistory === undefined) {
+        return MarketRecommendationSchema.parse({
+          ...base,
+          recommendation: "insufficient-data",
+          confidence: 0,
+          topReasons: ["Validated public history is unavailable."],
+          warnings: [error instanceof Error ? error.message : "History provider failed."],
+          scores: emptyScores("History unavailable."),
+        });
+      }
+      try {
+        series = await this.comparisonHistory.getHistory(item.itemId, "180d", options);
+      } catch (fallbackError) {
+        return MarketRecommendationSchema.parse({
+          ...base,
+          recommendation: "insufficient-data",
+          confidence: 0,
+          topReasons: ["Validated public history is unavailable from both providers."],
+          warnings: [
+            error instanceof Error ? error.message : "Primary history provider failed.",
+            fallbackError instanceof Error
+              ? fallbackError.message
+              : "Fallback history provider failed.",
+          ],
+          scores: emptyScores("History unavailable."),
+        });
+      }
     }
-    const indicators = calculateMarketIndicators(item, series);
+    if (!primaryHistoryUnavailable && this.comparisonHistory !== undefined) {
+      try {
+        comparisonSeries = await this.comparisonHistory.getHistory(item.itemId, "180d", options);
+      } catch {
+        comparisonHistoryUnavailable = true;
+      }
+    }
+    const indicators = calculateMarketIndicators(item, series, comparisonSeries);
     const scores = scoreMarketIndicators(indicators, preferences, this.now());
+    const eventInstability =
+      eventContext.length > 0 &&
+      (indicators.dailyReturnVolatilityPercent ?? 0) >=
+        MARKET_STRATEGY_CONFIGURATION_V1.extremeVolatilityPercent;
+    const confidencePenalty = eventInstability ? 15 : 0;
     const confidence = round(
-      Math.min(scores.freshness.score, scores.sourceConfidence.score, scores.userFit.score),
+      Math.max(
+        0,
+        Math.min(scores.freshness.score, scores.sourceConfidence.score, scores.userFit.score) -
+          confidencePenalty,
+      ),
     );
     const recommendation = classification(
       indicators,
@@ -396,6 +540,7 @@ export class MarketIntelligenceService {
       preferences,
       holding?.quantity ?? 0,
       holding?.averageAcquisitionPrice,
+      confidencePenalty,
     );
     const warnings = ["RS3 public sources provide guide prices/history, not a live order book."];
     if (
@@ -404,6 +549,21 @@ export class MarketIntelligenceService {
       warnings.push("Public providers materially disagree; confidence is reduced.");
     if (scores.freshness.score < 50)
       warnings.push("Market history is stale; confidence and recommendation strength are reduced.");
+    if (newsUnavailable)
+      warnings.push("RuneScape news context was unavailable; no event link was inferred.");
+    if (primaryHistoryUnavailable)
+      warnings.push(
+        "Weird Gloop history was unavailable; Jagex graph history was used as fallback.",
+      );
+    if (comparisonHistoryUnavailable)
+      warnings.push(
+        "Jagex graph comparison was unavailable; provider agreement could not be checked.",
+      );
+    if (eventContext.length > 0) warnings.push(EVENT_CORRELATION_DISCLAIMER);
+    if (eventInstability)
+      warnings.push(
+        "A recent source-backed item mention coincides with extreme volatility; confidence was reduced by 15 points.",
+      );
     if (recommendation === "sell-candidate" && holding === undefined)
       throw new CompanionError(
         "Unheld items cannot receive sell recommendations",
@@ -427,11 +587,30 @@ export class MarketIntelligenceService {
           provider: series.sourceName,
           url: series.sourceUrl,
           retrievedAt: series.retrievedAt,
-          state:
-            options.offline === true
-              ? ("retained-cached-data" as const)
-              : ("live-public-data" as const),
+          state: series.dataState ?? ("retained-cached-data" as const),
         },
+        ...(comparisonSeries === undefined
+          ? []
+          : [
+              {
+                provider: comparisonSeries.sourceName,
+                url: comparisonSeries.sourceUrl,
+                retrievedAt: comparisonSeries.retrievedAt,
+                state: comparisonSeries.dataState ?? ("retained-cached-data" as const),
+              },
+            ]),
+        ...(newsRetrievedAt === undefined ||
+        newsSourceName === undefined ||
+        newsSourceUrl === undefined
+          ? []
+          : [
+              {
+                provider: newsSourceName,
+                url: newsSourceUrl,
+                retrievedAt: newsRetrievedAt,
+                state: newsDataState ?? ("retained-cached-data" as const),
+              },
+            ]),
       ],
     });
   }
@@ -650,7 +829,14 @@ export function backtestMarketSeries(
   let equity = input.initialGp;
   let peak = equity;
   let maximumDrawdown = 0;
+  let walkForwardWindows = 0;
+  const confidenceBands = {
+    low: { signals: 0, returns: [] as number[] },
+    medium: { signals: 0, returns: [] as number[] },
+    high: { signals: 0, returns: [] as number[] },
+  };
   for (let index = split; index < points.length - input.fillDelayDays - 1; index += 1) {
+    walkForwardWindows += 1;
     const prefix = points.slice(0, index + 1).map((point) => point.price);
     if (prefix.length < 30) {
       insufficient += 1;
@@ -661,7 +847,13 @@ export function backtestMarketSeries(
     const current = prefix.at(-1) ?? 0;
     const sevenAgo = prefix.at(-8);
     if (current <= sma7 || sma7 <= sma30 || sevenAgo === undefined || current <= sevenAgo) continue;
+    const momentum7Percent = percentageChange(current, sevenAgo) ?? 0;
+    const spreadPercent = sma30 === 0 ? 0 : ((sma7 - sma30) / sma30) * 100;
+    const signalConfidence = clamp(50 + momentum7Percent * 4 + spreadPercent * 6);
+    const confidenceBand =
+      signalConfidence >= 75 ? "high" : signalConfidence >= 50 ? "medium" : "low";
     signals += 1;
+    confidenceBands[confidenceBand].signals += 1;
     const fillIndex = index + input.fillDelayDays;
     const exitIndex = Math.min(fillIndex + input.maximumHoldingDays, points.length - 1);
     const rawEntry = points[fillIndex]?.price;
@@ -686,6 +878,7 @@ export function backtestMarketSeries(
     equity += proceeds - invested;
     turnover += invested + proceeds;
     returns.push(tradeReturn);
+    confidenceBands[confidenceBand].returns.push(tradeReturn);
     holdings.push(exitIndex - fillIndex);
     peak = Math.max(peak, equity);
     maximumDrawdown = Math.max(maximumDrawdown, peak === 0 ? 0 : ((peak - equity) / peak) * 100);
@@ -712,12 +905,29 @@ export function backtestMarketSeries(
     turnoverGp: safe(turnover, "Backtest turnover"),
     averageHoldingDays: round(mean(holdings) ?? 0),
     insufficientDataCount: insufficient,
+    walkForwardWindowCount: walkForwardWindows,
+    resultsByConfidenceBand: (["low", "medium", "high"] as const).map((band) => {
+      const result = confidenceBands[band];
+      return {
+        band,
+        signalCount: result.signals,
+        completedTradeCount: result.returns.length,
+        hitRatePercent:
+          result.returns.length === 0
+            ? 0
+            : round(
+                (result.returns.filter((value) => value > 0).length / result.returns.length) * 100,
+              ),
+        meanReturnPercent: round(mean(result.returns) ?? 0),
+      };
+    }),
     trainingPeriod: { from: points[0]?.timestamp, to: points[split - 1]?.timestamp },
     evaluationPeriod: { from: points[split]?.timestamp, to: points.at(-1)?.timestamp },
     protections: [
       "Signals use only observations at or before the simulated signal date.",
       "The fixed strategy configuration is not tuned against the evaluation period.",
       "A separate chronological training/evaluation split is enforced.",
+      "Evaluation uses sequential expanding-history walk-forward windows without future observations.",
       "Fill delay, slippage, buy limits, and insufficient-history exclusions are applied.",
       "Evaluation advances after each simulated holding period to avoid overlapping capital.",
     ],
