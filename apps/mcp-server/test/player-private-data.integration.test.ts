@@ -124,5 +124,28 @@ describe("player-private data over the real MCP boundary", () => {
       arguments: { profileId },
     });
     expect((trades.structuredContent as { data: unknown[] }).data).toHaveLength(1);
+
+    const paperTrade = await client.callTool({
+      name: "record_paper_trade",
+      arguments: {
+        profileId,
+        itemId: 4151,
+        side: "buy",
+        quantity: 2,
+        unitPrice: 80_000,
+        initialCashGp: 1_000_000,
+      },
+    });
+    expect(paperTrade.structuredContent).toMatchObject({
+      data: { cashGp: 840_000, holdings: [{ itemId: 4151, quantity: 2 }] },
+      meta: { source: expect.stringContaining("hypothetical") },
+    });
+    const paperPortfolio = await client.callTool({
+      name: "get_paper_portfolio",
+      arguments: { profileId },
+    });
+    expect(paperPortfolio.structuredContent).toMatchObject({
+      data: { cashGp: 840_000, trades: [{ source: "paper-simulation" }] },
+    });
   });
 });

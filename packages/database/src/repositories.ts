@@ -21,6 +21,7 @@ import {
   PriceSyncResultSchema,
   QuestDataSnapshotSchema,
   QuestDataStatusSchema,
+  QuestCoverageReportSchema,
   QuestSchema,
   QuestSyncResultSchema,
   SkillIdSchema,
@@ -172,6 +173,23 @@ function parseQuest(row: QuestRow): Quest {
       cause: error,
     });
   }
+}
+
+function questCoverage(quests: Quest[]) {
+  const parseWarningsByField: Record<string, number> = {};
+  for (const warning of quests.flatMap((quest) => quest.parseWarnings)) {
+    parseWarningsByField[warning.field] = (parseWarningsByField[warning.field] ?? 0) + 1;
+  }
+  return QuestCoverageReportSchema.parse({
+    totalQuests: quests.length,
+    questsWithPrerequisiteData: quests.filter((quest) => quest.prerequisiteGroups.length > 0)
+      .length,
+    questsWithSkillRequirements: quests.filter((quest) => quest.skillRequirements.length > 0)
+      .length,
+    questsWithItemRequirements: quests.filter((quest) => quest.itemRequirements.length > 0).length,
+    questsWithStructuredRewards: quests.filter((quest) => quest.rewards.length > 0).length,
+    parseWarningsByField,
+  });
 }
 
 function parseTrainingMethod(row: TrainingMethodRow): TrainingMethod {
@@ -692,6 +710,7 @@ export class SqliteQuestRepository implements QuestRepository {
       updated,
       unchanged,
       removed,
+      ...(validated.coverage === undefined ? {} : { coverage: validated.coverage }),
     });
   }
 
@@ -710,6 +729,7 @@ export class SqliteQuestRepository implements QuestRepository {
         questCount: 0,
       });
     }
+    const coverage = row.quest_count === 0 ? undefined : questCoverage(await this.list());
     return QuestDataStatusSchema.parse({
       state: row.state,
       ...(row.provider === null ? {} : { provider: row.provider }),
@@ -719,6 +739,7 @@ export class SqliteQuestRepository implements QuestRepository {
         ? {}
         : { lastSuccessfulSyncAt: row.last_successful_sync_at }),
       questCount: row.quest_count,
+      ...(coverage === undefined ? {} : { coverage }),
       ...(row.last_error_code === null ? {} : { lastErrorCode: row.last_error_code }),
       ...(row.last_error_message === null ? {} : { lastErrorMessage: row.last_error_message }),
     });

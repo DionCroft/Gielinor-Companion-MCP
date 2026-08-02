@@ -98,4 +98,13 @@ export const MCP_TOOL_NAMES_V1_1 = Object.freeze([
   "explain_ge_recommendation",
   "backtest_ge_strategy",
   "get_portfolio_summary",
+  "get_real_data_status",
+  "refresh_all_real_data",
+  "get_market_data_status",
+  "refresh_market_data",
+  "get_provider_disagreements",
+  "set_offline_mode",
+  "get_paper_portfolio",
+  "record_paper_trade",
+  "create_account_aware_quest_shopping_list",
 ] as const);

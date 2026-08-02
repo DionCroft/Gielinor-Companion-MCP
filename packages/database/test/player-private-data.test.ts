@@ -4,7 +4,11 @@ import { PlayerPrivateDataService } from "@gielinor/core";
 import { PlayerProfileSchema } from "@gielinor/shared-types";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { DATABASE_SCHEMA_VERSION, getDatabaseSchemaVersion, openDatabase } from "../src/connection.js";
+import {
+  DATABASE_SCHEMA_VERSION,
+  getDatabaseSchemaVersion,
+  openDatabase,
+} from "../src/connection.js";
 import { SqlitePlayerPrivateDataRepository } from "../src/private-data-repository.js";
 import { SqlitePlayerProfileRepository } from "../src/repositories.js";
 
@@ -70,9 +74,9 @@ describe("player-private market data", () => {
     expect(second.cashGp).toBe(2_000_000);
     expect(
       (
-        database
-          .prepare("SELECT COUNT(*) AS count FROM player_holdings_snapshots")
-          .get() as { count: number }
+        database.prepare("SELECT COUNT(*) AS count FROM player_holdings_snapshots").get() as {
+          count: number;
+        }
       ).count,
     ).toBe(2);
   });
@@ -98,9 +102,7 @@ describe("player-private market data", () => {
       confirmReplace: true,
     });
     expect(imported.source).toBe("csv-import");
-    expect(imported.items.find((item) => item.itemId === 4151)?.notes).toBe(
-      "manual, confirmed",
-    );
+    expect(imported.items.find((item) => item.itemId === 4151)?.notes).toBe("manual, confirmed");
 
     const csv = await privateData.exportHoldings(profile.id, "csv");
     expect(csv.content).toContain('4151,2,80000,"manual, confirmed"');
@@ -166,5 +168,52 @@ describe("player-private market data", () => {
 
     await expect(privateData.removeTrade(profile.id, trade.id)).resolves.toEqual({ removed: true });
     expect(await privateData.listTrades(profile.id)).toEqual([]);
+  });
+
+  it("persists constrained paper trades without affecting real holdings or GP", async () => {
+    const { profiles, privateData } = setup();
+    const profile = PlayerProfileSchema.parse({
+      id: randomUUID(),
+      displayName: "Paper Hero",
+      gameMode: "normal",
+      skills: [],
+      completedQuestIds: [],
+      inProgressQuestIds: [],
+      goals: [],
+    });
+    await profiles.create(profile);
+
+    const bought = await privateData.recordPaperTrade({
+      profileId: profile.id,
+      itemId: 4151,
+      side: "buy",
+      quantity: 2,
+      unitPrice: 80_000,
+      initialCashGp: 1_000_000,
+    });
+    expect(bought).toMatchObject({
+      initialCashGp: 1_000_000,
+      cashGp: 840_000,
+      holdings: [{ itemId: 4151, quantity: 2, averageAcquisitionPrice: 80_000 }],
+    });
+    const sold = await privateData.recordPaperTrade({
+      profileId: profile.id,
+      itemId: 4151,
+      side: "sell",
+      quantity: 1,
+      unitPrice: 90_000,
+    });
+    expect(sold).toMatchObject({ cashGp: 930_000, holdings: [{ quantity: 1 }] });
+    expect(await privateData.getPaperPortfolio(profile.id)).toEqual(sold);
+    await expect(
+      privateData.recordPaperTrade({
+        profileId: profile.id,
+        itemId: 4151,
+        side: "sell",
+        quantity: 2,
+        unitPrice: 90_000,
+      }),
+    ).rejects.toThrow(/cannot sell more/);
+    expect(await privateData.getHoldings(profile.id)).toBeNull();
   });
 });

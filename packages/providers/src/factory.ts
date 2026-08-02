@@ -20,6 +20,7 @@ export type DefaultProviderStack = {
 export function createDefaultProviderStack(
   config: ProviderConfig,
   cacheStore: CacheStore,
+  offline: boolean | (() => boolean) = config.offline,
 ): DefaultProviderStack {
   const httpClient = new ResilientHttpClient({
     userAgent: config.userAgent,
@@ -67,7 +68,7 @@ export function createDefaultProviderStack(
   registry.register(createBuiltinProviderPlugin({ stats, prices, quests, training }));
   return {
     registry,
-    ports: new ProviderPortAdapter(registry, config.offline),
+    ports: new ProviderPortAdapter(registry, offline),
     marketHistory,
     news,
   };

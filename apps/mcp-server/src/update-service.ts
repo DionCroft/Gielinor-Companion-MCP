@@ -83,7 +83,7 @@ export type SoftwareUpdateServiceOptions = {
   installedVersion: string;
   cacheStore: CacheStore;
   userAgent: string;
-  offline?: boolean | undefined;
+  offline?: boolean | (() => boolean) | undefined;
   enabled?: boolean | undefined;
   apiUrl?: string | undefined;
   checkIntervalMs?: number | undefined;
@@ -290,7 +290,7 @@ export class SoftwareUpdateService {
     if (!this.enabled) {
       return this.result("disabled", "Software update checks are disabled", traceId, "none");
     }
-    if (this.options.offline ?? false) {
+    if (this.isOffline()) {
       return this.offlineResult(cached, options.includePrereleases ?? false, traceId);
     }
     if (
@@ -364,7 +364,7 @@ export class SoftwareUpdateService {
         checkedAt,
       };
     }
-    if (this.options.offline ?? false) {
+    if (this.isOffline()) {
       return {
         id: "update-checker",
         state: "offline",
@@ -603,5 +603,11 @@ export class SoftwareUpdateService {
       }
     }
     throw lastError;
+  }
+
+  private isOffline(): boolean {
+    return typeof this.options.offline === "function"
+      ? this.options.offline()
+      : (this.options.offline ?? false);
   }
 }

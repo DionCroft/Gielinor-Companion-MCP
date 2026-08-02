@@ -6,6 +6,7 @@ import type {
   MarketHistorySeries,
   MarketPriceObservation,
   MarketWatchlist,
+  PaperPortfolio,
   PlayerProfile,
   PlayerHoldingsSnapshot,
   PlayerStatsResult,
@@ -107,6 +108,8 @@ export interface PlayerPrivateDataRepository {
   saveWatchlist(watchlist: MarketWatchlist): Promise<MarketWatchlist>;
   getSelectedProfile(): Promise<{ profileId: string; selectedAt: string } | null>;
   setSelectedProfile(profileId: string, selectedAt: string): Promise<void>;
+  getPaperPortfolio(profileId: string): Promise<PaperPortfolio | null>;
+  savePaperPortfolio(portfolio: PaperPortfolio): Promise<PaperPortfolio>;
 }
 
 export interface QuestDataProvider {

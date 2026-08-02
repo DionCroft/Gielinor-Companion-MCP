@@ -160,6 +160,14 @@ describe("RuneScapeWikiQuestProvider", () => {
     expect(snapshot.provider).toBe("RuneScape Wiki");
     expect(snapshot.sourceRevision).toMatch(/^900:[a-f0-9]{64}$/);
     expect(snapshot.quests).toHaveLength(2);
+    expect(snapshot.coverage).toEqual({
+      totalQuests: 2,
+      questsWithPrerequisiteData: 1,
+      questsWithSkillRequirements: 2,
+      questsWithItemRequirements: 2,
+      questsWithStructuredRewards: 2,
+      parseWarningsByField: {},
+    });
     expect(snapshot.quests.find((quest) => quest.id === "target-quest")).toMatchObject({
       name: "Target Quest",
       members: true,

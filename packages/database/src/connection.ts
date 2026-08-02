@@ -4,7 +4,7 @@ import { dirname, resolve } from "node:path";
 import Database from "better-sqlite3";
 
 export type DatabaseConnection = Database.Database;
-export const DATABASE_SCHEMA_VERSION = 7;
+export const DATABASE_SCHEMA_VERSION = 8;
 
 export type DatabaseMigration = {
   version: number;
@@ -380,6 +380,20 @@ export const DATABASE_MIGRATIONS: readonly DatabaseMigration[] = [
         profile_id TEXT NOT NULL REFERENCES player_profiles(id) ON DELETE CASCADE,
         selected_at TEXT NOT NULL
       );
+    `,
+  },
+  {
+    version: 8,
+    name: "paper-trading",
+    sql: `
+      CREATE TABLE paper_portfolios (
+        profile_id TEXT PRIMARY KEY REFERENCES player_profiles(id) ON DELETE CASCADE,
+        portfolio_json TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+
+      CREATE INDEX idx_paper_portfolios_updated_at
+        ON paper_portfolios(updated_at DESC);
     `,
   },
 ];

@@ -91,6 +91,15 @@ const ALLOWED_TOOLS: &[&str] = &[
     "explain_ge_recommendation",
     "backtest_ge_strategy",
     "get_portfolio_summary",
+    "get_real_data_status",
+    "refresh_all_real_data",
+    "get_market_data_status",
+    "refresh_market_data",
+    "get_provider_disagreements",
+    "set_offline_mode",
+    "get_paper_portfolio",
+    "record_paper_trade",
+    "create_account_aware_quest_shopping_list",
 ];
 const MAX_ARGUMENT_BYTES: usize = 256 * 1024;
 
@@ -391,7 +400,7 @@ mod tests {
         assert!(is_allowed_tool("create_levelling_plan"));
         assert!(!is_allowed_tool("run_shell_command"));
         assert!(!is_allowed_tool("../mcp-server"));
-        assert_eq!(ALLOWED_TOOLS.len(), 84);
+        assert_eq!(ALLOWED_TOOLS.len(), 93);
     }
 
     #[test]

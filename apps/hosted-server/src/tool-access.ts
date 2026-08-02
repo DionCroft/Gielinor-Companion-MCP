@@ -51,6 +51,10 @@ const PROFILE_METHODS = new Set<keyof CompanionToolService>([
   "createManualGeOrderPlan",
   "backtestGeStrategy",
   "getPortfolioSummary",
+  "getRealDataStatus",
+  "getProviderDisagreements",
+  "getPaperPortfolio",
+  "recordPaperTrade",
 ]);
 
 const OPERATOR_METHODS = new Set<keyof CompanionToolService>([
@@ -69,6 +73,9 @@ const OPERATOR_METHODS = new Set<keyof CompanionToolService>([
   "checkForSoftwareUpdates",
   "clearExpiredQuarantineRecords",
   "resetProviderCircuit",
+  "refreshAllRealData",
+  "refreshMarketData",
+  "setOfflineMode",
 ]);
 
 function authorize(

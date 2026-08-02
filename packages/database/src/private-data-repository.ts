@@ -4,10 +4,12 @@ import {
   MarketPreferencesSchema,
   MarketWatchlistSchema,
   PlayerHoldingsSnapshotSchema,
+  PaperPortfolioSchema,
   type GeTradeRecord,
   type MarketPreferences,
   type MarketWatchlist,
   type PlayerHoldingsSnapshot,
+  type PaperPortfolio,
 } from "@gielinor/shared-types";
 
 import type { DatabaseConnection } from "./connection.js";
@@ -34,9 +36,7 @@ export class SqlitePlayerPrivateDataRepository implements PlayerPrivateDataRepos
       : parseStored(row.snapshot_json, (value) => PlayerHoldingsSnapshotSchema.parse(value));
   }
 
-  public async saveHoldings(
-    snapshot: PlayerHoldingsSnapshot,
-  ): Promise<PlayerHoldingsSnapshot> {
+  public async saveHoldings(snapshot: PlayerHoldingsSnapshot): Promise<PlayerHoldingsSnapshot> {
     const parsed = PlayerHoldingsSnapshotSchema.parse(snapshot);
     this.database
       .prepare(
@@ -188,9 +188,7 @@ export class SqlitePlayerPrivateDataRepository implements PlayerPrivateDataRepos
 
   public async getSelectedProfile(): Promise<{ profileId: string; selectedAt: string } | null> {
     const row = this.database
-      .prepare(
-        "SELECT profile_id, selected_at FROM selected_player_profile WHERE singleton_id = 1",
-      )
+      .prepare("SELECT profile_id, selected_at FROM selected_player_profile WHERE singleton_id = 1")
       .get() as { profile_id: string; selected_at: string } | undefined;
     return row === undefined ? null : { profileId: row.profile_id, selectedAt: row.selected_at };
   }
@@ -205,5 +203,28 @@ export class SqlitePlayerPrivateDataRepository implements PlayerPrivateDataRepos
            selected_at = excluded.selected_at`,
       )
       .run(profileId, selectedAt);
+  }
+
+  public async getPaperPortfolio(profileId: string): Promise<PaperPortfolio | null> {
+    const row = this.database
+      .prepare("SELECT portfolio_json FROM paper_portfolios WHERE profile_id = ?")
+      .get(profileId) as { portfolio_json: string } | undefined;
+    return row === undefined
+      ? null
+      : parseStored(row.portfolio_json, (value) => PaperPortfolioSchema.parse(value));
+  }
+
+  public async savePaperPortfolio(portfolio: PaperPortfolio): Promise<PaperPortfolio> {
+    const parsed = PaperPortfolioSchema.parse(portfolio);
+    this.database
+      .prepare(
+        `INSERT INTO paper_portfolios (profile_id, portfolio_json, updated_at)
+         VALUES (?, ?, ?)
+         ON CONFLICT(profile_id) DO UPDATE SET
+           portfolio_json = excluded.portfolio_json,
+           updated_at = excluded.updated_at`,
+      )
+      .run(parsed.profileId, JSON.stringify(parsed), parsed.updatedAt);
+    return parsed;
   }
 }

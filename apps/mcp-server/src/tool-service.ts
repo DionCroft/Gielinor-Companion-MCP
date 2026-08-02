@@ -117,6 +117,11 @@ export type DiagnosticsToolBackend = {
   };
 };
 
+export type OfflineModeBackend = {
+  isOffline(): boolean;
+  setOffline(offline: boolean): { offline: boolean; enforcedBy: "backend" };
+};
+
 export function publicToolError(error: unknown): ToolError {
   if (!(error instanceof CompanionError)) {
     return createGielinorError("GC-MCP-003", {
@@ -142,6 +147,7 @@ export class CompanionToolService {
     private readonly diagnostics?: DiagnosticsToolBackend,
     private readonly playerPrivateData?: PlayerPrivateDataService,
     private readonly marketIntelligence?: MarketIntelligenceService,
+    private readonly offlineMode?: OfflineModeBackend,
   ) {}
 
   private questService(): QuestService {
@@ -190,6 +196,23 @@ export class CompanionToolService {
       );
     }
     return this.marketIntelligence;
+  }
+
+  private providerOptions(forceRefresh: boolean) {
+    return { forceRefresh, offline: this.offlineMode?.isOffline() ?? false };
+  }
+
+  private requireOnline(): void {
+    if (this.offlineMode?.isOffline() === true) {
+      throw new CompanionError(
+        "Network refresh is disabled by backend-enforced offline mode",
+        "OFFLINE_MODE",
+        {
+          gielinorCode: "GC-CACHE-001",
+          retryable: false,
+        },
+      );
+    }
   }
 
   public async getSystemHealth(): Promise<ToolEnvelope<SystemHealth>> {
@@ -576,7 +599,11 @@ export class CompanionToolService {
 
   public async analyseGeItem(profileId: string, item: ItemReference, forceRefresh = false) {
     return envelope(
-      await this.marketIntelligenceService().analyseGeItem(profileId, item, { forceRefresh }),
+      await this.marketIntelligenceService().analyseGeItem(
+        profileId,
+        item,
+        this.providerOptions(forceRefresh),
+      ),
       "deterministic RS3 market intelligence over public guide-price sources",
     );
   }
@@ -587,17 +614,21 @@ export class CompanionToolService {
     forceRefresh = false,
   ) {
     return envelope(
-      await this.marketIntelligenceService().scanGeOpportunities(profileId, items, {
-        forceRefresh,
-      }),
+      await this.marketIntelligenceService().scanGeOpportunities(
+        profileId,
+        items,
+        this.providerOptions(forceRefresh),
+      ),
       "versioned deterministic RS3 market scoring",
     );
   }
 
   public async getGeBuyCandidates(profileId: string, items: ItemReference[], forceRefresh = false) {
-    const results = await this.marketIntelligenceService().scanGeOpportunities(profileId, items, {
-      forceRefresh,
-    });
+    const results = await this.marketIntelligenceService().scanGeOpportunities(
+      profileId,
+      items,
+      this.providerOptions(forceRefresh),
+    );
     return envelope(
       results.filter(
         ({ recommendation }) =>
@@ -612,9 +643,11 @@ export class CompanionToolService {
     items: ItemReference[],
     forceRefresh = false,
   ) {
-    const results = await this.marketIntelligenceService().scanGeOpportunities(profileId, items, {
-      forceRefresh,
-    });
+    const results = await this.marketIntelligenceService().scanGeOpportunities(
+      profileId,
+      items,
+      this.providerOptions(forceRefresh),
+    );
     return envelope(
       results.filter(
         ({ recommendation }) => recommendation === "sell-candidate" || recommendation === "reduce",
@@ -629,9 +662,11 @@ export class CompanionToolService {
     forceRefresh = false,
   ) {
     return envelope(
-      await this.marketIntelligenceService().createManualOrderPlan(profileId, item, {
-        forceRefresh,
-      }),
+      await this.marketIntelligenceService().createManualOrderPlan(
+        profileId,
+        item,
+        this.providerOptions(forceRefresh),
+      ),
       "non-executing deterministic manual order plan",
     );
   }
@@ -642,7 +677,11 @@ export class CompanionToolService {
     forceRefresh = false,
   ) {
     return envelope(
-      await this.marketIntelligenceService().backtestGeStrategy(itemId, input, { forceRefresh }),
+      await this.marketIntelligenceService().backtestGeStrategy(
+        itemId,
+        input,
+        this.providerOptions(forceRefresh),
+      ),
       "chronological public guide-price backtest",
     );
   }
@@ -651,6 +690,134 @@ export class CompanionToolService {
     return envelope(
       await this.marketIntelligenceService().getPortfolioSummary(profileId),
       "user-entered holdings and public guide-price valuation",
+    );
+  }
+
+  public async getPaperPortfolio(profileId: string, initialCashGp?: number) {
+    return envelope(
+      await this.privateDataService().getPaperPortfolio(profileId, initialCashGp),
+      "private local hypothetical paper portfolio",
+    );
+  }
+
+  public async recordPaperTrade(input: {
+    profileId: string;
+    itemId: number;
+    side: "buy" | "sell";
+    quantity: number;
+    unitPrice: number;
+    occurredAt?: string | undefined;
+    initialCashGp?: number | undefined;
+  }) {
+    return envelope(
+      await this.privateDataService().recordPaperTrade(input),
+      "private local hypothetical paper trade; no RuneScape offer was placed",
+    );
+  }
+
+  public async setOfflineMode(offline: boolean) {
+    if (this.offlineMode === undefined) {
+      throw new CompanionError(
+        "Runtime offline-mode control is not configured",
+        "UNSUPPORTED_FEATURE",
+      );
+    }
+    return envelope(
+      this.offlineMode.setOffline(offline),
+      "backend-enforced persistent runtime mode",
+    );
+  }
+
+  public async getRealDataStatus() {
+    const [quests, training, prices] = await Promise.all([
+      this.questService().getDataStatus(),
+      this.plannerService().getDataStatus(),
+      this.exchangeService().getDataStatus(),
+    ]);
+    let selectedProfile: unknown;
+    try {
+      selectedProfile = await this.privateDataService().getSelectedPlayerSnapshot();
+    } catch {
+      selectedProfile = { state: "unavailable", reason: "No selected local profile." };
+    }
+    return envelope(
+      {
+        runtimeMode: "native-real",
+        offline: this.offlineMode?.isOffline() ?? false,
+        selectedProfile,
+        catalogues: { quests, training, prices },
+        truthfulness: "No fixture data is available in native-real mode.",
+      },
+      "real providers, retained SQLite catalogues, and private local state",
+    );
+  }
+
+  public async refreshAllRealData() {
+    this.requireOnline();
+    const stages: Array<{
+      stage: string;
+      status: "complete" | "failed" | "skipped";
+      data?: unknown;
+      error?: ToolError;
+    }> = [];
+    try {
+      const selected = await this.privateDataService().getSelectedPlayerSnapshot();
+      stages.push({
+        stage: "player-hiscores",
+        status: "complete",
+        data: await this.profiles.refreshStats(selected.profile.id),
+      });
+    } catch (error) {
+      stages.push({ stage: "player-hiscores", status: "skipped", error: publicToolError(error) });
+    }
+    for (const [stage, operation] of [
+      ["quests", () => this.questService().refreshData()],
+      ["training", () => this.plannerService().refreshData()],
+      ["grand-exchange", () => this.exchangeService().refreshData()],
+    ] as const) {
+      try {
+        stages.push({ stage, status: "complete", data: await operation() });
+      } catch (error) {
+        stages.push({ stage, status: "failed", error: publicToolError(error) });
+      }
+    }
+    return envelope(
+      { stages, limited: stages.some(({ status }) => status !== "complete") },
+      "validated public RuneScape providers with transactional local retention",
+    );
+  }
+
+  public async getMarketDataStatus() {
+    return envelope(
+      {
+        ...(await this.exchangeService().getDataStatus()),
+        offline: this.offlineMode?.isOffline() ?? false,
+      },
+      "local RS3 Grand Exchange catalogue and history status",
+    );
+  }
+
+  public async refreshMarketData(itemIds: number[] = []) {
+    this.requireOnline();
+    return envelope(
+      await this.exchangeService().refreshData(itemIds),
+      "validated RS3 Grand Exchange public providers",
+    );
+  }
+
+  public async getProviderDisagreements(
+    profileId: string,
+    items: ItemReference[],
+    forceRefresh = false,
+  ) {
+    const results = await this.marketIntelligenceService().scanGeOpportunities(
+      profileId,
+      items,
+      this.providerOptions(forceRefresh),
+    );
+    return envelope(
+      results.filter((result) => (result.indicators?.providerDifferencePercent ?? 0) >= 10),
+      "Jagex guide values compared with Weird Gloop RS3 history",
     );
   }
 
@@ -930,10 +1097,112 @@ export class CompanionToolService {
     );
   }
 
-  public async createQuestShoppingList(profileId: string, identifier: string) {
+  public async createQuestShoppingList(
+    profileId: string,
+    identifier: string,
+    subtractOwned = false,
+  ) {
+    const shoppingList = await this.questService().createShoppingList(profileId, identifier);
+    if (!subtractOwned) {
+      return envelope(
+        shoppingList,
+        "deterministic quest route and validated RuneScape Wiki item requirements",
+      );
+    }
+
+    const holdings = await this.privateDataService().getHoldings(profileId);
+    if (holdings === null) {
+      return envelope(
+        {
+          ...shoppingList,
+          subtraction: {
+            requested: true,
+            status: "unavailable",
+            dataClassification: "unavailable",
+            assumptions: [
+              "No confirmed local holdings snapshot exists, so required quantities were not reduced.",
+            ],
+            unresolvedItems: shoppingList.items.map((item) => item.name),
+            satisfiedItems: [],
+          },
+        },
+        "validated RuneScape Wiki requirements; confirmed local holdings unavailable",
+      );
+    }
+
+    const ownedByItemId = new Map(
+      holdings.items.map((holding) => [holding.itemId, holding.quantity] as const),
+    );
+    const unresolvedItems: string[] = [];
+    const satisfiedItems: Array<{
+      name: string;
+      itemId: number;
+      requiredQuantity: number;
+      ownedQuantityApplied: number;
+    }> = [];
+    const remainingItems = [];
+
+    for (const item of shoppingList.items) {
+      let itemId = item.itemId;
+      if (itemId === undefined) {
+        try {
+          itemId = (await this.exchangeService().getItemDetails(item.name)).itemId;
+        } catch (error) {
+          if (!(error instanceof NotFoundError)) {
+            throw error;
+          }
+        }
+      }
+      if (itemId === undefined) {
+        unresolvedItems.push(item.name);
+        remainingItems.push({
+          ...item,
+          requiredQuantity: item.quantity,
+          ownedQuantityApplied: 0,
+        });
+        continue;
+      }
+      const ownedQuantityApplied = Math.min(ownedByItemId.get(itemId) ?? 0, item.quantity);
+      const remainingQuantity = item.quantity - ownedQuantityApplied;
+      if (remainingQuantity === 0) {
+        satisfiedItems.push({
+          name: item.name,
+          itemId,
+          requiredQuantity: item.quantity,
+          ownedQuantityApplied,
+        });
+        continue;
+      }
+      remainingItems.push({
+        ...item,
+        itemId,
+        quantity: remainingQuantity,
+        requiredQuantity: item.quantity,
+        ownedQuantityApplied,
+      });
+    }
+
     return envelope(
-      await this.questService().createShoppingList(profileId, identifier),
-      "deterministic quest route and validated RuneScape Wiki item requirements",
+      {
+        ...shoppingList,
+        items: remainingItems,
+        subtraction: {
+          requested: true,
+          status: "applied",
+          dataClassification: "user-entered local data",
+          holdingsSnapshotId: holdings.snapshotId,
+          holdingsCapturedAt: holdings.capturedAt,
+          holdingsSource: holdings.source,
+          unresolvedItems,
+          satisfiedItems,
+          assumptions: [
+            "Only quantities in the selected profile's latest confirmed holdings snapshot were subtracted.",
+            "Items that could not be resolved to an exact Grand Exchange item ID were left unchanged.",
+            "Alternative quest items were not subtracted automatically.",
+          ],
+        },
+      },
+      "validated RuneScape Wiki requirements and user-entered local holdings",
     );
   }
 

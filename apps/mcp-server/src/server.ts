@@ -14,12 +14,14 @@ import {
   CreateLevellingPlanToolInputSchema,
   CreateMarketWatchlistToolInputSchema,
   CreatePlayerProfileToolInputSchema,
+  CreateQuestShoppingListToolInputSchema,
   CreateWeeklyGoalPlanToolInputSchema,
   EmptyInputSchema,
   ExportPriceDataToolInputSchema,
   ExportPlayerHoldingsToolInputSchema,
   GetItemPriceToolInputSchema,
   GetMarketWatchlistToolInputSchema,
+  GetPaperPortfolioToolInputSchema,
   GetPlayerStatsToolInputSchema,
   GetSkillProgressToolInputSchema,
   GetTrainingMethodToolInputSchema,
@@ -37,12 +39,14 @@ import {
   RefreshPriceDataToolInputSchema,
   RefreshStaleCataloguesToolInputSchema,
   RecordGeTradeToolInputSchema,
+  RecordPaperTradeToolInputSchema,
   RemoveGeTradeToolInputSchema,
   ReplacePlayerHoldingsToolInputSchema,
   ResetProviderCircuitToolInputSchema,
   RetryFailedOperationToolInputSchema,
   SearchItemsToolInputSchema,
   ScanGeOpportunitiesToolInputSchema,
+  SetOfflineModeToolInputSchema,
   SearchQuestsToolInputSchema,
   SetMultipleQuestStatusesToolInputSchema,
   SetQuestStatusToolInputSchema,
@@ -504,6 +508,18 @@ export function createCompanionServer(
       annotations: { readOnlyHint: true },
     },
     ({ profileId, quest }) => run(() => tools.createQuestShoppingList(profileId, quest)),
+  );
+
+  server.registerTool(
+    "create_account_aware_quest_shopping_list",
+    {
+      description:
+        "Aggregate required quest items and optionally subtract the selected profile's confirmed user-entered holdings.",
+      inputSchema: CreateQuestShoppingListToolInputSchema.shape,
+      annotations: { readOnlyHint: true },
+    },
+    ({ profileId, quest, subtractOwned }) =>
+      run(() => tools.createQuestShoppingList(profileId, quest, subtractOwned)),
   );
 
   server.registerTool(
@@ -1030,6 +1046,95 @@ export function createCompanionServer(
       annotations: { readOnlyHint: true },
     },
     ({ profileId }) => run(() => tools.getPortfolioSummary(profileId)),
+  );
+
+  server.registerTool(
+    "get_real_data_status",
+    {
+      description:
+        "Read the truthful native runtime, backend offline state, selected profile and every real catalogue status.",
+      inputSchema: EmptyInputSchema,
+      annotations: { readOnlyHint: true },
+    },
+    () => run(() => tools.getRealDataStatus()),
+  );
+
+  server.registerTool(
+    "refresh_all_real_data",
+    {
+      description:
+        "Run isolated stages for selected-profile Hiscores, quests, training and GE data; valid stages survive other failures.",
+      inputSchema: EmptyInputSchema,
+      annotations: { destructiveHint: false, idempotentHint: true },
+    },
+    () => run(() => tools.refreshAllRealData()),
+  );
+
+  server.registerTool(
+    "get_market_data_status",
+    {
+      description:
+        "Read local RS3 GE catalogue and price-history status, timestamps, counts and offline state.",
+      inputSchema: EmptyInputSchema,
+      annotations: { readOnlyHint: true },
+    },
+    () => run(() => tools.getMarketDataStatus()),
+  );
+
+  server.registerTool(
+    "refresh_market_data",
+    {
+      description:
+        "Transactionally refresh the RS3 GE catalogue and optional item histories; unavailable in offline mode.",
+      inputSchema: RefreshPriceDataToolInputSchema,
+      annotations: { destructiveHint: false, idempotentHint: true },
+    },
+    ({ itemIds }) => run(() => tools.refreshMarketData(itemIds)),
+  );
+
+  server.registerTool(
+    "get_provider_disagreements",
+    {
+      description:
+        "List material differences between Jagex guide values and Weird Gloop RS3 history for explicit items.",
+      inputSchema: ScanGeOpportunitiesToolInputSchema,
+      annotations: { readOnlyHint: true },
+    },
+    ({ profileId, items, forceRefresh }) =>
+      run(() => tools.getProviderDisagreements(profileId, items, forceRefresh)),
+  );
+
+  server.registerTool(
+    "set_offline_mode",
+    {
+      description:
+        "Persist backend-enforced offline mode; enabling it stops provider, update and scheduler network calls.",
+      inputSchema: SetOfflineModeToolInputSchema,
+      annotations: { destructiveHint: false, idempotentHint: true },
+    },
+    ({ offline }) => run(() => tools.setOfflineMode(offline)),
+  );
+
+  server.registerTool(
+    "get_paper_portfolio",
+    {
+      description:
+        "Read a private hypothetical portfolio with simulated cash, holdings and trades.",
+      inputSchema: GetPaperPortfolioToolInputSchema,
+      annotations: { readOnlyHint: true },
+    },
+    ({ profileId, initialCashGp }) => run(() => tools.getPaperPortfolio(profileId, initialCashGp)),
+  );
+
+  server.registerTool(
+    "record_paper_trade",
+    {
+      description:
+        "Record a hypothetical buy or sell constrained by simulated cash/holdings; no RuneScape offer is placed.",
+      inputSchema: RecordPaperTradeToolInputSchema,
+      annotations: { destructiveHint: false, idempotentHint: false },
+    },
+    (input) => run(() => tools.recordPaperTrade(input)),
   );
 
   return server;

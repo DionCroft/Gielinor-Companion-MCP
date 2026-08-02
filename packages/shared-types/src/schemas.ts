@@ -134,9 +134,37 @@ export const QuestSchema = z
     sourceUpdatedAt: isoDateTime.optional(),
     contentHash: z.string().regex(/^[a-f0-9]{64}$/),
     lastCheckedAt: isoDateTime,
+    parseWarnings: z
+      .array(
+        z
+          .object({
+            field: z.enum([
+              "prerequisites",
+              "skillRequirements",
+              "itemRequirements",
+              "recommendedItems",
+              "rewards",
+            ]),
+            message: z.string().min(1),
+          })
+          .strict(),
+      )
+      .default([]),
   })
   .strict();
 export type Quest = z.infer<typeof QuestSchema>;
+
+export const QuestCoverageReportSchema = z
+  .object({
+    totalQuests: nonNegativeInteger,
+    questsWithPrerequisiteData: nonNegativeInteger,
+    questsWithSkillRequirements: nonNegativeInteger,
+    questsWithItemRequirements: nonNegativeInteger,
+    questsWithStructuredRewards: nonNegativeInteger,
+    parseWarningsByField: z.record(z.string(), nonNegativeInteger),
+  })
+  .strict();
+export type QuestCoverageReport = z.infer<typeof QuestCoverageReportSchema>;
 
 export const QuestDataSnapshotSchema = z
   .object({
@@ -145,6 +173,7 @@ export const QuestDataSnapshotSchema = z
     sourceRevision: z.string().min(1),
     retrievedAt: isoDateTime,
     quests: z.array(QuestSchema).min(1),
+    coverage: QuestCoverageReportSchema.optional(),
   })
   .strict();
 export type QuestDataSnapshot = z.infer<typeof QuestDataSnapshotSchema>;
@@ -159,6 +188,7 @@ export const QuestSyncResultSchema = z
     updated: nonNegativeInteger,
     unchanged: nonNegativeInteger,
     removed: nonNegativeInteger,
+    coverage: QuestCoverageReportSchema.optional(),
   })
   .strict();
 export type QuestSyncResult = z.infer<typeof QuestSyncResultSchema>;
@@ -173,6 +203,7 @@ export const QuestDataStatusSchema = z
     questCount: nonNegativeInteger,
     lastErrorCode: z.string().min(1).optional(),
     lastErrorMessage: z.string().min(1).optional(),
+    coverage: QuestCoverageReportSchema.optional(),
   })
   .strict();
 export type QuestDataStatus = z.infer<typeof QuestDataStatusSchema>;
