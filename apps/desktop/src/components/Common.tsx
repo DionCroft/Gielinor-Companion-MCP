@@ -1,5 +1,7 @@
 import type { ReactNode } from "react";
 
+import type { RuntimeStatus } from "../types.js";
+
 import { Icon } from "./Icon.js";
 
 export function PageHeader({
@@ -76,6 +78,19 @@ export function InlineAlert({
     <div className={`inline-alert alert-${tone}`} role={tone === "error" ? "alert" : "status"}>
       <Icon name={tone === "error" || tone === "warning" ? "warning" : "check"} size={18} />
       <div>{children}</div>
+    </div>
+  );
+}
+
+export function RuntimeDataBanner({ runtime }: { runtime?: RuntimeStatus | undefined }) {
+  if (runtime?.mode !== "browser-preview" && runtime?.mode !== "automated-test") {
+    return null;
+  }
+  return (
+    <div className="runtime-data-banner" role="note" data-runtime-mode={runtime.mode}>
+      <Icon name="warning" size={18} />
+      <strong>Preview data — not connected to RuneScape or your local profile.</strong>
+      <span>Every value on this screen is deterministic fixture data.</span>
     </div>
   );
 }

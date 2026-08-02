@@ -10,6 +10,12 @@ import {
   SkillIdSchema,
   TrainingStrategySchema,
 } from "./schemas.js";
+import {
+  MarketPreferencesSchema,
+  PlayerHoldingSchema,
+  PlayerPrivateDataSourceSchema,
+} from "./player-private-data.js";
+import { MarketBacktestInputSchema } from "./market-intelligence.js";
 
 export const EmptyInputSchema = z.object({}).strict();
 
@@ -327,3 +333,144 @@ export const ResetProviderCircuitToolInputSchema = z
     confirmed: z.literal(true),
   })
   .strict();
+
+export const ReplacePlayerHoldingsToolInputSchema = z
+  .object({
+    profileId: z.string().uuid(),
+    cashGp: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER).optional(),
+    items: z.array(PlayerHoldingSchema).max(20_000),
+    source: PlayerPrivateDataSourceSchema.optional(),
+    capturedAt: z.string().datetime({ offset: true }).optional(),
+    confirmReplace: z.literal(true),
+  })
+  .strict();
+
+export const UpsertPlayerHoldingToolInputSchema = z
+  .object({
+    profileId: z.string().uuid(),
+    holding: PlayerHoldingSchema,
+    cashGp: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER).optional(),
+    source: PlayerPrivateDataSourceSchema.optional(),
+  })
+  .strict();
+
+export const ImportPlayerHoldingsToolInputSchema = z
+  .object({
+    profileId: z.string().uuid(),
+    format: z.enum(["csv", "json"]),
+    content: z
+      .string()
+      .min(1)
+      .max(5 * 1024 * 1024),
+    confirmReplace: z.literal(true),
+  })
+  .strict();
+
+export const ExportPlayerHoldingsToolInputSchema = z
+  .object({
+    profileId: z.string().uuid(),
+    format: z.enum(["csv", "json"]),
+  })
+  .strict();
+
+export const RecordGeTradeToolInputSchema = z
+  .object({
+    profileId: z.string().uuid(),
+    itemId: z.number().int().positive(),
+    side: z.enum(["buy", "sell"]),
+    quantity: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
+    unitPrice: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
+    occurredAt: z.string().datetime({ offset: true }),
+    source: PlayerPrivateDataSourceSchema,
+    notes: z.string().trim().max(2_000).optional(),
+  })
+  .strict();
+
+export const ListGeTradesToolInputSchema = z
+  .object({
+    profileId: z.string().uuid(),
+  })
+  .strict();
+
+export const UpdateGeTradeToolInputSchema = z
+  .object({
+    profileId: z.string().uuid(),
+    tradeId: z.string().uuid(),
+    itemId: z.number().int().positive().optional(),
+    side: z.enum(["buy", "sell"]).optional(),
+    quantity: z.number().int().positive().max(Number.MAX_SAFE_INTEGER).optional(),
+    unitPrice: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER).optional(),
+    occurredAt: z.string().datetime({ offset: true }).optional(),
+    source: PlayerPrivateDataSourceSchema.optional(),
+    notes: z.string().trim().max(2_000).optional(),
+  })
+  .strict()
+  .refine(
+    ({ profileId: _profileId, tradeId: _tradeId, ...updates }) => Object.keys(updates).length > 0,
+    { message: "At least one trade field must be updated" },
+  );
+
+export const RemoveGeTradeToolInputSchema = z
+  .object({
+    profileId: z.string().uuid(),
+    tradeId: z.string().uuid(),
+    confirmed: z.literal(true),
+  })
+  .strict();
+
+export const CreateMarketWatchlistToolInputSchema = z
+  .object({
+    profileId: z.string().uuid(),
+    name: z.string().trim().min(1).max(100),
+    itemIds: z.array(z.number().int().positive()).max(2_000).optional(),
+  })
+  .strict();
+
+export const UpdateMarketWatchlistToolInputSchema = z
+  .object({
+    profileId: z.string().uuid(),
+    watchlistId: z.string().uuid(),
+    name: z.string().trim().min(1).max(100).optional(),
+    itemIds: z.array(z.number().int().positive()).max(2_000).optional(),
+  })
+  .strict()
+  .refine(
+    ({ profileId: _profileId, watchlistId: _watchlistId, ...updates }) =>
+      Object.keys(updates).length > 0,
+    { message: "At least one watchlist field must be updated" },
+  );
+
+export const GetMarketWatchlistToolInputSchema = z
+  .object({
+    profileId: z.string().uuid(),
+    watchlistId: z.string().uuid().optional(),
+  })
+  .strict();
+
+export const UpdateMarketPreferencesToolInputSchema = MarketPreferencesSchema.omit({
+  schemaVersion: true,
+})
+  .partial()
+  .extend({ profileId: z.string().uuid() })
+  .strict();
+
+export const AnalyseGeItemToolInputSchema = z
+  .object({
+    profileId: z.string().uuid(),
+    item: ItemIdentifierSchema,
+    forceRefresh: z.boolean().optional(),
+  })
+  .strict();
+
+export const ScanGeOpportunitiesToolInputSchema = z
+  .object({
+    profileId: z.string().uuid(),
+    items: z.array(ItemIdentifierSchema).min(1).max(100),
+    forceRefresh: z.boolean().optional(),
+  })
+  .strict();
+
+export const BacktestGeStrategyToolInputSchema = MarketBacktestInputSchema.extend({
+  itemId: z.number().int().positive(),
+  forceRefresh: z.boolean().optional(),
+}).strict();

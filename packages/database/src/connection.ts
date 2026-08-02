@@ -4,7 +4,7 @@ import { dirname, resolve } from "node:path";
 import Database from "better-sqlite3";
 
 export type DatabaseConnection = Database.Database;
-export const DATABASE_SCHEMA_VERSION = 6;
+export const DATABASE_SCHEMA_VERSION = 7;
 
 export type DatabaseMigration = {
   version: number;
@@ -319,6 +319,67 @@ export const DATABASE_MIGRATIONS: readonly DatabaseMigration[] = [
 
       CREATE INDEX idx_recovery_events_time
         ON recovery_events(occurred_at DESC);
+    `,
+  },
+  {
+    version: 7,
+    name: "player-private-market-data",
+    sql: `
+      CREATE TABLE player_holdings_snapshots (
+        snapshot_id TEXT PRIMARY KEY,
+        profile_id TEXT NOT NULL REFERENCES player_profiles(id) ON DELETE CASCADE,
+        captured_at TEXT NOT NULL,
+        source TEXT NOT NULL CHECK (
+          source IN ('manual', 'csv-import', 'json-import', 'alt1-confirmed')
+        ),
+        cash_gp INTEGER CHECK (cash_gp IS NULL OR cash_gp >= 0),
+        snapshot_json TEXT NOT NULL,
+        schema_version INTEGER NOT NULL DEFAULT 1 CHECK (schema_version = 1)
+      );
+
+      CREATE INDEX idx_player_holdings_profile_time
+        ON player_holdings_snapshots(profile_id, captured_at DESC);
+
+      CREATE TABLE ge_trade_records (
+        id TEXT PRIMARY KEY,
+        profile_id TEXT NOT NULL REFERENCES player_profiles(id) ON DELETE CASCADE,
+        item_id INTEGER NOT NULL CHECK (item_id > 0),
+        side TEXT NOT NULL CHECK (side IN ('buy', 'sell')),
+        occurred_at TEXT NOT NULL,
+        trade_json TEXT NOT NULL,
+        schema_version INTEGER NOT NULL DEFAULT 1 CHECK (schema_version = 1)
+      );
+
+      CREATE INDEX idx_ge_trades_profile_time
+        ON ge_trade_records(profile_id, occurred_at DESC);
+      CREATE INDEX idx_ge_trades_profile_item_time
+        ON ge_trade_records(profile_id, item_id, occurred_at DESC);
+
+      CREATE TABLE player_market_preferences (
+        profile_id TEXT PRIMARY KEY REFERENCES player_profiles(id) ON DELETE CASCADE,
+        preferences_json TEXT NOT NULL,
+        schema_version INTEGER NOT NULL DEFAULT 1 CHECK (schema_version = 1),
+        updated_at TEXT NOT NULL
+      );
+
+      CREATE TABLE market_watchlists (
+        id TEXT PRIMARY KEY,
+        profile_id TEXT NOT NULL REFERENCES player_profiles(id) ON DELETE CASCADE,
+        name TEXT NOT NULL,
+        watchlist_json TEXT NOT NULL,
+        schema_version INTEGER NOT NULL DEFAULT 1 CHECK (schema_version = 1),
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+
+      CREATE INDEX idx_market_watchlists_profile_name
+        ON market_watchlists(profile_id, name COLLATE NOCASE);
+
+      CREATE TABLE selected_player_profile (
+        singleton_id INTEGER PRIMARY KEY CHECK (singleton_id = 1),
+        profile_id TEXT NOT NULL REFERENCES player_profiles(id) ON DELETE CASCADE,
+        selected_at TEXT NOT NULL
+      );
     `,
   },
 ];

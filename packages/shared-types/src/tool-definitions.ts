@@ -1,6 +1,8 @@
 import type { z } from "zod";
 
 import {
+  AnalyseGeItemToolInputSchema,
+  BacktestGeStrategyToolInputSchema,
   CalculateTrainingCostToolInputSchema,
   CalculateXpRemainingToolInputSchema,
   CheckForSoftwareUpdatesToolInputSchema,
@@ -8,19 +10,24 @@ import {
   CompareItemPricesToolInputSchema,
   CompareQuestXpRewardsToolInputSchema,
   CompareTrainingMethodsToolInputSchema,
+  CreateMarketWatchlistToolInputSchema,
   CreateLevellingPlanToolInputSchema,
   CreatePlayerProfileToolInputSchema,
   CreateWeeklyGoalPlanToolInputSchema,
   EmptyInputSchema,
   ExportPriceDataToolInputSchema,
+  ExportPlayerHoldingsToolInputSchema,
   GetItemPriceToolInputSchema,
+  GetMarketWatchlistToolInputSchema,
   GetPlayerStatsToolInputSchema,
   GetSkillProgressToolInputSchema,
   GetTrainingMethodToolInputSchema,
   ImportPlayerProfileToolInputSchema,
+  ImportPlayerHoldingsToolInputSchema,
   ItemIdentifierInputSchema,
   ItemPriceHistoryToolInputSchema,
   ListRecentErrorsToolInputSchema,
+  ListGeTradesToolInputSchema,
   ListRecoveryEventsToolInputSchema,
   ListTrainingMethodsToolInputSchema,
   ProfileIdInputSchema,
@@ -29,12 +36,20 @@ import {
   RefreshPriceDataToolInputSchema,
   RefreshStaleCataloguesToolInputSchema,
   ResetProviderCircuitToolInputSchema,
+  RecordGeTradeToolInputSchema,
+  RemoveGeTradeToolInputSchema,
+  ReplacePlayerHoldingsToolInputSchema,
   RetryFailedOperationToolInputSchema,
   SearchItemsToolInputSchema,
   SearchQuestsToolInputSchema,
+  ScanGeOpportunitiesToolInputSchema,
   SetMultipleQuestStatusesToolInputSchema,
   SetQuestStatusToolInputSchema,
   UpdatePlayerPreferencesToolInputSchema,
+  UpdateGeTradeToolInputSchema,
+  UpdateMarketPreferencesToolInputSchema,
+  UpdateMarketWatchlistToolInputSchema,
+  UpsertPlayerHoldingToolInputSchema,
   ValueEquipmentSetupToolInputSchema,
   ValueItemListToolInputSchema,
 } from "./tool-schemas.js";
@@ -360,6 +375,133 @@ export const COMPANION_TOOL_DEFINITIONS_V1_1_ADDITIONS = {
       "Reset one provider capability circuit after explicit confirmation so a bounded probe can run.",
     inputSchema: ResetProviderCircuitToolInputSchema,
     effect: "local-state",
+  },
+  get_selected_player_snapshot: {
+    description:
+      "Read the explicitly selected local profile together with its latest holdings and market preferences.",
+    inputSchema: EmptyInputSchema,
+    effect: "read-only",
+  },
+  set_selected_player_profile: {
+    description: "Persist the selected local player profile used by user-aware planning.",
+    inputSchema: ProfileIdInputSchema,
+    effect: "local-state",
+  },
+  get_player_holdings: {
+    description: "Read the latest user-controlled local holdings snapshot for one profile.",
+    inputSchema: ProfileIdInputSchema,
+    effect: "read-only",
+  },
+  replace_player_holdings: {
+    description:
+      "Replace local holdings by writing a new versioned snapshot after explicit confirmation.",
+    inputSchema: ReplacePlayerHoldingsToolInputSchema,
+    effect: "local-state",
+  },
+  upsert_player_holding: {
+    description: "Add or update one user-entered holding in a new local snapshot.",
+    inputSchema: UpsertPlayerHoldingToolInputSchema,
+    effect: "local-state",
+  },
+  import_player_holdings: {
+    description: "Validate and import bounded CSV or JSON holdings after explicit confirmation.",
+    inputSchema: ImportPlayerHoldingsToolInputSchema,
+    effect: "local-state",
+  },
+  export_player_holdings: {
+    description: "Export the latest local holdings snapshot as returned CSV or JSON content.",
+    inputSchema: ExportPlayerHoldingsToolInputSchema,
+    effect: "read-only",
+  },
+  record_ge_trade: {
+    description: "Record one manually confirmed Grand Exchange trade in the local journal.",
+    inputSchema: RecordGeTradeToolInputSchema,
+    effect: "local-state",
+  },
+  list_ge_trades: {
+    description: "List the selected profile's private local Grand Exchange trade journal.",
+    inputSchema: ListGeTradesToolInputSchema,
+    effect: "read-only",
+  },
+  update_ge_trade: {
+    description: "Update one local Grand Exchange trade-journal record.",
+    inputSchema: UpdateGeTradeToolInputSchema,
+    effect: "local-state",
+  },
+  remove_ge_trade: {
+    description: "Remove one local trade-journal record after explicit confirmation.",
+    inputSchema: RemoveGeTradeToolInputSchema,
+    effect: "local-state",
+  },
+  get_market_preferences: {
+    description: "Read versioned local risk, strategy, allocation and data-confidence preferences.",
+    inputSchema: ProfileIdInputSchema,
+    effect: "read-only",
+  },
+  update_market_preferences: {
+    description: "Update versioned local market-analysis preferences for one profile.",
+    inputSchema: UpdateMarketPreferencesToolInputSchema,
+    effect: "local-state",
+  },
+  create_market_watchlist: {
+    description: "Create a private local item watchlist for one profile.",
+    inputSchema: CreateMarketWatchlistToolInputSchema,
+    effect: "local-state",
+  },
+  update_market_watchlist: {
+    description: "Update a private local watchlist's name or item IDs.",
+    inputSchema: UpdateMarketWatchlistToolInputSchema,
+    effect: "local-state",
+  },
+  get_market_watchlist: {
+    description: "Get one local market watchlist or list all watchlists for a profile.",
+    inputSchema: GetMarketWatchlistToolInputSchema,
+    effect: "read-only",
+  },
+  analyse_ge_item: {
+    description:
+      "Calculate a deterministic, confidence-scored manual RS3 market signal with full evidence.",
+    inputSchema: AnalyseGeItemToolInputSchema,
+    effect: "read-only",
+  },
+  scan_ge_opportunities: {
+    description: "Rank a bounded explicit item set using versioned deterministic market rules.",
+    inputSchema: ScanGeOpportunitiesToolInputSchema,
+    effect: "read-only",
+  },
+  get_ge_buy_candidates: {
+    description: "Return only buy candidates from a deterministic bounded market scan.",
+    inputSchema: ScanGeOpportunitiesToolInputSchema,
+    effect: "read-only",
+  },
+  get_ge_sell_candidates: {
+    description: "Return sell/reduce candidates only when the profile records holdings.",
+    inputSchema: ScanGeOpportunitiesToolInputSchema,
+    effect: "read-only",
+  },
+  create_manual_ge_order_plan: {
+    description:
+      "Create a non-executing order plan capped by local cash, allocation, risk and buy limit.",
+    inputSchema: AnalyseGeItemToolInputSchema,
+    effect: "read-only",
+  },
+  explain_ge_recommendation: {
+    description:
+      "Return the deterministic component scores, reasons, warnings and provenance for one signal.",
+    inputSchema: AnalyseGeItemToolInputSchema,
+    effect: "read-only",
+  },
+  backtest_ge_strategy: {
+    description:
+      "Run a chronological, delayed-fill, slippage-aware historical guide-price backtest.",
+    inputSchema: BacktestGeStrategyToolInputSchema,
+    effect: "read-only",
+  },
+  get_portfolio_summary: {
+    description:
+      "Calculate local holdings guide value, cost basis, gains and concentration exposure.",
+    inputSchema: ProfileIdInputSchema,
+    effect: "read-only",
   },
 } as const satisfies Record<string, CompanionToolDefinition>;
 

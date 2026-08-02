@@ -14,11 +14,14 @@ export type ProviderConfig = {
   geUrl: string;
   geGraphUrl: string;
   geBulkUrl: string;
+  weirdGloopHistoryUrl: string;
+  newsUrl: string;
   wikiApiUrl: string;
   wikiPageUrl: string;
   hiscoresCache: CachePolicy;
   geCache: CachePolicy;
   geHistoryCache: CachePolicy;
+  newsCache: CachePolicy;
 };
 
 function envInteger(environment: NodeJS.ProcessEnv, name: string, fallback: number): number {
@@ -59,6 +62,10 @@ export function loadProviderConfig(environment: NodeJS.ProcessEnv = process.env)
     geBulkUrl:
       environment.GIELINOR_GE_BULK_URL ??
       "https://chisel.weirdgloop.org/gazproj/gazbot/rs_dump.json",
+    weirdGloopHistoryUrl:
+      environment.GIELINOR_WEIRD_GLOOP_HISTORY_URL ??
+      "https://api.weirdgloop.org/exchange/history/rs/",
+    newsUrl: environment.GIELINOR_NEWS_URL ?? "https://api.weirdgloop.org/runescape/social",
     wikiApiUrl: environment.GIELINOR_WIKI_API_URL ?? "https://runescape.wiki/api.php",
     wikiPageUrl: environment.GIELINOR_WIKI_PAGE_URL ?? "https://runescape.wiki/w/",
     hiscoresCache: {
@@ -72,6 +79,10 @@ export function loadProviderConfig(environment: NodeJS.ProcessEnv = process.env)
     geHistoryCache: {
       freshForMs: envInteger(environment, "GIELINOR_GE_HISTORY_TTL_MS", 6 * 60 * 60_000),
       staleForMs: envInteger(environment, "GIELINOR_GE_HISTORY_STALE_MS", 7 * 24 * 60 * 60_000),
+    },
+    newsCache: {
+      freshForMs: envInteger(environment, "GIELINOR_NEWS_TTL_MS", 30 * 60_000),
+      staleForMs: envInteger(environment, "GIELINOR_NEWS_STALE_MS", 24 * 60 * 60_000),
     },
   };
 }

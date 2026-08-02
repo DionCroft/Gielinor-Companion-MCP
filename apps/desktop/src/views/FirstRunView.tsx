@@ -1,7 +1,7 @@
 import { useRef, useState, type FormEvent } from "react";
 
 import type { CompanionBridge, DataStatus, DesktopProfile, RuntimeStatus } from "../types.js";
-import { InlineAlert } from "../components/Common.js";
+import { InlineAlert, RuntimeDataBanner } from "../components/Common.js";
 import { Icon } from "../components/Icon.js";
 import { desktopError } from "../lib/errors.js";
 import { CreateProfileFormSchema, firstError } from "../lib/validation.js";
@@ -168,6 +168,7 @@ export function FirstRunView({
 
   return (
     <main className="onboarding-shell" id="main-content">
+      <RuntimeDataBanner runtime={runtime} />
       <section className="onboarding-story" aria-labelledby="welcome-title">
         <div className="onboarding-brand">
           <span className="brand-mark large" aria-hidden="true">

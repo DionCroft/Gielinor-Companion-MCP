@@ -5,6 +5,8 @@ import {
   CompanionError,
   GrandExchangeService,
   LevellingPlannerService,
+  PlayerPrivateDataService,
+  MarketIntelligenceService,
   ProfileService,
   QuestService,
   type GrandExchangeDataProvider,
@@ -12,12 +14,14 @@ import {
   type PlayerStatsProvider,
   type QuestDataProvider,
   type TrainingMethodProvider,
+  type MarketHistoryProvider,
 } from "@gielinor/core";
 import {
   openResilientDatabase,
   SqliteCacheStore,
   SqliteDiagnosticsRepository,
   SqlitePlayerProfileRepository,
+  SqlitePlayerPrivateDataRepository,
   SqlitePriceRepository,
   SqliteQuestRepository,
   SqliteTrainingMethodRepository,
@@ -111,6 +115,7 @@ export class HostedServiceFactory {
   private readonly priceRepository: SqlitePriceRepository;
   private readonly questProvider: QuestDataProvider;
   private readonly trainingProvider: TrainingMethodProvider;
+  private readonly marketHistoryProvider: MarketHistoryProvider;
   private readonly offline: boolean;
   private readonly maintenancePolicy: MaintenanceRuntimePolicy;
   private readonly diagnosticsRepository: SqliteDiagnosticsRepository | undefined;
@@ -148,6 +153,7 @@ export class HostedServiceFactory {
     this.priceRepository = new SqlitePriceRepository(this.publicDatabase);
     this.questProvider = providers.ports.quests;
     this.trainingProvider = providers.ports.training;
+    this.marketHistoryProvider = providers.marketHistory;
     this.diagnosticsRepository =
       this.publicDatabaseRuntime.state.status === "safe-mode"
         ? undefined
@@ -195,6 +201,13 @@ export class HostedServiceFactory {
           })()
         : new UnavailableProfileRepository();
     const profiles = new ProfileService(profileRepository, this.statsProvider);
+    const playerPrivateData =
+      accountDatabaseRuntime === undefined
+        ? undefined
+        : new PlayerPrivateDataService(
+            new SqlitePlayerPrivateDataRepository(accountDatabaseRuntime.database),
+            profileRepository,
+          );
     const quests = new QuestService(this.questRepository, profiles, this.questProvider);
     const planner = new LevellingPlannerService(
       this.trainingRepository,
@@ -208,6 +221,14 @@ export class HostedServiceFactory {
       quests,
       planner,
     );
+    const marketIntelligence =
+      playerPrivateData === undefined
+        ? undefined
+        : new MarketIntelligenceService(
+            this.priceRepository,
+            this.marketHistoryProvider,
+            playerPrivateData,
+          );
     const tools = restrictToolService(
       new CompanionToolService(
         profiles,
@@ -216,6 +237,8 @@ export class HostedServiceFactory {
         planner,
         exchange,
         this.diagnostics,
+        playerPrivateData,
+        marketIntelligence,
       ),
       actor,
     );

@@ -1,76 +1,69 @@
-import { SKILL_IDS } from "@gielinor/shared-types";
+import {
+  BrowserLiveDevelopmentBridge,
+  createDefaultBridge,
+  DemoCompanionBridge,
+  TauriCompanionBridge,
+} from "./bridge.js";
 
-import { createDefaultBridge, DemoCompanionBridge, TauriCompanionBridge } from "./bridge.js";
-
-function hiscoresFixture(): string {
-  const rows = ["1,2000,250000000"];
-  for (const [index] of SKILL_IDS.entries()) {
-    rows.push(`${1000 + index},${10 + index},${1000 + index * 100}`);
-  }
-  return rows.join("\n");
-}
-
-describe("browser development bridge", () => {
+describe("desktop runtime boundaries", () => {
   afterEach(() => {
+    window.history.replaceState({}, "", "/");
     vi.unstubAllGlobals();
   });
 
-  it("refreshes the entered normal account from live Hiscores instead of demo skills", async () => {
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      status: 200,
-      text: async () => hiscoresFixture(),
-    });
-    vi.stubGlobal("fetch", fetchMock);
-    const bridge = new DemoCompanionBridge("live");
-    const created = await bridge.callTool<{ id: string }>("create_player_profile", {
-      displayName: "vipergtrkin",
-      gameMode: "normal",
-    });
+  it("does not silently select fixtures during ordinary browser startup", async () => {
+    const bridge = createDefaultBridge();
 
-    const refreshed = await bridge.callTool<{
-      displayName: string;
-      gameMode: string;
-      skills: Array<{ skillId: string; level: number; experience: number }>;
-    }>("refresh_player_stats", {
-      profileId: created.data.id,
+    expect(bridge).toBeInstanceOf(BrowserLiveDevelopmentBridge);
+    await expect(bridge.runtimeStatus()).resolves.toMatchObject({
+      ready: false,
+      mode: "browser-live-development",
+      transport: "unavailable",
     });
+    await expect(
+      bridge.callTool("refresh_player_stats", { profileId: "profile-1" }),
+    ).rejects.toThrow(/standalone browser/i);
+  });
 
-    expect(fetchMock).toHaveBeenCalledWith(
-      "/__gielinor/hiscores/normal?player=vipergtrkin",
-      expect.objectContaining({ headers: { accept: "text/plain" } }),
+  it("does not treat a fixture name without an explicit runtime mode as test mode", () => {
+    window.history.replaceState({}, "", "/?fixture=returning");
+
+    expect(createDefaultBridge()).toBeInstanceOf(BrowserLiveDevelopmentBridge);
+  });
+
+  it("selects deterministic preview data only when browser-preview is explicit", async () => {
+    window.history.replaceState({}, "", "/?mode=browser-preview&fixture=returning");
+
+    const bridge = createDefaultBridge();
+    expect(bridge).toBeInstanceOf(DemoCompanionBridge);
+    await expect(bridge.runtimeStatus()).resolves.toMatchObject({
+      ready: true,
+      mode: "browser-preview",
+    });
+    const profiles = await bridge.callTool<Array<{ displayName: string }>>(
+      "list_player_profiles",
+      {},
     );
-    expect(refreshed.meta.source).toMatch(/Jagex public Hiscores/i);
-    expect(refreshed.data).toMatchObject({
-      displayName: "vipergtrkin",
-      gameMode: "normal",
-    });
-    expect(refreshed.data.skills).toHaveLength(29);
-    expect(refreshed.data.skills[0]).toMatchObject({
-      skillId: "attack",
-      level: 10,
-      experience: 1000,
+    expect(profiles.meta.source).toMatch(/fixture|preview/i);
+    expect(profiles.data[0]?.displayName).toBe("Demo Adventurer");
+  });
+
+  it("selects automated fixtures only when automated-test is explicit", async () => {
+    window.history.replaceState({}, "", "/?mode=automated-test&fixture=returning");
+
+    const bridge = createDefaultBridge();
+    await expect(bridge.runtimeStatus()).resolves.toMatchObject({
+      ready: true,
+      mode: "automated-test",
     });
   });
 
-  it("reports a missing live Hiscores account without falling back to demo progress", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockResolvedValue({
-        ok: false,
-        status: 404,
-        text: async () => "",
-      }),
-    );
-    const bridge = new DemoCompanionBridge("live");
-    const created = await bridge.callTool<{ id: string }>("create_player_profile", {
-      displayName: "Missing Hero",
-      gameMode: "normal",
-    });
+  it("reports missing fixture profiles instead of substituting another profile", async () => {
+    const bridge = new DemoCompanionBridge("first-run");
 
     await expect(
-      bridge.callTool("refresh_player_stats", { profileId: created.data.id }),
-    ).rejects.toThrow(/was not found on the normal Hiscores/i);
+      bridge.callTool("refresh_player_stats", { profileId: "missing-profile" }),
+    ).rejects.toThrow(/profile was not found/i);
   });
 
   it("selects the native bridge through Tauri's supported runtime marker", () => {

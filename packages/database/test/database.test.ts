@@ -135,7 +135,7 @@ describe("SQLite migrations and repositories", () => {
   it("applies migrations transactionally to a new database", () => {
     const database = openDatabase(":memory:");
     databases.push(database);
-    expect(getDatabaseSchemaVersion(database)).toBe(6);
+    expect(getDatabaseSchemaVersion(database)).toBe(7);
     expect(
       database
         .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'player_profiles'")
@@ -171,20 +171,20 @@ describe("SQLite migrations and repositories", () => {
     const database = openDatabase(":memory:", { targetVersion: 4 });
     databases.push(database);
     expect(pendingDatabaseMigrations(database).map((migration) => migration.version)).toEqual([
-      5, 6,
+      5, 6, 7,
     ]);
-    expect(applyDatabaseMigrations(database)).toEqual([5, 6]);
+    expect(applyDatabaseMigrations(database)).toEqual([5, 6, 7]);
 
     const brokenMigration: DatabaseMigration = {
-      version: 7,
+      version: 8,
       name: "injected-failure",
       sql: `
         CREATE TABLE migration_should_rollback (id INTEGER PRIMARY KEY);
         INSERT INTO table_that_does_not_exist (id) VALUES (1);
       `,
     };
-    expect(() => applyDatabaseMigrations(database, [brokenMigration], 7)).toThrow();
-    expect(getDatabaseSchemaVersion(database)).toBe(6);
+    expect(() => applyDatabaseMigrations(database, [brokenMigration], 8)).toThrow();
+    expect(getDatabaseSchemaVersion(database)).toBe(7);
     expect(
       database
         .prepare(

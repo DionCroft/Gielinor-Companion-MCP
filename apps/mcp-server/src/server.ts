@@ -2,6 +2,8 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 
 import {
+  AnalyseGeItemToolInputSchema,
+  BacktestGeStrategyToolInputSchema,
   CalculateXpRemainingToolInputSchema,
   CalculateTrainingCostToolInputSchema,
   CheckForSoftwareUpdatesToolInputSchema,
@@ -10,18 +12,23 @@ import {
   CompareQuestXpRewardsToolInputSchema,
   CompareTrainingMethodsToolInputSchema,
   CreateLevellingPlanToolInputSchema,
+  CreateMarketWatchlistToolInputSchema,
   CreatePlayerProfileToolInputSchema,
   CreateWeeklyGoalPlanToolInputSchema,
   EmptyInputSchema,
   ExportPriceDataToolInputSchema,
+  ExportPlayerHoldingsToolInputSchema,
   GetItemPriceToolInputSchema,
+  GetMarketWatchlistToolInputSchema,
   GetPlayerStatsToolInputSchema,
   GetSkillProgressToolInputSchema,
   GetTrainingMethodToolInputSchema,
   ImportPlayerProfileToolInputSchema,
+  ImportPlayerHoldingsToolInputSchema,
   ItemIdentifierInputSchema,
   ItemPriceHistoryToolInputSchema,
   ListTrainingMethodsToolInputSchema,
+  ListGeTradesToolInputSchema,
   ListRecentErrorsToolInputSchema,
   ListRecoveryEventsToolInputSchema,
   ProfileQuestInputSchema,
@@ -29,13 +36,21 @@ import {
   QuestIdentifierInputSchema,
   RefreshPriceDataToolInputSchema,
   RefreshStaleCataloguesToolInputSchema,
+  RecordGeTradeToolInputSchema,
+  RemoveGeTradeToolInputSchema,
+  ReplacePlayerHoldingsToolInputSchema,
   ResetProviderCircuitToolInputSchema,
   RetryFailedOperationToolInputSchema,
   SearchItemsToolInputSchema,
+  ScanGeOpportunitiesToolInputSchema,
   SearchQuestsToolInputSchema,
   SetMultipleQuestStatusesToolInputSchema,
   SetQuestStatusToolInputSchema,
   UpdatePlayerPreferencesToolInputSchema,
+  UpdateGeTradeToolInputSchema,
+  UpdateMarketPreferencesToolInputSchema,
+  UpdateMarketWatchlistToolInputSchema,
+  UpsertPlayerHoldingToolInputSchema,
   ValueEquipmentSetupToolInputSchema,
   ValueItemListToolInputSchema,
 } from "./schemas.js";
@@ -753,6 +768,268 @@ export function createCompanionServer(
       annotations: { destructiveHint: false, idempotentHint: true },
     },
     ({ providerId, capability }) => run(() => tools.resetProviderCircuit(providerId, capability)),
+  );
+
+  server.registerTool(
+    "get_selected_player_snapshot",
+    {
+      description:
+        "Read the explicitly selected local profile, its latest user-entered holdings, and market preferences.",
+      inputSchema: EmptyInputSchema,
+      annotations: { readOnlyHint: true },
+    },
+    () => run(() => tools.getSelectedPlayerSnapshot()),
+  );
+
+  server.registerTool(
+    "set_selected_player_profile",
+    {
+      description: "Persist the local profile used by user-aware planning and market analysis.",
+      inputSchema: ProfileIdInputSchema,
+      annotations: { destructiveHint: false, idempotentHint: true },
+    },
+    ({ profileId }) => run(() => tools.setSelectedPlayerProfile(profileId)),
+  );
+
+  server.registerTool(
+    "get_player_holdings",
+    {
+      description:
+        "Read the latest private local holdings snapshot. Public RuneScape APIs are not presented as bank or inventory access.",
+      inputSchema: ProfileIdInputSchema,
+      annotations: { readOnlyHint: true },
+    },
+    ({ profileId }) => run(() => tools.getPlayerHoldings(profileId)),
+  );
+
+  server.registerTool(
+    "replace_player_holdings",
+    {
+      description:
+        "Write a new versioned local holdings snapshot after explicit confirmation; earlier snapshots remain retained.",
+      inputSchema: ReplacePlayerHoldingsToolInputSchema,
+      annotations: { destructiveHint: true, idempotentHint: false },
+    },
+    (input) => run(() => tools.replacePlayerHoldings(input)),
+  );
+
+  server.registerTool(
+    "upsert_player_holding",
+    {
+      description: "Add or update one user-entered holding in a new local snapshot.",
+      inputSchema: UpsertPlayerHoldingToolInputSchema,
+      annotations: { destructiveHint: false, idempotentHint: true },
+    },
+    (input) => run(() => tools.upsertPlayerHolding(input)),
+  );
+
+  server.registerTool(
+    "import_player_holdings",
+    {
+      description:
+        "Validate bounded CSV or JSON content and write a new local holdings snapshot after explicit confirmation.",
+      inputSchema: ImportPlayerHoldingsToolInputSchema,
+      annotations: { destructiveHint: true, idempotentHint: false },
+    },
+    (input) => run(() => tools.importPlayerHoldings(input)),
+  );
+
+  server.registerTool(
+    "export_player_holdings",
+    {
+      description: "Return the latest user-entered holdings as CSV or JSON without writing a file.",
+      inputSchema: ExportPlayerHoldingsToolInputSchema,
+      annotations: { readOnlyHint: true },
+    },
+    ({ profileId, format }) => run(() => tools.exportPlayerHoldings(profileId, format)),
+  );
+
+  server.registerTool(
+    "record_ge_trade",
+    {
+      description:
+        "Record one user-entered or user-confirmed Grand Exchange trade locally; no offer is placed.",
+      inputSchema: RecordGeTradeToolInputSchema,
+      annotations: { destructiveHint: false, idempotentHint: false },
+    },
+    (input) => run(() => tools.recordGeTrade(input)),
+  );
+
+  server.registerTool(
+    "list_ge_trades",
+    {
+      description: "List one profile's private local Grand Exchange trade journal.",
+      inputSchema: ListGeTradesToolInputSchema,
+      annotations: { readOnlyHint: true },
+    },
+    ({ profileId }) => run(() => tools.listGeTrades(profileId)),
+  );
+
+  server.registerTool(
+    "update_ge_trade",
+    {
+      description: "Update one local trade-journal record; no RuneScape offer is changed.",
+      inputSchema: UpdateGeTradeToolInputSchema,
+      annotations: { destructiveHint: false, idempotentHint: true },
+    },
+    ({ profileId, tradeId, ...updates }) =>
+      run(() => tools.updateGeTrade(profileId, tradeId, updates)),
+  );
+
+  server.registerTool(
+    "remove_ge_trade",
+    {
+      description: "Remove one local journal record after explicit confirmation.",
+      inputSchema: RemoveGeTradeToolInputSchema,
+      annotations: { destructiveHint: true, idempotentHint: true },
+    },
+    ({ profileId, tradeId }) => run(() => tools.removeGeTrade(profileId, tradeId)),
+  );
+
+  server.registerTool(
+    "get_market_preferences",
+    {
+      description: "Read versioned private risk, strategy, allocation and confidence preferences.",
+      inputSchema: ProfileIdInputSchema,
+      annotations: { readOnlyHint: true },
+    },
+    ({ profileId }) => run(() => tools.getMarketPreferences(profileId)),
+  );
+
+  server.registerTool(
+    "update_market_preferences",
+    {
+      description: "Update versioned local market-analysis preferences for one profile.",
+      inputSchema: UpdateMarketPreferencesToolInputSchema,
+      annotations: { destructiveHint: false, idempotentHint: true },
+    },
+    ({ profileId, ...updates }) => run(() => tools.updateMarketPreferences(profileId, updates)),
+  );
+
+  server.registerTool(
+    "create_market_watchlist",
+    {
+      description: "Create a private local item watchlist; no market offer is placed.",
+      inputSchema: CreateMarketWatchlistToolInputSchema,
+      annotations: { destructiveHint: false, idempotentHint: false },
+    },
+    (input) => run(() => tools.createMarketWatchlist(input)),
+  );
+
+  server.registerTool(
+    "update_market_watchlist",
+    {
+      description: "Update one private local market watchlist.",
+      inputSchema: UpdateMarketWatchlistToolInputSchema,
+      annotations: { destructiveHint: false, idempotentHint: true },
+    },
+    ({ profileId, watchlistId, ...updates }) =>
+      run(() => tools.updateMarketWatchlist(profileId, watchlistId, updates)),
+  );
+
+  server.registerTool(
+    "get_market_watchlist",
+    {
+      description: "Get one private local watchlist or list all watchlists for a profile.",
+      inputSchema: GetMarketWatchlistToolInputSchema,
+      annotations: { readOnlyHint: true },
+    },
+    ({ profileId, watchlistId }) => run(() => tools.getMarketWatchlist(profileId, watchlistId)),
+  );
+
+  server.registerTool(
+    "analyse_ge_item",
+    {
+      description:
+        "Calculate a deterministic RS3 guide-price signal with inspectable scores, evidence, freshness and warnings.",
+      inputSchema: AnalyseGeItemToolInputSchema,
+      annotations: { readOnlyHint: true },
+    },
+    ({ profileId, item, forceRefresh }) =>
+      run(() => tools.analyseGeItem(profileId, item, forceRefresh)),
+  );
+
+  server.registerTool(
+    "scan_ge_opportunities",
+    {
+      description:
+        "Rank an explicit bounded item set using the same versioned deterministic scoring model.",
+      inputSchema: ScanGeOpportunitiesToolInputSchema,
+      annotations: { readOnlyHint: true },
+    },
+    ({ profileId, items, forceRefresh }) =>
+      run(() => tools.scanGeOpportunities(profileId, items, forceRefresh)),
+  );
+
+  server.registerTool(
+    "get_ge_buy_candidates",
+    {
+      description:
+        "Return only strong-buy-candidate and buy-candidate signals; no offer is placed.",
+      inputSchema: ScanGeOpportunitiesToolInputSchema,
+      annotations: { readOnlyHint: true },
+    },
+    ({ profileId, items, forceRefresh }) =>
+      run(() => tools.getGeBuyCandidates(profileId, items, forceRefresh)),
+  );
+
+  server.registerTool(
+    "get_ge_sell_candidates",
+    {
+      description:
+        "Return sell/reduce signals only for items present in confirmed local holdings; no offer is changed.",
+      inputSchema: ScanGeOpportunitiesToolInputSchema,
+      annotations: { readOnlyHint: true },
+    },
+    ({ profileId, items, forceRefresh }) =>
+      run(() => tools.getGeSellCandidates(profileId, items, forceRefresh)),
+  );
+
+  server.registerTool(
+    "create_manual_ge_order_plan",
+    {
+      description:
+        "Create a non-executing plan with statistical zones and cash/allocation/risk/buy-limit sizing.",
+      inputSchema: AnalyseGeItemToolInputSchema,
+      annotations: { readOnlyHint: true },
+    },
+    ({ profileId, item, forceRefresh }) =>
+      run(() => tools.createManualGeOrderPlan(profileId, item, forceRefresh)),
+  );
+
+  server.registerTool(
+    "explain_ge_recommendation",
+    {
+      description:
+        "Return the complete deterministic analysis whose component reasons explain the recommendation.",
+      inputSchema: AnalyseGeItemToolInputSchema,
+      annotations: { readOnlyHint: true },
+    },
+    ({ profileId, item, forceRefresh }) =>
+      run(() => tools.analyseGeItem(profileId, item, forceRefresh)),
+  );
+
+  server.registerTool(
+    "backtest_ge_strategy",
+    {
+      description:
+        "Run a no-look-ahead chronological guide-price backtest with delayed fills, slippage and buy limits.",
+      inputSchema: BacktestGeStrategyToolInputSchema,
+      annotations: { readOnlyHint: true },
+    },
+    ({ itemId, forceRefresh, ...input }) =>
+      run(() => tools.backtestGeStrategy(itemId, input, forceRefresh)),
+  );
+
+  server.registerTool(
+    "get_portfolio_summary",
+    {
+      description:
+        "Calculate private local portfolio guide value, known basis, realised journal gain/loss and exposure.",
+      inputSchema: ProfileIdInputSchema,
+      annotations: { readOnlyHint: true },
+    },
+    ({ profileId }) => run(() => tools.getPortfolioSummary(profileId)),
   );
 
   return server;

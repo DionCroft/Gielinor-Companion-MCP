@@ -3,7 +3,7 @@
   "contractVersion": "1.1",
   "stability": "stable",
   "profileExportSchemaVersion": 1,
-  "toolCount": 60,
+  "toolCount": 84,
   "resultEnvelope": {
     "type": "object",
     "additionalProperties": false,
@@ -2522,6 +2522,907 @@
           "providerId",
           "capability",
           "confirmed"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "get_selected_player_snapshot",
+      "description": "Read the explicitly selected local profile together with its latest holdings and market preferences.",
+      "effect": "read-only",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "set_selected_player_profile",
+      "description": "Persist the selected local player profile used by user-aware planning.",
+      "effect": "local-state",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "profileId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "profileId"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "get_player_holdings",
+      "description": "Read the latest user-controlled local holdings snapshot for one profile.",
+      "effect": "read-only",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "profileId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "profileId"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "replace_player_holdings",
+      "description": "Replace local holdings by writing a new versioned snapshot after explicit confirmation.",
+      "effect": "local-state",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "profileId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "cashGp": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "itemId": {
+                  "type": "integer",
+                  "exclusiveMinimum": true,
+                  "minimum": 0
+                },
+                "quantity": {
+                  "type": "integer",
+                  "exclusiveMinimum": true,
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "averageAcquisitionPrice": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "notes": {
+                  "type": "string",
+                  "maxLength": 2000
+                }
+              },
+              "required": [
+                "itemId",
+                "quantity"
+              ],
+              "additionalProperties": false
+            },
+            "maxItems": 20000
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "manual",
+              "csv-import",
+              "json-import",
+              "alt1-confirmed"
+            ]
+          },
+          "capturedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "confirmReplace": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          }
+        },
+        "required": [
+          "profileId",
+          "items",
+          "confirmReplace"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "upsert_player_holding",
+      "description": "Add or update one user-entered holding in a new local snapshot.",
+      "effect": "local-state",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "profileId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "holding": {
+            "type": "object",
+            "properties": {
+              "itemId": {
+                "type": "integer",
+                "exclusiveMinimum": true,
+                "minimum": 0
+              },
+              "quantity": {
+                "type": "integer",
+                "exclusiveMinimum": true,
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "averageAcquisitionPrice": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "notes": {
+                "type": "string",
+                "maxLength": 2000
+              }
+            },
+            "required": [
+              "itemId",
+              "quantity"
+            ],
+            "additionalProperties": false
+          },
+          "cashGp": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "manual",
+              "csv-import",
+              "json-import",
+              "alt1-confirmed"
+            ]
+          }
+        },
+        "required": [
+          "profileId",
+          "holding"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "import_player_holdings",
+      "description": "Validate and import bounded CSV or JSON holdings after explicit confirmation.",
+      "effect": "local-state",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "profileId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "csv",
+              "json"
+            ]
+          },
+          "content": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 5242880
+          },
+          "confirmReplace": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          }
+        },
+        "required": [
+          "profileId",
+          "format",
+          "content",
+          "confirmReplace"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "export_player_holdings",
+      "description": "Export the latest local holdings snapshot as returned CSV or JSON content.",
+      "effect": "read-only",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "profileId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "csv",
+              "json"
+            ]
+          }
+        },
+        "required": [
+          "profileId",
+          "format"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "record_ge_trade",
+      "description": "Record one manually confirmed Grand Exchange trade in the local journal.",
+      "effect": "local-state",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "profileId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "itemId": {
+            "type": "integer",
+            "exclusiveMinimum": true,
+            "minimum": 0
+          },
+          "side": {
+            "type": "string",
+            "enum": [
+              "buy",
+              "sell"
+            ]
+          },
+          "quantity": {
+            "type": "integer",
+            "exclusiveMinimum": true,
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "unitPrice": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "manual",
+              "csv-import",
+              "json-import",
+              "alt1-confirmed"
+            ]
+          },
+          "notes": {
+            "type": "string",
+            "maxLength": 2000
+          }
+        },
+        "required": [
+          "profileId",
+          "itemId",
+          "side",
+          "quantity",
+          "unitPrice",
+          "occurredAt",
+          "source"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "list_ge_trades",
+      "description": "List the selected profile's private local Grand Exchange trade journal.",
+      "effect": "read-only",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "profileId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "profileId"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "update_ge_trade",
+      "description": "Update one local Grand Exchange trade-journal record.",
+      "effect": "local-state",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "profileId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "tradeId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "itemId": {
+            "type": "integer",
+            "exclusiveMinimum": true,
+            "minimum": 0
+          },
+          "side": {
+            "type": "string",
+            "enum": [
+              "buy",
+              "sell"
+            ]
+          },
+          "quantity": {
+            "type": "integer",
+            "exclusiveMinimum": true,
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "unitPrice": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "manual",
+              "csv-import",
+              "json-import",
+              "alt1-confirmed"
+            ]
+          },
+          "notes": {
+            "type": "string",
+            "maxLength": 2000
+          }
+        },
+        "required": [
+          "profileId",
+          "tradeId"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "remove_ge_trade",
+      "description": "Remove one local trade-journal record after explicit confirmation.",
+      "effect": "local-state",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "profileId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "tradeId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "confirmed": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          }
+        },
+        "required": [
+          "profileId",
+          "tradeId",
+          "confirmed"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "get_market_preferences",
+      "description": "Read versioned local risk, strategy, allocation and data-confidence preferences.",
+      "effect": "read-only",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "profileId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "profileId"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "update_market_preferences",
+      "description": "Update versioned local market-analysis preferences for one profile.",
+      "effect": "local-state",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "riskTolerance": {
+            "type": "string",
+            "enum": [
+              "low",
+              "medium",
+              "high"
+            ]
+          },
+          "strategy": {
+            "type": "string",
+            "enum": [
+              "trend",
+              "mean-reversion",
+              "balanced",
+              "long-term"
+            ]
+          },
+          "maximumAllocationPercent": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "minimumVolume": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "maximumVolatility": {
+            "type": "number",
+            "exclusiveMinimum": true,
+            "minimum": 0,
+            "maximum": 1000
+          },
+          "minimumDataConfidence": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "avoidNewOrUnstableItems": {
+            "type": "boolean"
+          },
+          "profileId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "profileId"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "create_market_watchlist",
+      "description": "Create a private local item watchlist for one profile.",
+      "effect": "local-state",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "profileId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "itemIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "exclusiveMinimum": true,
+              "minimum": 0
+            },
+            "maxItems": 2000
+          }
+        },
+        "required": [
+          "profileId",
+          "name"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "update_market_watchlist",
+      "description": "Update a private local watchlist's name or item IDs.",
+      "effect": "local-state",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "profileId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "watchlistId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "itemIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "exclusiveMinimum": true,
+              "minimum": 0
+            },
+            "maxItems": 2000
+          }
+        },
+        "required": [
+          "profileId",
+          "watchlistId"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "get_market_watchlist",
+      "description": "Get one local market watchlist or list all watchlists for a profile.",
+      "effect": "read-only",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "profileId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "watchlistId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "profileId"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "analyse_ge_item",
+      "description": "Calculate a deterministic, confidence-scored manual RS3 market signal with full evidence.",
+      "effect": "read-only",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "profileId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "item": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": true,
+                "minimum": 0
+              },
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              }
+            ]
+          },
+          "forceRefresh": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "profileId",
+          "item"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "scan_ge_opportunities",
+      "description": "Rank a bounded explicit item set using versioned deterministic market rules.",
+      "effect": "read-only",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "profileId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "exclusiveMinimum": true,
+                  "minimum": 0
+                },
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                }
+              ]
+            },
+            "minItems": 1,
+            "maxItems": 100
+          },
+          "forceRefresh": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "profileId",
+          "items"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "get_ge_buy_candidates",
+      "description": "Return only buy candidates from a deterministic bounded market scan.",
+      "effect": "read-only",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "profileId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "exclusiveMinimum": true,
+                  "minimum": 0
+                },
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                }
+              ]
+            },
+            "minItems": 1,
+            "maxItems": 100
+          },
+          "forceRefresh": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "profileId",
+          "items"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "get_ge_sell_candidates",
+      "description": "Return sell/reduce candidates only when the profile records holdings.",
+      "effect": "read-only",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "profileId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "exclusiveMinimum": true,
+                  "minimum": 0
+                },
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                }
+              ]
+            },
+            "minItems": 1,
+            "maxItems": 100
+          },
+          "forceRefresh": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "profileId",
+          "items"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "create_manual_ge_order_plan",
+      "description": "Create a non-executing order plan capped by local cash, allocation, risk and buy limit.",
+      "effect": "read-only",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "profileId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "item": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": true,
+                "minimum": 0
+              },
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              }
+            ]
+          },
+          "forceRefresh": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "profileId",
+          "item"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "explain_ge_recommendation",
+      "description": "Return the deterministic component scores, reasons, warnings and provenance for one signal.",
+      "effect": "read-only",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "profileId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "item": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": true,
+                "minimum": 0
+              },
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              }
+            ]
+          },
+          "forceRefresh": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "profileId",
+          "item"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "backtest_ge_strategy",
+      "description": "Run a chronological, delayed-fill, slippage-aware historical guide-price backtest.",
+      "effect": "read-only",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "initialGp": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "slippagePercent": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 25
+          },
+          "fillDelayDays": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 30
+          },
+          "maximumHoldingDays": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 365
+          },
+          "trainingFraction": {
+            "type": "number",
+            "minimum": 0.5,
+            "maximum": 0.9
+          },
+          "buyLimit": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "itemId": {
+            "type": "integer",
+            "exclusiveMinimum": true,
+            "minimum": 0
+          },
+          "forceRefresh": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "initialGp",
+          "slippagePercent",
+          "fillDelayDays",
+          "maximumHoldingDays",
+          "trainingFraction",
+          "itemId"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "get_portfolio_summary",
+      "description": "Calculate local holdings guide value, cost basis, gains and concentration exposure.",
+      "effect": "read-only",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "profileId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "profileId"
         ],
         "additionalProperties": false
       }

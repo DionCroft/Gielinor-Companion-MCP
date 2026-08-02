@@ -62,12 +62,12 @@ describe("resilient SQLite startup", () => {
     expect(runtime.state).toMatchObject({
       status: "ready",
       mode: "read-write",
-      schemaVersion: 6,
+      schemaVersion: 7,
       action: "fresh-install",
       originalPreserved: true,
     });
     expect(runtime.state.backupId).toBeUndefined();
-    expect(getDatabaseSchemaVersion(runtime.database)).toBe(6);
+    expect(getDatabaseSchemaVersion(runtime.database)).toBe(7);
     expect(
       runtime.database.prepare("SELECT COUNT(*) AS count FROM database_recovery_events").get(),
     ).toEqual({ count: 1 });
@@ -83,7 +83,7 @@ describe("resilient SQLite startup", () => {
     expect(runtime.state).toMatchObject({
       status: "ready",
       mode: "read-write",
-      schemaVersion: 6,
+      schemaVersion: 7,
       action: "verified-migration",
       backupId: expect.any(String),
     });
@@ -112,7 +112,7 @@ describe("resilient SQLite startup", () => {
     expect(recovered.state).toMatchObject({
       status: "recovered",
       action: "recovered-interrupted-migration",
-      schemaVersion: 6,
+      schemaVersion: 7,
       backupId: expect.any(String),
     });
     expect(recovered.database.prepare("SELECT display_name FROM player_profiles").get()).toEqual({
@@ -137,7 +137,7 @@ describe("resilient SQLite startup", () => {
     expect(recovered.state).toMatchObject({
       status: "recovered",
       action: "recovered-interrupted-migration",
-      schemaVersion: 6,
+      schemaVersion: 7,
     });
     expect(existsSync(`${filename}.migration-state.json`)).toBe(false);
     recovered.close();
@@ -146,9 +146,9 @@ describe("resilient SQLite startup", () => {
   it("rolls back a failed migration to the verified backup and enters safe mode", () => {
     const root = directory();
     const filename = join(root, "failed-migration.db");
-    createVersionedDatabase(filename, 6);
+    createVersionedDatabase(filename, 7);
     const brokenMigration: DatabaseMigration = {
-      version: 7,
+      version: 8,
       name: "injected-broken-migration",
       sql: `
         CREATE TABLE should_not_survive (id INTEGER PRIMARY KEY);
@@ -156,7 +156,7 @@ describe("resilient SQLite startup", () => {
       `,
     };
     const runtime = openResilientDatabase(filename, {
-      targetVersion: 7,
+      targetVersion: 8,
       migrations: [...DATABASE_MIGRATIONS, brokenMigration],
     });
     expect(runtime.state).toMatchObject({
@@ -170,7 +170,7 @@ describe("resilient SQLite startup", () => {
     runtime.close();
 
     const restored = new Database(filename, { readonly: true });
-    expect(getDatabaseSchemaVersion(restored)).toBe(6);
+    expect(getDatabaseSchemaVersion(restored)).toBe(7);
     expect(restored.prepare("SELECT display_name FROM player_profiles").get()).toEqual({
       display_name: "Recovery Hero",
     });
@@ -248,7 +248,7 @@ describe("resilient SQLite startup", () => {
     });
     expect(existsSync(restored.preservedFilename!)).toBe(true);
     const database = openDatabase(filename);
-    expect(getDatabaseSchemaVersion(database)).toBe(6);
+    expect(getDatabaseSchemaVersion(database)).toBe(7);
     expect(database.prepare("SELECT display_name FROM player_profiles").get()).toEqual({
       display_name: "Recovery Hero",
     });

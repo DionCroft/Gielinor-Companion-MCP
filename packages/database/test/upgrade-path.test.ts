@@ -52,7 +52,9 @@ describe("Version 1 stable database upgrade path", () => {
   it("creates a fresh database at the stable schema target", () => {
     const database = openDatabase(":memory:");
     expect(getDatabaseSchemaVersion(database)).toBe(DATABASE_SCHEMA_VERSION);
-    expect(DATABASE_MIGRATIONS.map((migration) => migration.version)).toEqual([1, 2, 3, 4, 5, 6]);
+    expect(DATABASE_MIGRATIONS.map((migration) => migration.version)).toEqual([
+      1, 2, 3, 4, 5, 6, 7,
+    ]);
     database.close();
   });
 });

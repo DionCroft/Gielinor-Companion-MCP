@@ -21,7 +21,13 @@ export type ToolEnvelope<T> = {
 
 export type RuntimeStatus = {
   ready: boolean;
-  mode: "bundled" | "development" | "configured" | "browser-preview" | "unavailable";
+  mode:
+    | "native-real"
+    | "browser-live-development"
+    | "browser-preview"
+    | "automated-test"
+    | "unavailable";
+  transport?: "bundled" | "development" | "configured" | "unavailable";
   message: string;
 };
 

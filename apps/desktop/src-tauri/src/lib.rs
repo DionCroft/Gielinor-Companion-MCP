@@ -67,6 +67,30 @@ const ALLOWED_TOOLS: &[&str] = &[
     "check_for_software_updates",
     "clear_expired_quarantine_records",
     "reset_provider_circuit",
+    "get_selected_player_snapshot",
+    "set_selected_player_profile",
+    "get_player_holdings",
+    "replace_player_holdings",
+    "upsert_player_holding",
+    "import_player_holdings",
+    "export_player_holdings",
+    "record_ge_trade",
+    "list_ge_trades",
+    "update_ge_trade",
+    "remove_ge_trade",
+    "get_market_preferences",
+    "update_market_preferences",
+    "create_market_watchlist",
+    "update_market_watchlist",
+    "get_market_watchlist",
+    "analyse_ge_item",
+    "scan_ge_opportunities",
+    "get_ge_buy_candidates",
+    "get_ge_sell_candidates",
+    "create_manual_ge_order_plan",
+    "explain_ge_recommendation",
+    "backtest_ge_strategy",
+    "get_portfolio_summary",
 ];
 const MAX_ARGUMENT_BYTES: usize = 256 * 1024;
 
@@ -100,6 +124,7 @@ impl BridgeError {
 struct RuntimeStatus {
     ready: bool,
     mode: &'static str,
+    transport: &'static str,
     message: String,
 }
 
@@ -127,16 +152,7 @@ fn bundled_executable() -> Option<PathBuf> {
     if exact.is_file() {
         return Some(exact);
     }
-    std::fs::read_dir(directory)
-        .ok()?
-        .flatten()
-        .map(|entry| entry.path())
-        .find(|path| {
-            path.file_name()
-                .and_then(|name| name.to_str())
-                .is_some_and(|name| name.starts_with("gielinor-runtime"))
-                && path.is_file()
-        })
+    None
 }
 
 fn resolve_runtime(app: &AppHandle) -> Result<RuntimeCommand, BridgeError> {
@@ -178,16 +194,6 @@ fn resolve_runtime(app: &AppHandle) -> Result<RuntimeCommand, BridgeError> {
         }
     }
 
-    #[cfg(not(debug_assertions))]
-    let entry = development_entry();
-    #[cfg(not(debug_assertions))]
-    if entry.is_file() {
-        return Ok(RuntimeCommand {
-            executable: PathBuf::from(if cfg!(windows) { "node.exe" } else { "node" }),
-            entry,
-            mode: "development",
-        });
-    }
     Err(BridgeError::RuntimeUnavailable)
 }
 
@@ -325,12 +331,14 @@ async fn desktop_runtime_status(app: AppHandle) -> RuntimeStatus {
     match resolve_runtime(&app) {
         Ok(runtime) => RuntimeStatus {
             ready: true,
-            mode: runtime.mode,
+            mode: "native-real",
+            transport: runtime.mode,
             message: "Local deterministic companion runtime is ready.".into(),
         },
         Err(error) => RuntimeStatus {
             ready: false,
-            mode: "unavailable",
+            mode: "native-real",
+            transport: "unavailable",
             message: error.public_message(),
         },
     }
@@ -383,7 +391,7 @@ mod tests {
         assert!(is_allowed_tool("create_levelling_plan"));
         assert!(!is_allowed_tool("run_shell_command"));
         assert!(!is_allowed_tool("../mcp-server"));
-        assert_eq!(ALLOWED_TOOLS.len(), 60);
+        assert_eq!(ALLOWED_TOOLS.len(), 84);
     }
 
     #[test]

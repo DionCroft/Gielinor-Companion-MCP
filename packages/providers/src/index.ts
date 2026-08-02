@@ -10,3 +10,5 @@ export * from "./runescape-wiki-quests.js";
 export * from "./runescape-wiki-training.js";
 export * from "./plugin.js";
 export * from "./request-deduplicator.js";
+export * from "./weird-gloop-exchange.js";
+export * from "./weird-gloop-news.js";

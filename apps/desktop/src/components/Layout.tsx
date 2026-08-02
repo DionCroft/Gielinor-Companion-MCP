@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 
 import type { AppState, ViewId } from "../state/app-state.js";
+import { RuntimeDataBanner } from "./Common.js";
 import type { IconName } from "./Icon.js";
 import { Icon } from "./Icon.js";
 
@@ -131,6 +132,7 @@ export function Layout({
             </div>
           </div>
         </header>
+        <RuntimeDataBanner runtime={state.runtime} />
         {state.notice === undefined ? null : (
           <div className={`global-notice notice-${state.notice.tone}`} role="status">
             <span>{state.notice.message}</span>

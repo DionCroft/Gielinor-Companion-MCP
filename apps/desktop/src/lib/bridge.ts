@@ -4,7 +4,6 @@ import {
   type JsonTransportRequest,
   type JsonTransportResponse,
 } from "@gielinor/agent-runtime";
-import { parseHiscoresCsv } from "@gielinor/providers/jagex-hiscores-parser";
 import {
   APPLICATION_VERSION,
   SKILL_IDS,
@@ -31,27 +30,6 @@ import type {
 } from "../types.js";
 
 const NOW = "2026-07-23T12:00:00.000Z";
-const LIVE_BROWSER_FIXTURE = "live";
-
-async function readLiveBrowserSkills(
-  displayName: string,
-  gameMode: PlayerProfile["gameMode"],
-): Promise<PlayerProfile["skills"]> {
-  const effectiveMode = gameMode === "unknown" ? "normal" : gameMode;
-  const parameters = new URLSearchParams({ player: displayName });
-  const response = await fetch(`/__gielinor/hiscores/${effectiveMode}?${parameters.toString()}`, {
-    headers: { accept: "text/plain" },
-  });
-  if (!response.ok) {
-    if (response.status === 404) {
-      throw new Error(
-        `${displayName} was not found on the ${effectiveMode.replaceAll("-", " ")} Hiscores.`,
-      );
-    }
-    throw new Error(`Jagex public Hiscores returned HTTP ${response.status}.`);
-  }
-  return parseHiscoresCsv(await response.text());
-}
 
 function envelope<T>(data: T, source = "browser preview fixture"): ToolEnvelope<T> {
   return { data, meta: { generatedAt: NOW, source } };
@@ -108,7 +86,7 @@ function demoSystemHealth(offline = false, circuitOpen = false): SystemHealth {
         recordCount: 269,
         freshnessIntervalMs: 86_400_000,
         ageMs: 0,
-        source: "RuneScape Wiki",
+        source: "fixture: RuneScape Wiki quest preview",
         lastSuccessAt: NOW,
         nextRefreshAt: "2026-07-24T12:00:00.000Z",
       },
@@ -118,7 +96,7 @@ function demoSystemHealth(offline = false, circuitOpen = false): SystemHealth {
         recordCount: 793,
         freshnessIntervalMs: 86_400_000,
         ageMs: 0,
-        source: "RuneScape Wiki",
+        source: "fixture: RuneScape Wiki training preview",
         lastSuccessAt: NOW,
         nextRefreshAt: "2026-07-24T12:00:00.000Z",
       },
@@ -128,7 +106,7 @@ function demoSystemHealth(offline = false, circuitOpen = false): SystemHealth {
         recordCount: 7_310,
         freshnessIntervalMs: 21_600_000,
         ageMs: 0,
-        source: "RuneScape Wiki GE Market Watch",
+        source: "fixture: Grand Exchange preview",
         lastSuccessAt: NOW,
         nextRefreshAt: "2026-07-23T18:00:00.000Z",
       },
@@ -190,7 +168,7 @@ const PRICE_ITEMS: PriceItem[] = [
     alchemyValue: 72_000,
     volume: 931,
     timestamp: NOW,
-    sourceName: "RuneScape Wiki GE Market Watch",
+    sourceName: "fixture: Grand Exchange preview",
   },
   {
     itemId: 453,
@@ -200,7 +178,7 @@ const PRICE_ITEMS: PriceItem[] = [
     alchemyValue: 27,
     volume: 3_200_000,
     timestamp: NOW,
-    sourceName: "RuneScape Wiki GE Market Watch",
+    sourceName: "fixture: Grand Exchange preview",
   },
   {
     itemId: 2,
@@ -209,7 +187,7 @@ const PRICE_ITEMS: PriceItem[] = [
     buyLimit: 25_000,
     volume: 980_000,
     timestamp: NOW,
-    sourceName: "RuneScape Wiki GE Market Watch",
+    sourceName: "fixture: Grand Exchange preview",
   },
 ];
 const DEFAULT_PRICE_ITEM: PriceItem = PRICE_ITEMS[0]!;
@@ -323,10 +301,15 @@ class TauriJsonTransport implements JsonTransport {
 
 export class DemoCompanionBridge implements CompanionBridge {
   private readonly fixture: string;
+  private readonly runtimeMode: "browser-preview" | "automated-test";
   private profiles: PlayerProfile[];
 
-  public constructor(fixture = "first-run") {
+  public constructor(
+    fixture = "first-run",
+    runtimeMode: "browser-preview" | "automated-test" = "automated-test",
+  ) {
     this.fixture = fixture;
+    this.runtimeMode = runtimeMode;
     this.profiles = [
       "returning",
       "offline",
@@ -340,22 +323,24 @@ export class DemoCompanionBridge implements CompanionBridge {
   }
 
   public async runtimeStatus(): Promise<RuntimeStatus> {
-    if (this.fixture === LIVE_BROWSER_FIXTURE) {
-      return {
-        ready: true,
-        mode: "browser-preview",
-        message:
-          "Local browser development uses live public Hiscores. Planning catalogues remain deterministic preview data.",
-      };
-    }
     return {
       ready: true,
-      mode: "browser-preview",
+      mode: this.runtimeMode,
       message:
         this.fixture === "offline"
-          ? "Offline preview: validated local fixture data is available."
-          : "Browser preview uses deterministic fixture data.",
+          ? "Offline fixture preview: deterministic local test data is available."
+          : this.runtimeMode === "automated-test"
+            ? "Automated-test mode uses deterministic fixture data."
+            : "Browser preview uses deterministic fixture data.",
     };
+  }
+
+  private requireProfile(profileId: unknown): PlayerProfile {
+    const profile = this.profiles.find((candidate) => candidate.id === profileId);
+    if (profile === undefined) {
+      throw new Error("Player profile was not found");
+    }
+    return profile;
   }
 
   public localAiTransport(): JsonTransport {
@@ -486,7 +471,7 @@ export class DemoCompanionBridge implements CompanionBridge {
   ): Promise<ToolEnvelope<T>> {
     this.providerGuard(tool);
     let result: unknown;
-    let source = "browser preview fixture";
+    const source = "browser preview fixture";
     switch (tool) {
       case "list_player_profiles":
         result = this.profiles;
@@ -506,27 +491,16 @@ export class DemoCompanionBridge implements CompanionBridge {
         break;
       }
       case "get_player_profile":
-        result =
-          this.profiles.find((profile) => profile.id === arguments_.profileId) ?? this.profiles[0];
+        result = this.requireProfile(arguments_.profileId);
         break;
       case "refresh_player_stats": {
-        const profile = this.profiles.find((candidate) => candidate.id === arguments_.profileId);
-        if (profile === undefined) {
-          throw new Error("Player profile was not found");
-        }
-        const skills =
-          this.fixture === LIVE_BROWSER_FIXTURE
-            ? await readLiveBrowserSkills(profile.displayName, profile.gameMode)
-            : demoProfile().skills;
+        const profile = this.requireProfile(arguments_.profileId);
+        const skills = demoProfile().skills;
         const refreshed: PlayerProfile = {
           ...profile,
           skills,
-          lastHiscoresRefresh:
-            this.fixture === LIVE_BROWSER_FIXTURE ? new Date().toISOString() : NOW,
+          lastHiscoresRefresh: NOW,
         };
-        if (this.fixture === LIVE_BROWSER_FIXTURE) {
-          source = "Jagex public Hiscores via the local development proxy";
-        }
         this.profiles = this.profiles.map((candidate) =>
           candidate.id === profile.id ? refreshed : candidate,
         );
@@ -534,10 +508,7 @@ export class DemoCompanionBridge implements CompanionBridge {
         break;
       }
       case "export_player_profile": {
-        const profile = this.profiles.find((candidate) => candidate.id === arguments_.profileId);
-        if (profile === undefined) {
-          throw new Error("Player profile was not found");
-        }
+        const profile = this.requireProfile(arguments_.profileId);
         result = {
           schemaVersion: 1,
           displayName: profile.displayName,
@@ -581,7 +552,7 @@ export class DemoCompanionBridge implements CompanionBridge {
         break;
       }
       case "get_skill_progress": {
-        const profile = this.profiles[0] ?? demoProfile();
+        const profile = this.requireProfile(arguments_.profileId);
         const skill = profile.skills.find((candidate) => candidate.skillId === arguments_.skillId);
         const currentExperience = skill?.experience ?? 0;
         result = {
@@ -602,6 +573,7 @@ export class DemoCompanionBridge implements CompanionBridge {
         break;
       }
       case "create_quest_route":
+        this.requireProfile(arguments_.profileId);
         result = {
           targetQuestId: "plague-s-end",
           steps: [
@@ -628,6 +600,7 @@ export class DemoCompanionBridge implements CompanionBridge {
         } satisfies QuestRoute;
         break;
       case "create_quest_shopping_list":
+        this.requireProfile(arguments_.profileId);
         result = {
           targetQuestId: "plague-s-end",
           routeQuestIds: ["making-history", "within-the-light", "plague-s-end"],
@@ -648,10 +621,29 @@ export class DemoCompanionBridge implements CompanionBridge {
           ],
         } satisfies ShoppingList;
         break;
-      case "set_quest_status":
-        result = this.profiles[0] ?? demoProfile();
+      case "set_quest_status": {
+        const profile = this.requireProfile(arguments_.profileId);
+        const questId = String(arguments_.quest);
+        const completed = profile.completedQuestIds.filter((id) => id !== questId);
+        const inProgress = profile.inProgressQuestIds.filter((id) => id !== questId);
+        if (arguments_.status === "completed") {
+          completed.push(questId);
+        } else if (arguments_.status === "in-progress") {
+          inProgress.push(questId);
+        }
+        const updated = {
+          ...profile,
+          completedQuestIds: completed,
+          inProgressQuestIds: inProgress,
+        };
+        this.profiles = this.profiles.map((candidate) =>
+          candidate.id === profile.id ? updated : candidate,
+        );
+        result = updated;
         break;
+      }
       case "create_levelling_plan":
+        this.requireProfile(arguments_.profileId);
         result = {
           skillId: String(arguments_.skillId),
           currentLevel: 62,
@@ -734,7 +726,7 @@ export class DemoCompanionBridge implements CompanionBridge {
       case "get_quest_data_status":
         result = {
           state: "ready",
-          provider: "RuneScape Wiki",
+          provider: "fixture: RuneScape Wiki quest preview",
           lastSuccessfulSyncAt: NOW,
           questCount: 269,
         } satisfies DataStatus;
@@ -742,7 +734,7 @@ export class DemoCompanionBridge implements CompanionBridge {
       case "get_training_data_status":
         result = {
           state: "ready",
-          provider: "RuneScape Wiki",
+          provider: "fixture: RuneScape Wiki training preview",
           lastSuccessfulSyncAt: NOW,
           methodCount: 793,
           coveredSkills: [...SKILL_IDS],
@@ -751,7 +743,7 @@ export class DemoCompanionBridge implements CompanionBridge {
       case "get_price_data_status":
         result = {
           state: "ready",
-          provider: "RuneScape Wiki GE Market Watch",
+          provider: "fixture: Grand Exchange preview",
           lastSuccessfulSyncAt: NOW,
           itemCount: 7_310,
           historyPointCount: 180,
@@ -871,12 +863,69 @@ export class DemoCompanionBridge implements CompanionBridge {
   }
 }
 
+export class BrowserLiveDevelopmentBridge implements CompanionBridge {
+  public async runtimeStatus(): Promise<RuntimeStatus> {
+    return {
+      ready: false,
+      mode: "browser-live-development",
+      transport: "unavailable",
+      message:
+        "Browser live-development is not connected to the local MCP and SQLite runtime. Run `corepack pnpm desktop:dev` for real functionality, or explicitly select browser-preview mode.",
+    };
+  }
+
+  public async callTool<T>(
+    tool: string,
+    arguments_: Record<string, unknown>,
+  ): Promise<ToolEnvelope<T>> {
+    void arguments_;
+    if (tool === "list_player_profiles") {
+      return {
+        data: [] as T,
+        meta: {
+          generatedAt: new Date().toISOString(),
+          source: "unavailable: browser live-development has no local MCP connection",
+        },
+      };
+    }
+    throw new Error(
+      "Real companion tools are unavailable in a standalone browser. Run `corepack pnpm desktop:dev` to use the native MCP and SQLite bridge.",
+    );
+  }
+
+  public localAiTransport(): JsonTransport {
+    return {
+      request: async () => ({
+        status: 503,
+        body: {
+          error:
+            "Local AI is unavailable in standalone browser mode; use the native desktop runtime.",
+        },
+      }),
+    };
+  }
+}
+
+function explicitBrowserMode(): "browser-preview" | "automated-test" | undefined {
+  const queryMode = new URLSearchParams(window.location.search).get("mode");
+  const requestedMode = queryMode ?? import.meta.env.VITE_GIELINOR_RUNTIME_MODE;
+  if (requestedMode === "browser-preview" || requestedMode === "automated-test") {
+    return requestedMode;
+  }
+  return undefined;
+}
+
 export function createDefaultBridge(): CompanionBridge {
   if (isTauri()) {
     return new TauriCompanionBridge();
   }
-  const fixture =
-    new URLSearchParams(window.location.search).get("fixture") ??
-    (import.meta.env.DEV ? LIVE_BROWSER_FIXTURE : "first-run");
-  return new DemoCompanionBridge(fixture);
+  const mode = explicitBrowserMode();
+  if (mode !== undefined) {
+    const fixture =
+      new URLSearchParams(window.location.search).get("fixture") ??
+      import.meta.env.VITE_GIELINOR_FIXTURE ??
+      "first-run";
+    return new DemoCompanionBridge(fixture, mode);
+  }
+  return new BrowserLiveDevelopmentBridge();
 }

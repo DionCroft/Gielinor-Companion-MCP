@@ -16,11 +16,17 @@ describe("desktop application flows", () => {
     render(<App bridge={new DemoCompanionBridge("first-run")} />);
 
     expect(await screen.findByRole("heading", { name: /plan with confidence/i })).toBeVisible();
+    expect(
+      screen.getByText("Preview data — not connected to RuneScape or your local profile."),
+    ).toBeVisible();
     await user.type(screen.getByLabelText(/runescape display name/i), "Local Hero");
     await user.click(screen.getByRole("button", { name: /continue to companion/i }));
 
     expect(await screen.findByRole("heading", { name: /welcome back, local hero/i })).toBeVisible();
     expect(screen.getByText(/local & read-only/i)).toBeVisible();
+    expect(
+      screen.getByText("Preview data — not connected to RuneScape or your local profile."),
+    ).toBeVisible();
   });
 
   it("builds a deterministic quest route and checklist", async () => {
