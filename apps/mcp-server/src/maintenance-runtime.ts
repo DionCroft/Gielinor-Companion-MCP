@@ -110,13 +110,15 @@ export async function createCatalogueMaintenanceRuntime(input: {
   quests: QuestService;
   planner: LevellingPlannerService;
   exchange: GrandExchangeService;
-  offline?: boolean;
+  offline?: boolean | (() => boolean);
   diagnostics?: SqliteDiagnosticsRepository | undefined;
   updateChecker?: SoftwareUpdateService | undefined;
   policy?: MaintenanceRuntimePolicy | undefined;
   now?: (() => number) | undefined;
 }): Promise<CatalogueMaintenanceRuntime> {
   const now = input.now ?? Date.now;
+  const isOffline = (): boolean =>
+    typeof input.offline === "function" ? input.offline() : (input.offline ?? false);
   const policy = input.policy ?? loadMaintenanceRuntimePolicy();
   const [quests, training, prices] = await Promise.all([
     input.quests.getDataStatus(),
@@ -127,7 +129,7 @@ export async function createCatalogueMaintenanceRuntime(input: {
     { quests, training, prices },
     {
       now: now(),
-      enabled: policy.automaticRefreshEnabled && !(input.offline ?? false),
+      enabled: policy.automaticRefreshEnabled && !isOffline(),
       intervals: policy.intervals,
     },
   ).map((definition) =>
@@ -176,7 +178,7 @@ export async function createCatalogueMaintenanceRuntime(input: {
     },
     {
       now,
-      networkAllowed: () => !(input.offline ?? false),
+      networkAllowed: () => !isOffline(),
       concurrency: policy.concurrency,
       maximumRecoveryAttempts: policy.maximumRecoveryAttempts,
       onError: (error) => input.diagnostics?.recordError(error),

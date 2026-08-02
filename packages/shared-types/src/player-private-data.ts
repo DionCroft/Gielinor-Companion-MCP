@@ -108,6 +108,35 @@ export const MarketWatchlistSchema = z
   });
 export type MarketWatchlist = z.infer<typeof MarketWatchlistSchema>;
 
+export const PaperTradeRecordSchema = z
+  .object({
+    id: z.string().uuid(),
+    profileId: z.string().uuid(),
+    itemId: z.number().int().positive(),
+    side: z.enum(["buy", "sell"]),
+    quantity: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
+    unitPrice: gpAmount,
+    occurredAt: isoDateTime,
+    source: z.literal("paper-simulation"),
+  })
+  .strict();
+export type PaperTradeRecord = z.infer<typeof PaperTradeRecordSchema>;
+
+export const PaperPortfolioSchema = z
+  .object({
+    schemaVersion: z.literal(1),
+    profileId: z.string().uuid(),
+    initialCashGp: gpAmount,
+    cashGp: gpAmount,
+    holdings: z.array(PlayerHoldingSchema).max(20_000),
+    trades: z.array(PaperTradeRecordSchema).max(100_000),
+    createdAt: isoDateTime,
+    updatedAt: isoDateTime,
+    disclaimer: z.string().min(1),
+  })
+  .strict();
+export type PaperPortfolio = z.infer<typeof PaperPortfolioSchema>;
+
 export const SelectedPlayerSnapshotSchema = z
   .object({
     profileId: z.string().uuid(),

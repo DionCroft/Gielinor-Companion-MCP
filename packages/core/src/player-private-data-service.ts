@@ -8,12 +8,15 @@ import {
   PlayerHoldingSchema,
   PlayerHoldingsSnapshotSchema,
   PlayerPrivateDataSourceSchema,
+  PaperPortfolioSchema,
+  PaperTradeRecordSchema,
   type GeTradeRecord,
   type MarketPreferences,
   type MarketWatchlist,
   type PlayerHolding,
   type PlayerHoldingsSnapshot,
   type PlayerPrivateDataSource,
+  type PaperPortfolio,
 } from "@gielinor/shared-types";
 import { z } from "zod";
 
@@ -106,10 +109,16 @@ function parseHoldingsCsv(content: string): z.infer<typeof HoldingsReplacementSc
     const itemId = Number(values[index("itemId")]);
     const quantity = Number(values[index("quantity")]);
     if (!Number.isSafeInteger(itemId) || itemId <= 0) {
-      throw new CompanionError(`Holdings CSV line ${lineIndex + 2} has an invalid itemId`, "INVALID_CSV");
+      throw new CompanionError(
+        `Holdings CSV line ${lineIndex + 2} has an invalid itemId`,
+        "INVALID_CSV",
+      );
     }
     if (!Number.isSafeInteger(quantity) || quantity <= 0) {
-      throw new CompanionError(`Holdings CSV line ${lineIndex + 2} has an invalid quantity`, "INVALID_CSV");
+      throw new CompanionError(
+        `Holdings CSV line ${lineIndex + 2} has an invalid quantity`,
+        "INVALID_CSV",
+      );
     }
     const acquisitionIndex = index("averageAcquisitionPrice");
     const notesIndex = index("notes");
@@ -208,7 +217,10 @@ export class PlayerPrivateDataService {
     confirmReplace: boolean;
   }): Promise<PlayerHoldingsSnapshot> {
     if (new TextEncoder().encode(input.content).byteLength > 5 * 1024 * 1024) {
-      throw new CompanionError("Holdings import exceeds the five-megabyte limit", "INPUT_TOO_LARGE");
+      throw new CompanionError(
+        "Holdings import exceeds the five-megabyte limit",
+        "INPUT_TOO_LARGE",
+      );
     }
     requireBulkConfirmation(input.confirmReplace);
     let replacement: z.infer<typeof HoldingsReplacementSchema>;
@@ -396,5 +408,111 @@ export class PlayerPrivateDataService {
       this.getMarketPreferences(selected.profileId),
     ]);
     return { profile, holdings, marketPreferences, selectedAt: selected.selectedAt };
+  }
+
+  public async getPaperPortfolio(
+    profileId: string,
+    initialCashGp = 10_000_000,
+  ): Promise<PaperPortfolio> {
+    await this.requireProfile(profileId);
+    const stored = await this.repository.getPaperPortfolio(profileId);
+    if (stored !== null) {
+      return stored;
+    }
+    const now = new Date().toISOString();
+    return PaperPortfolioSchema.parse({
+      schemaVersion: 1,
+      profileId,
+      initialCashGp,
+      cashGp: initialCashGp,
+      holdings: [],
+      trades: [],
+      createdAt: now,
+      updatedAt: now,
+      disclaimer:
+        "Paper trades are hypothetical and do not place or change any RuneScape Grand Exchange offer.",
+    });
+  }
+
+  public async recordPaperTrade(input: {
+    profileId: string;
+    itemId: number;
+    side: "buy" | "sell";
+    quantity: number;
+    unitPrice: number;
+    occurredAt?: string | undefined;
+    initialCashGp?: number | undefined;
+  }): Promise<PaperPortfolio> {
+    const current = await this.getPaperPortfolio(input.profileId, input.initialCashGp);
+    const trade = PaperTradeRecordSchema.parse({
+      id: randomUUID(),
+      profileId: input.profileId,
+      itemId: input.itemId,
+      side: input.side,
+      quantity: input.quantity,
+      unitPrice: input.unitPrice,
+      occurredAt: input.occurredAt ?? new Date().toISOString(),
+      source: "paper-simulation",
+    });
+    const value = trade.quantity * trade.unitPrice;
+    if (!Number.isSafeInteger(value)) {
+      throw new CompanionError("Paper trade value exceeds the safe GP range", "NUMERIC_OVERFLOW");
+    }
+    const holdings = [...current.holdings];
+    const index = holdings.findIndex(({ itemId }) => itemId === trade.itemId);
+    const existing = index < 0 ? undefined : holdings[index];
+    let cashGp = current.cashGp;
+    if (trade.side === "buy") {
+      if (value > cashGp) {
+        throw new CompanionError(
+          "Paper portfolio has insufficient simulated cash",
+          "INSUFFICIENT_FUNDS",
+        );
+      }
+      const priorQuantity = existing?.quantity ?? 0;
+      const priorCost = priorQuantity * (existing?.averageAcquisitionPrice ?? trade.unitPrice);
+      const quantity = priorQuantity + trade.quantity;
+      if (!Number.isSafeInteger(quantity)) {
+        throw new CompanionError(
+          "Paper holding quantity exceeds the safe range",
+          "NUMERIC_OVERFLOW",
+        );
+      }
+      const updated = PlayerHoldingSchema.parse({
+        itemId: trade.itemId,
+        quantity,
+        averageAcquisitionPrice: Math.round((priorCost + value) / quantity),
+        notes: "Paper portfolio only",
+      });
+      if (index < 0) holdings.push(updated);
+      else holdings[index] = updated;
+      cashGp -= value;
+    } else {
+      if (existing === undefined || existing.quantity < trade.quantity) {
+        throw new CompanionError(
+          "Paper portfolio cannot sell more than it holds",
+          "INSUFFICIENT_HOLDINGS",
+        );
+      }
+      const remaining = existing.quantity - trade.quantity;
+      if (remaining === 0) holdings.splice(index, 1);
+      else holdings[index] = { ...existing, quantity: remaining };
+      cashGp += value;
+      if (!Number.isSafeInteger(cashGp)) {
+        throw new CompanionError(
+          "Paper cash balance exceeds the safe GP range",
+          "NUMERIC_OVERFLOW",
+        );
+      }
+    }
+    return this.repository.savePaperPortfolio(
+      PaperPortfolioSchema.parse({
+        ...current,
+        cashGp,
+        holdings: holdings.sort((left, right) => left.itemId - right.itemId),
+        trades: [...current.trades, trade],
+        updatedAt: new Date().toISOString(),
+      }),
+    );
   }
 }

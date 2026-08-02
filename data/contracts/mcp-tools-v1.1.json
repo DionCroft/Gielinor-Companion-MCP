@@ -3,7 +3,7 @@
   "contractVersion": "1.1",
   "stability": "stable",
   "profileExportSchemaVersion": 1,
-  "toolCount": 84,
+  "toolCount": 93,
   "resultEnvelope": {
     "type": "object",
     "additionalProperties": false,
@@ -3423,6 +3423,227 @@
         },
         "required": [
           "profileId"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "get_real_data_status",
+      "description": "Read native runtime, offline enforcement, selected profile and catalogue truth states.",
+      "effect": "read-only",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "refresh_all_real_data",
+      "description": "Run an isolated staged refresh across selected Hiscores and all public catalogues.",
+      "effect": "local-state",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "get_market_data_status",
+      "description": "Read local GE catalogue/history counts, source revision, freshness and offline state.",
+      "effect": "read-only",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "refresh_market_data",
+      "description": "Transactionally refresh the public RS3 GE catalogue and optional item histories.",
+      "effect": "local-state",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "itemIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "exclusiveMinimum": true,
+              "minimum": 0
+            },
+            "maxItems": 20
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "get_provider_disagreements",
+      "description": "Identify material Jagex guide-price versus Weird Gloop RS3-history differences.",
+      "effect": "read-only",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "profileId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "exclusiveMinimum": true,
+                  "minimum": 0
+                },
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                }
+              ]
+            },
+            "minItems": 1,
+            "maxItems": 100
+          },
+          "forceRefresh": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "profileId",
+          "items"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "set_offline_mode",
+      "description": "Persist backend-enforced offline mode so provider and scheduler network calls stop.",
+      "effect": "local-state",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "offline": {
+            "type": "boolean"
+          },
+          "confirmed": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          }
+        },
+        "required": [
+          "offline",
+          "confirmed"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "get_paper_portfolio",
+      "description": "Read a private hypothetical portfolio that never affects RuneScape or real GP.",
+      "effect": "read-only",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "profileId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "initialCashGp": {
+            "type": "integer",
+            "exclusiveMinimum": true,
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "profileId"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "record_paper_trade",
+      "description": "Record a validated hypothetical trade with simulated cash and holding constraints.",
+      "effect": "local-state",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "profileId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "itemId": {
+            "type": "integer",
+            "exclusiveMinimum": true,
+            "minimum": 0
+          },
+          "side": {
+            "type": "string",
+            "enum": [
+              "buy",
+              "sell"
+            ]
+          },
+          "quantity": {
+            "type": "integer",
+            "exclusiveMinimum": true,
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "unitPrice": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "initialCashGp": {
+            "type": "integer",
+            "exclusiveMinimum": true,
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "profileId",
+          "itemId",
+          "side",
+          "quantity",
+          "unitPrice"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "create_account_aware_quest_shopping_list",
+      "description": "Aggregate required quest items and optionally subtract the selected profile's confirmed local holdings.",
+      "effect": "read-only",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "profileId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "quest": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "subtractOwned": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "profileId",
+          "quest"
         ],
         "additionalProperties": false
       }

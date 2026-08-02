@@ -13,12 +13,14 @@ import {
   CreateMarketWatchlistToolInputSchema,
   CreateLevellingPlanToolInputSchema,
   CreatePlayerProfileToolInputSchema,
+  CreateQuestShoppingListToolInputSchema,
   CreateWeeklyGoalPlanToolInputSchema,
   EmptyInputSchema,
   ExportPriceDataToolInputSchema,
   ExportPlayerHoldingsToolInputSchema,
   GetItemPriceToolInputSchema,
   GetMarketWatchlistToolInputSchema,
+  GetPaperPortfolioToolInputSchema,
   GetPlayerStatsToolInputSchema,
   GetSkillProgressToolInputSchema,
   GetTrainingMethodToolInputSchema,
@@ -37,12 +39,14 @@ import {
   RefreshStaleCataloguesToolInputSchema,
   ResetProviderCircuitToolInputSchema,
   RecordGeTradeToolInputSchema,
+  RecordPaperTradeToolInputSchema,
   RemoveGeTradeToolInputSchema,
   ReplacePlayerHoldingsToolInputSchema,
   RetryFailedOperationToolInputSchema,
   SearchItemsToolInputSchema,
   SearchQuestsToolInputSchema,
   ScanGeOpportunitiesToolInputSchema,
+  SetOfflineModeToolInputSchema,
   SetMultipleQuestStatusesToolInputSchema,
   SetQuestStatusToolInputSchema,
   UpdatePlayerPreferencesToolInputSchema,
@@ -501,6 +505,57 @@ export const COMPANION_TOOL_DEFINITIONS_V1_1_ADDITIONS = {
     description:
       "Calculate local holdings guide value, cost basis, gains and concentration exposure.",
     inputSchema: ProfileIdInputSchema,
+    effect: "read-only",
+  },
+  get_real_data_status: {
+    description:
+      "Read native runtime, offline enforcement, selected profile and catalogue truth states.",
+    inputSchema: EmptyInputSchema,
+    effect: "read-only",
+  },
+  refresh_all_real_data: {
+    description:
+      "Run an isolated staged refresh across selected Hiscores and all public catalogues.",
+    inputSchema: EmptyInputSchema,
+    effect: "local-state",
+  },
+  get_market_data_status: {
+    description:
+      "Read local GE catalogue/history counts, source revision, freshness and offline state.",
+    inputSchema: EmptyInputSchema,
+    effect: "read-only",
+  },
+  refresh_market_data: {
+    description: "Transactionally refresh the public RS3 GE catalogue and optional item histories.",
+    inputSchema: RefreshPriceDataToolInputSchema,
+    effect: "local-state",
+  },
+  get_provider_disagreements: {
+    description: "Identify material Jagex guide-price versus Weird Gloop RS3-history differences.",
+    inputSchema: ScanGeOpportunitiesToolInputSchema,
+    effect: "read-only",
+  },
+  set_offline_mode: {
+    description:
+      "Persist backend-enforced offline mode so provider and scheduler network calls stop.",
+    inputSchema: SetOfflineModeToolInputSchema,
+    effect: "local-state",
+  },
+  get_paper_portfolio: {
+    description: "Read a private hypothetical portfolio that never affects RuneScape or real GP.",
+    inputSchema: GetPaperPortfolioToolInputSchema,
+    effect: "read-only",
+  },
+  record_paper_trade: {
+    description:
+      "Record a validated hypothetical trade with simulated cash and holding constraints.",
+    inputSchema: RecordPaperTradeToolInputSchema,
+    effect: "local-state",
+  },
+  create_account_aware_quest_shopping_list: {
+    description:
+      "Aggregate required quest items and optionally subtract the selected profile's confirmed local holdings.",
+    inputSchema: CreateQuestShoppingListToolInputSchema,
     effect: "read-only",
   },
 } as const satisfies Record<string, CompanionToolDefinition>;

@@ -103,6 +103,32 @@ export function FirstRunView({
     }
   }
 
+  async function retryStage(stageId: SetupStageId): Promise<void> {
+    if (profile === undefined) return;
+    setBusy(true);
+    setError(undefined);
+    try {
+      if (stageId === "statistics") {
+        updateStage("statistics", "active");
+        const refreshed = await bridge.callTool<DesktopProfile>("refresh_player_stats", {
+          profileId: profile.id,
+        });
+        setProfile(refreshed.data);
+        updateStage("statistics", "complete", "Public Hiscores refreshed");
+        return;
+      }
+      const catalogue = CATALOGUES.find(({ id }) => id === stageId);
+      if (catalogue !== undefined) {
+        await populateCatalogue(catalogue);
+      }
+    } catch (caught) {
+      const failure = desktopError(caught, `first-run-retry-${stageId}`, "GC-SYNC-001");
+      updateStage(stageId, "failed", `${failure.code}; trace ${failure.traceId}`);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const parsed = CreateProfileFormSchema.safeParse({ displayName, gameMode });
@@ -120,6 +146,7 @@ export function FirstRunView({
       const created = await bridge.callTool<DesktopProfile>("create_player_profile", parsed.data);
       let profile = created.data;
       setProfile(profile);
+      await bridge.callTool("set_selected_player_profile", { profileId: profile.id });
       updateStage("database", "complete", "Local profile storage is ready");
       updateStage("statistics", "active");
       try {
@@ -242,6 +269,16 @@ export function FirstRunView({
                   <strong>{stage.label}</strong>
                   {stage.detail === undefined ? null : <small>{stage.detail}</small>}
                 </span>
+                {stage.status === "failed" && stage.id !== "database" ? (
+                  <button
+                    className="secondary-button"
+                    type="button"
+                    disabled={busy}
+                    onClick={() => void retryStage(stage.id)}
+                  >
+                    Retry
+                  </button>
+                ) : null}
               </li>
             ))}
           </ol>

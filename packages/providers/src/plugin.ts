@@ -565,15 +565,15 @@ export class ProviderPortAdapter implements PlayerStatsProvider, GrandExchangeDa
 
   public constructor(
     public readonly registry: ProviderRegistry,
-    private readonly offline = false,
+    private readonly offline: boolean | (() => boolean) = false,
   ) {
     this.quests = {
       fetchSnapshot: async () =>
-        (await this.registry.execute("quest-snapshot", {}, { offline: this.offline })).value,
+        (await this.registry.execute("quest-snapshot", {}, { offline: this.isOffline() })).value,
     };
     this.training = {
       fetchSnapshot: async () =>
-        (await this.registry.execute("training-snapshot", {}, { offline: this.offline })).value,
+        (await this.registry.execute("training-snapshot", {}, { offline: this.isOffline() })).value,
     };
   }
 
@@ -604,13 +604,17 @@ export class ProviderPortAdapter implements PlayerStatsProvider, GrandExchangeDa
   }
 
   public async fetchSnapshot(): Promise<PriceDataSnapshot> {
-    return (await this.registry.execute("price-snapshot", {}, { offline: this.offline })).value;
+    return (await this.registry.execute("price-snapshot", {}, { offline: this.isOffline() })).value;
   }
 
   private options(options: ProviderRequestOptions): ProviderRouteOptions {
     return {
       forceRefresh: options.forceRefresh ?? false,
-      offline: this.offline || (options.offline ?? false),
+      offline: this.isOffline() || (options.offline ?? false),
     };
+  }
+
+  private isOffline(): boolean {
+    return typeof this.offline === "function" ? this.offline() : this.offline;
   }
 }

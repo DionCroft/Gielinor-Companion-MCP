@@ -59,7 +59,7 @@ export type RuntimeDiagnosticsServiceOptions = {
   maintenance?: CatalogueMaintenanceRuntime | undefined;
   maintenancePolicy: MaintenanceRuntimePolicy;
   updateChecker?: SoftwareUpdateService | undefined;
-  offline: boolean;
+  offline: boolean | (() => boolean);
   repository?: SqliteDiagnosticsRepository | undefined;
   configuration?: ScalarConfiguration | undefined;
   recentLogs?: (() => Record<string, unknown>[]) | undefined;
@@ -164,6 +164,12 @@ export class RuntimeDiagnosticsService {
       },
       () => new Date(this.now()),
     );
+  }
+
+  private isOffline(): boolean {
+    return typeof this.options.offline === "function"
+      ? this.options.offline()
+      : this.options.offline;
   }
 
   public getSystemHealth(): Promise<SystemHealth> {
@@ -445,11 +451,11 @@ export class RuntimeDiagnosticsService {
       database: databaseHealth(this.options.databaseRecovery, checkedAt),
       providers,
       catalogues,
-      scheduler: schedulerHealth(jobs, this.options.offline, checkedAt),
+      scheduler: schedulerHealth(jobs, this.isOffline(), checkedAt),
       updateChecker,
       activeErrors: this.listRecentErrors(50, true),
       recentRecoveries: this.listRecoveryEvents(50),
-      offline: this.options.offline,
+      offline: this.isOffline(),
     };
   }
 
@@ -472,7 +478,7 @@ export class RuntimeDiagnosticsService {
     const state: CatalogueHealth["state"] =
       job?.state === "running"
         ? "refreshing"
-        : this.options.offline && recordCount > 0
+        : this.isOffline() && recordCount > 0
           ? "offline"
           : recordCount === 0
             ? status.state === "failed"
@@ -511,7 +517,7 @@ export class RuntimeDiagnosticsService {
         safe[key] = value;
       }
     }
-    safe.offline = this.options.offline;
+    safe.offline = this.isOffline();
     safe.automaticRefreshEnabled = this.options.maintenancePolicy.automaticRefreshEnabled;
     safe.refreshOnStartup = this.options.maintenancePolicy.refreshOnStartup;
     safe.backgroundRefresh = this.options.maintenancePolicy.backgroundRefresh;

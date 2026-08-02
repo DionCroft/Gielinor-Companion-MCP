@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import type { QuestDataProvider } from "@gielinor/core";
 import {
   QuestDataSnapshotSchema,
+  QuestCoverageReportSchema,
   QuestSchema,
   SKILL_IDS,
   SkillIdSchema,
@@ -552,6 +553,39 @@ export class RuneScapeWikiQuestProvider implements QuestDataProvider {
         this.pageEndpoint,
       ).toString();
       const aliases = uniqueAliases([row.page_name, row.page_name_sub, id], name);
+      const skillRequirements = parseSkillRequirements(row);
+      const itemRequirements = parseQuestItems(details.items);
+      const recommendedItems = parseQuestItems(details.recommended);
+      const rewards = parseRewards(rewardRow, questPointReward);
+      const parseWarnings: Quest["parseWarnings"] = [];
+      if (asTextArray(row.requirement_skill).length > 0 && skillRequirements.length === 0) {
+        parseWarnings.push({
+          field: "skillRequirements",
+          message: "The Wiki supplied skill requirement fields, but none could be structured.",
+        });
+      }
+      if (details.items?.trim() && itemRequirements.length === 0) {
+        parseWarnings.push({
+          field: "itemRequirements",
+          message: "The Wiki supplied required-item text, but none could be structured.",
+        });
+      }
+      if (details.recommended?.trim() && recommendedItems.length === 0) {
+        parseWarnings.push({
+          field: "recommendedItems",
+          message: "The Wiki supplied recommended-item text, but none could be structured.",
+        });
+      }
+      if (
+        (rewardRow?.rewards?.trim() || rewardRow?.post_rewards?.trim()) &&
+        rewards.length === (questPointReward === undefined ? 0 : 1)
+      ) {
+        parseWarnings.push({
+          field: "rewards",
+          message:
+            "The Wiki supplied reward text, but no non-quest-point reward could be structured.",
+        });
+      }
       const base = {
         id,
         name,
@@ -569,20 +603,21 @@ export class RuneScapeWikiQuestProvider implements QuestDataProvider {
         prerequisiteQuestIds: prerequisites.map((requirement) => requirement.questId),
         prerequisiteGroups:
           prerequisites.length === 0 ? [] : [{ mode: "all" as const, quests: prerequisites }],
-        skillRequirements: parseSkillRequirements(row),
+        skillRequirements,
         ...(parseQuestPointRequirement(row) === undefined
           ? {}
           : { questPointRequirement: parseQuestPointRequirement(row) }),
         otherRequirements: [...new Set(otherRequirements.filter((value) => value.length > 0))],
-        itemRequirements: parseQuestItems(details.items),
-        recommendedItems: parseQuestItems(details.recommended),
-        rewards: parseRewards(rewardRow, questPointReward),
+        itemRequirements,
+        recommendedItems,
+        rewards,
         guideUrl: sourcePageUrl,
         sourcePageUrl,
         sourceName: WIKI_NAME,
         sourceRevision: `${revision.revisionId}:${requirementRevision.revisionId}`,
         sourceUpdatedAt: revision.timestamp,
         lastCheckedAt: checkedAt,
+        parseWarnings,
       };
       return QuestSchema.parse({
         ...base,
@@ -608,6 +643,24 @@ export class RuneScapeWikiQuestProvider implements QuestDataProvider {
         .map(([title, revision]) => [title, revision.revisionId])
         .sort(([left], [right]) => String(left).localeCompare(String(right))),
     });
+    const warningCounts: Record<string, number> = {};
+    for (const warning of quests.flatMap((quest) => quest.parseWarnings)) {
+      warningCounts[warning.field] = (warningCounts[warning.field] ?? 0) + 1;
+    }
+    const coverage = QuestCoverageReportSchema.parse({
+      totalQuests: quests.length,
+      questsWithPrerequisiteData: quests.filter(
+        (quest) =>
+          quest.prerequisiteGroups.length > 0 ||
+          quest.otherRequirements.some((value) => value.startsWith("Quest prerequisite:")),
+      ).length,
+      questsWithSkillRequirements: quests.filter((quest) => quest.skillRequirements.length > 0)
+        .length,
+      questsWithItemRequirements: quests.filter((quest) => quest.itemRequirements.length > 0)
+        .length,
+      questsWithStructuredRewards: quests.filter((quest) => quest.rewards.length > 0).length,
+      parseWarningsByField: warningCounts,
+    });
     return QuestDataSnapshotSchema.parse({
       provider: WIKI_NAME,
       sourceUrl: new URL(
@@ -617,6 +670,7 @@ export class RuneScapeWikiQuestProvider implements QuestDataProvider {
       sourceRevision: `${requirementRevision.revisionId}:${revisionDigest}`,
       retrievedAt: checkedAt,
       quests,
+      coverage,
     });
   }
 }

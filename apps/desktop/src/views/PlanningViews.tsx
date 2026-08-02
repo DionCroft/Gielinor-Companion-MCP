@@ -1,4 +1,10 @@
 import { useMemo, useState, type FormEvent } from "react";
+import type {
+  MarketBacktestResult,
+  MarketRecommendation,
+  PaperPortfolio,
+  PortfolioSummary,
+} from "@gielinor/shared-types";
 
 import {
   EmptyState,
@@ -567,10 +573,40 @@ function PriceChart({ summary }: { summary: PriceSummary }) {
   );
 }
 
-export function ExchangeView({ bridge }: { bridge: CompanionBridge }) {
+const EXCHANGE_TABS = [
+  "Market overview",
+  "Buy candidates",
+  "Sell candidates",
+  "Watchlist",
+  "Item analysis",
+  "Portfolio",
+  "Trade journal",
+  "Paper trading",
+  "Backtests",
+  "Data status",
+] as const;
+
+type ExchangeTab = (typeof EXCHANGE_TABS)[number];
+
+export function ExchangeView({
+  bridge,
+  profile,
+}: {
+  bridge: CompanionBridge;
+  profile: DesktopProfile;
+}) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<PriceItem[]>([]);
   const [summary, setSummary] = useState<PriceSummary>();
+  const [analysis, setAnalysis] = useState<MarketRecommendation>();
+  const [scan, setScan] = useState<MarketRecommendation[]>([]);
+  const [portfolio, setPortfolio] = useState<PortfolioSummary>();
+  const [paper, setPaper] = useState<PaperPortfolio>();
+  const [backtest, setBacktest] = useState<MarketBacktestResult>();
+  const [journal, setJournal] = useState<Array<Record<string, unknown>>>([]);
+  const [dataStatus, setDataStatus] = useState<Record<string, unknown>>();
+  const [tab, setTab] = useState<ExchangeTab>("Market overview");
+  const [selectedItemId, setSelectedItemId] = useState<number>();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
 
@@ -605,8 +641,79 @@ export function ExchangeView({ bridge }: { bridge: CompanionBridge }) {
         range: "30d",
       });
       setSummary(response.data);
+      setSelectedItemId(item.itemId);
+      try {
+        const analysed = await bridge.callTool<MarketRecommendation>("analyse_ge_item", {
+          profileId: profile.id,
+          item: item.itemId,
+        });
+        setAnalysis(analysed.data);
+      } catch {
+        setAnalysis(undefined);
+      }
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Price history failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function loadTab(next: ExchangeTab) {
+    setTab(next);
+    setError(undefined);
+    setBusy(true);
+    try {
+      if (next === "Buy candidates" || next === "Sell candidates") {
+        if (results.length === 0) {
+          setScan([]);
+        } else {
+          const response = await bridge.callTool<MarketRecommendation[]>(
+            next === "Buy candidates" ? "get_ge_buy_candidates" : "get_ge_sell_candidates",
+            { profileId: profile.id, items: results.map(({ itemId }) => itemId) },
+          );
+          setScan(response.data);
+        }
+      } else if (next === "Portfolio") {
+        setPortfolio(
+          (
+            await bridge.callTool<PortfolioSummary>("get_portfolio_summary", {
+              profileId: profile.id,
+            })
+          ).data,
+        );
+      } else if (next === "Trade journal") {
+        setJournal(
+          (
+            await bridge.callTool<Array<Record<string, unknown>>>("list_ge_trades", {
+              profileId: profile.id,
+            })
+          ).data,
+        );
+      } else if (next === "Paper trading") {
+        setPaper(
+          (await bridge.callTool<PaperPortfolio>("get_paper_portfolio", { profileId: profile.id }))
+            .data,
+        );
+      } else if (next === "Backtests" && selectedItemId !== undefined) {
+        setBacktest(
+          (
+            await bridge.callTool<MarketBacktestResult>("backtest_ge_strategy", {
+              itemId: selectedItemId,
+              initialGp: 10_000_000,
+              slippagePercent: 1,
+              fillDelayDays: 1,
+              maximumHoldingDays: 14,
+              trainingFraction: 0.7,
+            })
+          ).data,
+        );
+      } else if (next === "Data status") {
+        setDataStatus(
+          (await bridge.callTool<Record<string, unknown>>("get_market_data_status", {})).data,
+        );
+      }
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "The market view could not be loaded");
     } finally {
       setBusy(false);
     }
@@ -620,6 +727,24 @@ export function ExchangeView({ bridge }: { bridge: CompanionBridge }) {
         description="Search current guide prices and inspect descriptive history—never guaranteed trades."
         actions={<StatusPill state="fresh">Catalogue ready</StatusPill>}
       />
+      <div
+        className="tab-list exchange-tabs"
+        role="tablist"
+        aria-label="Grand Exchange intelligence views"
+      >
+        {EXCHANGE_TABS.map((name) => (
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === name}
+            className={tab === name ? "active" : ""}
+            key={name}
+            onClick={() => void loadTab(name)}
+          >
+            {name}
+          </button>
+        ))}
+      </div>
       <form className="exchange-search" onSubmit={search}>
         <Icon name="search" size={22} />
         <input
@@ -648,7 +773,134 @@ export function ExchangeView({ bridge }: { bridge: CompanionBridge }) {
         </section>
       ) : null}
       {busy && summary === undefined ? <LoadingBlock label="Loading validated price data" /> : null}
-      {summary === undefined ? (
+      {tab === "Buy candidates" || tab === "Sell candidates" ? (
+        scan.length === 0 ? (
+          <EmptyState
+            title={`No ${tab.toLocaleLowerCase("en-GB")}`}
+            description="Search for a bounded set of items first. Missing or low-confidence data is never promoted into a candidate."
+          />
+        ) : (
+          <section className="metrics-grid">
+            {scan.map((candidate) => (
+              <article className="surface-card" key={candidate.itemId}>
+                <p className="eyebrow">{candidate.recommendation}</p>
+                <h2>{candidate.itemName}</h2>
+                <strong>{candidate.scores.overallOpportunity.score}/100 opportunity</strong>
+                <p>{candidate.topReasons[0]}</p>
+                <small>
+                  {candidate.confidence}/100 confidence · {candidate.heldQuantity} recorded held
+                </small>
+              </article>
+            ))}
+          </section>
+        )
+      ) : tab === "Portfolio" ? (
+        portfolio === undefined ? (
+          <LoadingBlock label="Loading local portfolio" />
+        ) : (
+          <section className="metrics-grid exchange-metrics">
+            <MetricCard
+              label="Guide value"
+              value={formatGp(portfolio.guideValue)}
+              detail="Estimated public guide value"
+              accent="mint"
+            />
+            <MetricCard
+              label="Known cost basis"
+              value={formatGp(portfolio.knownCostBasis)}
+              detail="User-entered acquisition prices"
+              accent="gold"
+            />
+            <MetricCard
+              label="Unrealised estimate"
+              value={formatGp(portfolio.unrealisedGuideValueGainLoss)}
+              detail="Not realised until manually recorded"
+              accent="blue"
+            />
+            <MetricCard
+              label="Concentration"
+              value={`${portfolio.concentrationRiskPercent.toFixed(1)}%`}
+              detail="Largest item allocation"
+              accent="rose"
+            />
+          </section>
+        )
+      ) : tab === "Trade journal" ? (
+        journal.length === 0 ? (
+          <EmptyState
+            title="No recorded trades"
+            description="Trades are private local records and are never imported from Jagex automatically."
+          />
+        ) : (
+          <section className="surface-card">
+            <h2>Manual trade journal</h2>
+            <pre>{JSON.stringify(journal, null, 2)}</pre>
+          </section>
+        )
+      ) : tab === "Paper trading" ? (
+        paper === undefined ? (
+          <LoadingBlock label="Loading paper portfolio" />
+        ) : (
+          <section className="surface-card">
+            <p className="eyebrow">Hypothetical only</p>
+            <h2>{formatGp(paper.cashGp)} simulated cash</h2>
+            <p>
+              {paper.holdings.length} simulated holdings · {paper.trades.length} paper trades
+            </p>
+            <InlineAlert tone="info">{paper.disclaimer}</InlineAlert>
+          </section>
+        )
+      ) : tab === "Backtests" ? (
+        selectedItemId === undefined ? (
+          <EmptyState
+            title="Select an item first"
+            description="Backtests require validated historical guide prices for a selected item."
+          />
+        ) : backtest === undefined ? (
+          <LoadingBlock label="Running chronological backtest" />
+        ) : (
+          <section className="metrics-grid exchange-metrics">
+            <MetricCard
+              label="Signals"
+              value={formatNumber(backtest.signalCount)}
+              detail={`${backtest.completedTradeCount} simulated trades`}
+              accent="mint"
+            />
+            <MetricCard
+              label="Hit rate"
+              value={`${backtest.hitRatePercent.toFixed(1)}%`}
+              detail="Evaluation period only"
+              accent="gold"
+            />
+            <MetricCard
+              label="Mean return"
+              value={`${backtest.meanReturnPercent.toFixed(2)}%`}
+              detail="After assumed slippage"
+              accent="blue"
+            />
+            <MetricCard
+              label="Max drawdown"
+              value={`${backtest.maximumDrawdownPercent.toFixed(2)}%`}
+              detail="Hypothetical evaluation"
+              accent="rose"
+            />
+          </section>
+        )
+      ) : tab === "Data status" ? (
+        dataStatus === undefined ? (
+          <LoadingBlock label="Loading market source status" />
+        ) : (
+          <section className="surface-card">
+            <h2>Market data status</h2>
+            <pre>{JSON.stringify(dataStatus, null, 2)}</pre>
+          </section>
+        )
+      ) : tab === "Watchlist" ? (
+        <EmptyState
+          title="Private watchlists"
+          description="Create and update private watchlists through the MCP tools; item signals remain read-only and never place offers."
+        />
+      ) : summary === undefined ? (
         <EmptyState
           title="Search for an item"
           description="See current guide value, recent change, moving averages, volatility and source freshness."
@@ -672,6 +924,31 @@ export function ExchangeView({ bridge }: { bridge: CompanionBridge }) {
               </StatusPill>
             </div>
           </section>
+          {analysis === undefined ? null : (
+            <section className="surface-card">
+              <div className="section-heading">
+                <div>
+                  <p className="eyebrow">Deterministic signal</p>
+                  <h2>{titleCase(analysis.recommendation.replaceAll("-", " "))}</h2>
+                </div>
+                <StatusPill state={analysis.confidence >= 70 ? "success" : "warning"}>
+                  {analysis.confidence}/100 confidence
+                </StatusPill>
+              </div>
+              <p>{analysis.topReasons.join(" ")}</p>
+              <div className="tag-row">
+                <span>Opportunity {analysis.scores.overallOpportunity.score}/100</span>
+                <span>Trend {analysis.scores.trend.score}/100</span>
+                <span>Risk {analysis.scores.volatilityRisk.score}/100</span>
+                <span>Liquidity {analysis.scores.liquidity.score}/100</span>
+              </div>
+              {analysis.warnings.map((warning) => (
+                <InlineAlert tone="warning" key={warning}>
+                  {warning}
+                </InlineAlert>
+              ))}
+            </section>
+          )}
           <section className="metrics-grid exchange-metrics">
             <MetricCard
               label="30-point average"

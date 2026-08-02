@@ -195,6 +195,10 @@ export const ProfileQuestInputSchema = z
   })
   .strict();
 
+export const CreateQuestShoppingListToolInputSchema = ProfileQuestInputSchema.extend({
+  subtractOwned: z.boolean().optional(),
+}).strict();
+
 export const SetQuestStatusToolInputSchema = ProfileQuestInputSchema.extend({
   status: QuestStatusSchema,
 }).strict();
@@ -405,10 +409,9 @@ export const UpdateGeTradeToolInputSchema = z
     notes: z.string().trim().max(2_000).optional(),
   })
   .strict()
-  .refine(
-    ({ profileId: _profileId, tradeId: _tradeId, ...updates }) => Object.keys(updates).length > 0,
-    { message: "At least one trade field must be updated" },
-  );
+  .refine((input) => Object.keys(input).some((key) => key !== "profileId" && key !== "tradeId"), {
+    message: "At least one trade field must be updated",
+  });
 
 export const RemoveGeTradeToolInputSchema = z
   .object({
@@ -435,8 +438,7 @@ export const UpdateMarketWatchlistToolInputSchema = z
   })
   .strict()
   .refine(
-    ({ profileId: _profileId, watchlistId: _watchlistId, ...updates }) =>
-      Object.keys(updates).length > 0,
+    (input) => Object.keys(input).some((key) => key !== "profileId" && key !== "watchlistId"),
     { message: "At least one watchlist field must be updated" },
   );
 
@@ -474,3 +476,29 @@ export const BacktestGeStrategyToolInputSchema = MarketBacktestInputSchema.exten
   itemId: z.number().int().positive(),
   forceRefresh: z.boolean().optional(),
 }).strict();
+
+export const SetOfflineModeToolInputSchema = z
+  .object({
+    offline: z.boolean(),
+    confirmed: z.literal(true),
+  })
+  .strict();
+
+export const GetPaperPortfolioToolInputSchema = z
+  .object({
+    profileId: z.string().uuid(),
+    initialCashGp: z.number().int().positive().max(Number.MAX_SAFE_INTEGER).optional(),
+  })
+  .strict();
+
+export const RecordPaperTradeToolInputSchema = z
+  .object({
+    profileId: z.string().uuid(),
+    itemId: z.number().int().positive(),
+    side: z.enum(["buy", "sell"]),
+    quantity: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
+    unitPrice: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
+    occurredAt: z.string().datetime({ offset: true }).optional(),
+    initialCashGp: z.number().int().positive().max(Number.MAX_SAFE_INTEGER).optional(),
+  })
+  .strict();

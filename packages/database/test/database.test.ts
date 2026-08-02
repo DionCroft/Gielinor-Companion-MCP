@@ -135,7 +135,7 @@ describe("SQLite migrations and repositories", () => {
   it("applies migrations transactionally to a new database", () => {
     const database = openDatabase(":memory:");
     databases.push(database);
-    expect(getDatabaseSchemaVersion(database)).toBe(7);
+    expect(getDatabaseSchemaVersion(database)).toBe(8);
     expect(
       database
         .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'player_profiles'")
@@ -171,20 +171,20 @@ describe("SQLite migrations and repositories", () => {
     const database = openDatabase(":memory:", { targetVersion: 4 });
     databases.push(database);
     expect(pendingDatabaseMigrations(database).map((migration) => migration.version)).toEqual([
-      5, 6, 7,
+      5, 6, 7, 8,
     ]);
-    expect(applyDatabaseMigrations(database)).toEqual([5, 6, 7]);
+    expect(applyDatabaseMigrations(database)).toEqual([5, 6, 7, 8]);
 
     const brokenMigration: DatabaseMigration = {
-      version: 8,
+      version: 9,
       name: "injected-failure",
       sql: `
         CREATE TABLE migration_should_rollback (id INTEGER PRIMARY KEY);
         INSERT INTO table_that_does_not_exist (id) VALUES (1);
       `,
     };
-    expect(() => applyDatabaseMigrations(database, [brokenMigration], 8)).toThrow();
-    expect(getDatabaseSchemaVersion(database)).toBe(7);
+    expect(() => applyDatabaseMigrations(database, [brokenMigration], 9)).toThrow();
+    expect(getDatabaseSchemaVersion(database)).toBe(8);
     expect(
       database
         .prepare(
@@ -482,7 +482,7 @@ describe("SQLite quest snapshot repository", () => {
       "2026-07-23T13:00:00.000Z",
     );
 
-    expect(await repository.getDataStatus()).toEqual({
+    expect(await repository.getDataStatus()).toMatchObject({
       state: "failed",
       provider: "fixture",
       sourceRevision: "good-revision",

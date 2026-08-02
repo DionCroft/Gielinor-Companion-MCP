@@ -37,6 +37,7 @@ import {
   type CatalogueMaintenanceRuntime,
 } from "./maintenance-runtime.js";
 import { CompanionToolService } from "./tool-service.js";
+import { OfflineModeController } from "./offline-mode.js";
 import { SoftwareUpdateService, softwareUpdateChecksEnabled } from "./update-service.js";
 
 async function main(): Promise<void> {
@@ -52,7 +53,8 @@ async function main(): Promise<void> {
     );
   }
   const cacheStore = new SqliteCacheStore(database);
-  const providers = createDefaultProviderStack(config, cacheStore);
+  const offlineMode = new OfflineModeController(database, config.offline);
+  const providers = createDefaultProviderStack(config, cacheStore, () => offlineMode.isOffline());
   const statsProvider = providers.ports;
   const priceProvider = providers.ports;
   const profileRepository = new SqlitePlayerProfileRepository(database);
@@ -88,7 +90,7 @@ async function main(): Promise<void> {
     installedVersion: APPLICATION_VERSION,
     cacheStore,
     userAgent: config.userAgent,
-    offline: config.offline,
+    offline: () => offlineMode.isOffline(),
     enabled: softwareUpdateChecksEnabled(),
     checkIntervalMs: maintenancePolicy.intervals["software-update-check"],
     timeoutMs: config.timeoutMs,
@@ -101,7 +103,7 @@ async function main(): Promise<void> {
         quests,
         planner,
         exchange,
-        offline: config.offline,
+        offline: () => offlineMode.isOffline(),
         policy: maintenancePolicy,
         diagnostics: diagnosticsRepository,
         updateChecker,
@@ -132,7 +134,7 @@ async function main(): Promise<void> {
     maintenance,
     maintenancePolicy,
     updateChecker,
-    offline: config.offline,
+    offline: () => offlineMode.isOffline(),
     repository: diagnosticsRepository,
   });
   const tools = new CompanionToolService(
@@ -144,6 +146,7 @@ async function main(): Promise<void> {
     diagnostics,
     playerPrivateData,
     marketIntelligence,
+    offlineMode,
   );
   const server = createCompanionServer(tools, {
     recordError: (error) => diagnostics.recordError(error),

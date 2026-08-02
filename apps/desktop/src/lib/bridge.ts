@@ -856,6 +856,18 @@ export class DemoCompanionBridge implements CompanionBridge {
           histories: [],
         };
         break;
+      case "set_offline_mode":
+        result = {
+          offline: arguments_["offline"] === true,
+          enforcedBy: "preview-fixture",
+        };
+        break;
+      case "set_selected_player_profile":
+        result = {
+          profileId: String(arguments_["profileId"]),
+          selectedAt: NOW,
+        };
+        break;
       default:
         throw new Error(`The browser preview does not implement ${tool}`);
     }

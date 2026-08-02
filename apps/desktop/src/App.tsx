@@ -30,6 +30,11 @@ function activeContent(
   profile: DesktopProfile,
   dispatch: React.Dispatch<Parameters<typeof appReducer>[1]>,
 ) {
+  const setOfflineMode = (offlineMode: boolean): void => {
+    void bridge
+      .callTool("set_offline_mode", { offline: offlineMode, confirmed: true })
+      .then(() => dispatch({ type: "set-offline", offlineMode }));
+  };
   const views: Record<ViewId, React.ReactNode> = {
     dashboard: (
       <DashboardView
@@ -46,13 +51,17 @@ function activeContent(
           ? {}
           : { selectedProfileId: state.selectedProfileId })}
         onProfilesChanged={(profiles) => dispatch({ type: "set-profiles", profiles })}
-        onSelect={(profileId) => dispatch({ type: "select-profile", profileId })}
+        onSelect={(profileId) => {
+          void bridge
+            .callTool("set_selected_player_profile", { profileId })
+            .then(() => dispatch({ type: "select-profile", profileId }));
+        }}
       />
     ),
     skills: <SkillsView bridge={bridge} profile={profile} />,
     quests: <QuestPlannerView bridge={bridge} profile={profile} />,
     levelling: <LevellingView bridge={bridge} profile={profile} />,
-    exchange: <ExchangeView bridge={bridge} />,
+    exchange: <ExchangeView bridge={bridge} profile={profile} />,
     shopping: <ShoppingListsView bridge={bridge} />,
     goals: (
       <GoalsView
@@ -63,11 +72,7 @@ function activeContent(
       />
     ),
     "data-status": (
-      <DiagnosticsView
-        bridge={bridge}
-        offlineMode={state.offlineMode}
-        onOffline={(offlineMode) => dispatch({ type: "set-offline", offlineMode })}
-      />
+      <DiagnosticsView bridge={bridge} offlineMode={state.offlineMode} onOffline={setOfflineMode} />
     ),
     updates: <UpdatesView bridge={bridge} />,
     settings: (
@@ -78,7 +83,7 @@ function activeContent(
         offlineMode={state.offlineMode}
         onTheme={(theme) => dispatch({ type: "set-theme", theme })}
         onCompact={(compactMode) => dispatch({ type: "set-compact", compactMode })}
-        onOffline={(offlineMode) => dispatch({ type: "set-offline", offlineMode })}
+        onOffline={setOfflineMode}
       />
     ),
     "ai-providers": <AiProvidersView bridge={bridge} profile={profile} />,
@@ -102,8 +107,29 @@ export function App({ bridge: providedBridge }: { bridge?: CompanionBridge }) {
           bridge.callTool<DesktopProfile[]>("list_player_profiles", {}),
         ]);
         if (active) {
+          let selectedProfileId: string | undefined;
+          if (profiles.data.length > 0) {
+            try {
+              const selected = await bridge.callTool<{ profile: { id: string } }>(
+                "get_selected_player_snapshot",
+                {},
+              );
+              selectedProfileId = selected.data.profile.id;
+            } catch {
+              selectedProfileId = profiles.data[0]?.id;
+              if (selectedProfileId !== undefined) {
+                await bridge.callTool("set_selected_player_profile", {
+                  profileId: selectedProfileId,
+                });
+              }
+            }
+          }
           dispatch({ type: "set-runtime", runtime });
-          dispatch({ type: "set-profiles", profiles: profiles.data });
+          dispatch({
+            type: "set-profiles",
+            profiles: profiles.data,
+            ...(selectedProfileId === undefined ? {} : { selectedProfileId }),
+          });
         }
       } catch (error) {
         if (active) {

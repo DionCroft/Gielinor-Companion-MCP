@@ -1,7 +1,8 @@
 import type { PlayerStatsProvider, PriceProvider, QuestDataProvider } from "@gielinor/core";
-import { ProfileService, QuestService } from "@gielinor/core";
+import { PlayerPrivateDataService, ProfileService, QuestService } from "@gielinor/core";
 import {
   openDatabase,
+  SqlitePlayerPrivateDataRepository,
   SqlitePlayerProfileRepository,
   SqliteQuestRepository,
 } from "@gielinor/database";
@@ -77,18 +78,28 @@ describe("quest companion end-to-end MCP flow", () => {
           sourceRevision: "snapshot-1",
           retrievedAt: CHECKED_AT,
           quests: [
-            quest("prerequisite", [], [{ name: "Rune bar", quantity: 2 }]),
-            quest("target", ["prerequisite"], [{ name: "Rune bar", quantity: 3 }]),
+            quest("prerequisite", [], [{ name: "Rune bar", itemId: 2363, quantity: 2 }]),
+            quest("target", ["prerequisite"], [{ name: "Rune bar", itemId: 2363, quantity: 3 }]),
           ],
         }),
     };
-    const profiles = new ProfileService(
-      new SqlitePlayerProfileRepository(database),
-      {} as PlayerStatsProvider,
+    const profileRepository = new SqlitePlayerProfileRepository(database);
+    const profiles = new ProfileService(profileRepository, {} as PlayerStatsProvider);
+    const privateData = new PlayerPrivateDataService(
+      new SqlitePlayerPrivateDataRepository(database),
+      profileRepository,
     );
     const quests = new QuestService(new SqliteQuestRepository(database), profiles, questProvider);
     const server = createCompanionServer(
-      new CompanionToolService(profiles, {} as PriceProvider, quests),
+      new CompanionToolService(
+        profiles,
+        {} as PriceProvider,
+        quests,
+        undefined,
+        undefined,
+        undefined,
+        privateData,
+      ),
     );
     const client = new Client({ name: "quest-e2e", version: "1.0.0" });
     const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
@@ -139,6 +150,40 @@ describe("quest companion end-to-end MCP flow", () => {
             requiredByQuestIds: ["target"],
           },
         ],
+      },
+    });
+
+    await client.callTool({
+      name: "replace_player_holdings",
+      arguments: {
+        profileId,
+        items: [{ itemId: 2363, quantity: 2 }],
+        source: "manual",
+        confirmReplace: true,
+      },
+    });
+    const accountAwareShopping = await client.callTool({
+      name: "create_account_aware_quest_shopping_list",
+      arguments: { profileId, quest: "target", subtractOwned: true },
+    });
+    expect(accountAwareShopping.structuredContent).toMatchObject({
+      data: {
+        items: [
+          {
+            itemId: 2363,
+            name: "Rune bar",
+            quantity: 1,
+            requiredQuantity: 3,
+            ownedQuantityApplied: 2,
+          },
+        ],
+        subtraction: {
+          requested: true,
+          status: "applied",
+          dataClassification: "user-entered local data",
+          holdingsSource: "manual",
+          unresolvedItems: [],
+        },
       },
     });
   });
