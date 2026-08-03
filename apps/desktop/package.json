@@ -30,7 +30,7 @@
     "@tauri-apps/plugin-http": "^2.0.0",
     "react": "19.2.8",
     "react-dom": "19.2.8",
-    "zod": "^3.25.76"
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@playwright/test": "1.61.1",
