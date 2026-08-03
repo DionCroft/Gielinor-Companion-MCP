@@ -33,7 +33,7 @@
     "@gielinor/database": "workspace:*",
     "@gielinor/providers": "workspace:*",
     "@gielinor/shared-types": "workspace:*",
-    "@modelcontextprotocol/sdk": "^1.29.0",
+    "@modelcontextprotocol/sdk": "^1.30.0",
     "zod": "^3.25.76"
   },
   "engines": {
