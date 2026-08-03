@@ -17,7 +17,7 @@ import { SoftwareUpdateService } from "../apps/mcp-server/dist/library.js";
 
 const outputDirectory = resolve(process.cwd(), "artifacts/live-provider-monitor");
 const userAgent =
-  "Gielinor-Companion-MCP-live-monitor/1.1.0 (https://github.com/DionCroft/Gielinor-Companion-MCP)";
+  "Gielinor-Companion-MCP-live-monitor/1.2.0 (https://github.com/DionCroft/Gielinor-Companion-MCP)";
 const startedAt = new Date().toISOString();
 const publicTestPlayer = process.env.GIELINOR_LIVE_TEST_PLAYER ?? "Zezima";
 
@@ -178,7 +178,7 @@ const checks = [
     id: "github-releases",
     run: async () => {
       const result = await new SoftwareUpdateService({
-        installedVersion: "1.1.0",
+        installedVersion: "1.2.0",
         cacheStore,
         userAgent,
         maximumAttempts: 2,

@@ -316,6 +316,7 @@ export class RuntimeDiagnosticsService {
       checkedAt,
       source: "none",
       message: "Read-only software update checks are not configured",
+      checksumMetadataAvailable: false,
       warnings: [],
       traceId: createTraceId(),
     };

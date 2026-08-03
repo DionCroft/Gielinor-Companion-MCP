@@ -92,6 +92,8 @@ export type SoftwareUpdateServiceOptions = {
   fetchImplementation?: typeof fetch | undefined;
   now?: (() => number) | undefined;
   sleep?: ((milliseconds: number) => Promise<void>) | undefined;
+  platform?: NodeJS.Platform | undefined;
+  architecture?: string | undefined;
 };
 
 export type SoftwareUpdateCheckOptions = {
@@ -253,6 +255,8 @@ export class SoftwareUpdateService {
   private readonly timeoutMs: number;
   private readonly maximumAttempts: number;
   private readonly apiUrl: string;
+  private readonly platform: NodeJS.Platform;
+  private readonly architecture: string;
 
   public constructor(private readonly options: SoftwareUpdateServiceOptions) {
     const installedVersion = parseSemanticVersion(options.installedVersion);
@@ -270,6 +274,8 @@ export class SoftwareUpdateService {
     this.timeoutMs = options.timeoutMs ?? 10_000;
     this.maximumAttempts = options.maximumAttempts ?? 2;
     this.apiUrl = options.apiUrl ?? RELEASES_API;
+    this.platform = options.platform ?? process.platform;
+    this.architecture = options.architecture ?? process.arch;
     if (
       !Number.isSafeInteger(this.intervalMs) ||
       this.intervalMs < 60_000 ||
@@ -407,6 +413,11 @@ export class SoftwareUpdateService {
     errorCode?: GielinorErrorCode,
     release?: SoftwareRelease,
   ): SoftwareUpdateCheck {
+    const recommendedAsset = release === undefined ? undefined : this.recommendedAsset(release);
+    const checksumMetadataAvailable =
+      release !== undefined &&
+      (recommendedAsset?.digest !== undefined ||
+        release.assets.some((asset) => /^SHA256SUMS(?:\.txt)?$/i.test(asset.name)));
     return SoftwareUpdateCheckSchema.parse({
       state,
       installedVersion: this.installedVersion.canonical,
@@ -420,8 +431,37 @@ export class SoftwareUpdateService {
           : [],
       traceId,
       ...(release === undefined ? {} : { release }),
+      ...(recommendedAsset === undefined ? {} : { recommendedAsset }),
+      checksumMetadataAvailable,
       ...(errorCode === undefined ? {} : { errorCode }),
     });
+  }
+
+  private recommendedAsset(release: SoftwareRelease) {
+    const architecture = this.architecture.toLowerCase();
+    const archMatches = (name: string) => {
+      const normalized = name.toLowerCase();
+      if (architecture === "x64") return /(?:x64|x86_64|amd64)/.test(normalized);
+      if (architecture === "arm64") return /(?:arm64|aarch64)/.test(normalized);
+      return normalized.includes(architecture);
+    };
+    const platformAssets = release.assets.filter((asset) => {
+      const name = asset.name.toLowerCase();
+      if (this.platform === "win32") {
+        return name.endsWith(".exe") && name.includes("setup") && !name.includes("portable");
+      }
+      if (this.platform === "darwin") return name.endsWith(".dmg");
+      if (this.platform === "linux") {
+        return name.endsWith(".appimage") || name.endsWith(".deb");
+      }
+      return false;
+    });
+    return (
+      platformAssets.find((asset) => archMatches(asset.name)) ??
+      platformAssets.find((asset) =>
+        this.platform === "linux" ? asset.name.toLowerCase().endsWith(".appimage") : true,
+      )
+    );
   }
 
   private evaluate(

@@ -1,6 +1,6 @@
 {
   "name": "@gielinor/database",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "SQLite persistence and forward-only migrations for Gielinor Companion.",
   "type": "module",
   "main": "./dist/index.js",

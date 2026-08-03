@@ -1,9 +1,9 @@
 import {
   BrowserLiveDevelopmentBridge,
   createDefaultBridge,
-  DemoCompanionBridge,
   TauriCompanionBridge,
-} from "./bridge.js";
+} from "./native-bridge.js";
+import { DemoCompanionBridge } from "./bridge.js";
 
 describe("desktop runtime boundaries", () => {
   afterEach(() => {
@@ -31,11 +31,8 @@ describe("desktop runtime boundaries", () => {
     expect(createDefaultBridge()).toBeInstanceOf(BrowserLiveDevelopmentBridge);
   });
 
-  it("selects deterministic preview data only when browser-preview is explicit", async () => {
-    window.history.replaceState({}, "", "/?mode=browser-preview&fixture=returning");
-
-    const bridge = createDefaultBridge();
-    expect(bridge).toBeInstanceOf(DemoCompanionBridge);
+  it("keeps deterministic preview data in its explicit preview-only bridge", async () => {
+    const bridge = new DemoCompanionBridge("returning", "browser-preview");
     await expect(bridge.runtimeStatus()).resolves.toMatchObject({
       ready: true,
       mode: "browser-preview",
@@ -48,10 +45,8 @@ describe("desktop runtime boundaries", () => {
     expect(profiles.data[0]?.displayName).toBe("Demo Adventurer");
   });
 
-  it("selects automated fixtures only when automated-test is explicit", async () => {
-    window.history.replaceState({}, "", "/?mode=automated-test&fixture=returning");
-
-    const bridge = createDefaultBridge();
+  it("labels automated fixtures only when automated-test is explicitly constructed", async () => {
+    const bridge = new DemoCompanionBridge("returning", "automated-test");
     await expect(bridge.runtimeStatus()).resolves.toMatchObject({
       ready: true,
       mode: "automated-test",

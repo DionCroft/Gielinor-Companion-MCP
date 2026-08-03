@@ -10,6 +10,7 @@ export const VIEW_IDS = [
   "shopping",
   "goals",
   "data-status",
+  "diagnostics",
   "updates",
   "settings",
   "ai-providers",

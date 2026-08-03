@@ -20,10 +20,10 @@ function release(
     html_url: `https://github.com/DionCroft/Gielinor-Companion-MCP/releases/tag/v${version}`,
     assets: [
       {
-        name: "gielinor-companion-windows.zip",
-        content_type: "application/zip",
+        name: `Gielinor-Companion-Setup-${version}-x64.exe`,
+        content_type: "application/vnd.microsoft.portable-executable",
         size: 1_024,
-        browser_download_url: `https://github.com/DionCroft/Gielinor-Companion-MCP/releases/download/v${version}/gielinor-companion-windows.zip`,
+        browser_download_url: `https://github.com/DionCroft/Gielinor-Companion-MCP/releases/download/v${version}/Gielinor-Companion-Setup-${version}-x64.exe`,
         ...(options.digest === undefined
           ? { digest: "sha256:abc123" }
           : { digest: options.digest }),
@@ -52,6 +52,8 @@ function service(
     fetchImplementation,
     maximumAttempts: 1,
     now: () => NOW,
+    platform: "win32",
+    architecture: "x64",
   });
 }
 
@@ -62,6 +64,8 @@ describe("read-only GitHub Releases update checker", () => {
       installedVersion: "1.1.0",
       source: "live",
       release: { version: "1.1.0", assets: [{ digest: "sha256:abc123" }] },
+      recommendedAsset: { name: "Gielinor-Companion-Setup-1.1.0-x64.exe" },
+      checksumMetadataAvailable: true,
     });
     await expect(service([release("1.2.0")]).check()).resolves.toMatchObject({
       state: "update-available",
@@ -166,7 +170,8 @@ describe("read-only GitHub Releases update checker", () => {
     await expect(service([release("1.2.0", { digest: null })]).check()).resolves.toMatchObject({
       state: "update-available",
       warnings: ["GC-UPDATE-004"],
-      release: { assets: [{ name: "gielinor-companion-windows.zip" }] },
+      checksumMetadataAvailable: false,
+      release: { assets: [{ name: "Gielinor-Companion-Setup-1.2.0-x64.exe" }] },
     });
   });
 });

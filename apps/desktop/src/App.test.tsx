@@ -23,7 +23,6 @@ describe("desktop application flows", () => {
     await user.click(screen.getByRole("button", { name: /continue to companion/i }));
 
     expect(await screen.findByRole("heading", { name: /welcome back, local hero/i })).toBeVisible();
-    expect(screen.getByText(/local & read-only/i)).toBeVisible();
     expect(
       screen.getByText("Preview data — not connected to RuneScape or your local profile."),
     ).toBeVisible();
@@ -80,6 +79,22 @@ describe("desktop application flows", () => {
     expect(await screen.findByText(/active data was preserved/i)).toBeVisible();
   });
 
+  it("shows capability-level provenance and verifies live data explicitly", async () => {
+    const user = userEvent.setup();
+    render(<App bridge={new DemoCompanionBridge("returning")} />);
+
+    await user.click(await screen.findByRole("button", { name: "Data sources" }));
+    expect(await screen.findByRole("heading", { name: "Data sources" })).toBeVisible();
+    expect(screen.getByText("Public Hiscores")).toBeVisible();
+    expect(screen.getByText("RuneScape news context")).toBeVisible();
+    expect(screen.getByText("Local private records")).toBeVisible();
+    expect(screen.getByText("Optional Alt1 capture")).toBeVisible();
+    expect(screen.getAllByText("Preview").length).toBeGreaterThan(0);
+
+    await user.click(screen.getByRole("button", { name: "Verify live data now" }));
+    expect(await screen.findByText(/all public snapshots refreshed successfully/i)).toBeVisible();
+  });
+
   it("requires confirmation before resetting one open provider circuit", async () => {
     const user = userEvent.setup();
     const confirm = vi.spyOn(window, "confirm").mockReturnValueOnce(true);
@@ -98,8 +113,13 @@ describe("desktop application flows", () => {
 
     await user.click(await screen.findByRole("button", { name: "Updates" }));
     expect(await screen.findByRole("heading", { name: "Update status" })).toBeVisible();
-    expect(await screen.findByText("Version 1.1.0")).toBeVisible();
+    expect(await screen.findByText("Version 1.2.0")).toBeVisible();
     expect(screen.getByText("sha256:preview-checksum")).toBeVisible();
+    expect(screen.getByText(/published SHA-256 metadata is available/i)).toBeVisible();
+    expect(screen.getByRole("link", { name: "View recommended download" })).toHaveAttribute(
+      "href",
+      expect.stringContaining("Gielinor-Companion-Setup-1.2.0-x64.exe"),
+    );
     expect(screen.getByRole("link", { name: "Open official release" })).toHaveAttribute(
       "href",
       expect.stringContaining("github.com/DionCroft/Gielinor-Companion-MCP/releases"),

@@ -109,7 +109,7 @@ try {
       GIELINOR_MAINTENANCE_ENABLED: "false",
       GIELINOR_OFFLINE: "true",
       GIELINOR_USER_AGENT:
-        "Gielinor-Companion-MCP-clean-install/1.1.0 (https://github.com/DionCroft/Gielinor-Companion-MCP)",
+        "Gielinor-Companion-MCP-clean-install/1.2.0 (https://github.com/DionCroft/Gielinor-Companion-MCP)",
     },
   });
   const client = new Client({ name: "clean-install-smoke", version: "1.0.0" });

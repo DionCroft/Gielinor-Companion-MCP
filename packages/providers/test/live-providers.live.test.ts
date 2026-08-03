@@ -6,19 +6,23 @@ import { JagexGrandExchangeProvider } from "../src/jagex-ge.js";
 import { JagexHiscoresProvider } from "../src/jagex-hiscores.js";
 
 const live = process.env.RUN_LIVE_API_TESTS === "1";
+const publicTestPlayer = process.env.GIELINOR_LIVE_TEST_PLAYER ?? "Zezima";
 
 describe.runIf(live)("live public provider smoke tests", () => {
   const httpClient = new ResilientHttpClient({
     userAgent:
-      "Gielinor-Companion-MCP-live-test/1.1.0 (https://github.com/DionCroft/Gielinor-Companion-MCP)",
+      "Gielinor-Companion-MCP-live-test/1.2.0 (https://github.com/DionCroft/Gielinor-Companion-MCP)",
   });
 
   it("reads a public Hiscores profile", async () => {
     const result = await new JagexHiscoresProvider({
       httpClient,
       cacheStore: new MemoryCacheStore(),
-    }).getPlayerStats("Zezima");
+    }).getPlayerStats(publicTestPlayer);
     expect(result.skills).toHaveLength(29);
+    expect(result.skills.every(({ level, experience }) => level >= 1 && experience >= 0)).toBe(
+      true,
+    );
   });
 
   it("reads an RS3 ItemDB price", async () => {

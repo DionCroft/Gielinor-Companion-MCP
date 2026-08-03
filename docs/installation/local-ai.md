@@ -1,6 +1,6 @@
 # Ollama and LM Studio local AI
 
-Version 1.1 can ask a local model to choose among the same validated tools
+Version 1.2 can ask a local model to choose among the same validated tools
 that MCP clients use. AI is optional: **No-AI mode** is the default and every
 deterministic dashboard feature remains available without a model.
 
@@ -68,7 +68,7 @@ The adapter uses LM Studio's documented OpenAI-compatible
 endpoints. If just-in-time loading is disabled, load the model in LM Studio
 before sending a message.
 
-Version 1.1 does not collect or store LM Studio API tokens. Disable optional
+Version 1.2 does not collect or store LM Studio API tokens. Disable optional
 local-server authentication for this loopback-only integration.
 
 ## Trusted-tool behavior

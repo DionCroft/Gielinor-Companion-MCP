@@ -1,6 +1,6 @@
 {
   "name": "gielinor-companion-mcp",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "private": true,
   "description": "An open-source, AI-compatible RuneScape 3 quest, levelling and Grand Exchange companion.",
   "type": "module",
@@ -43,6 +43,12 @@
     "test:desktop:rust": "cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml",
     "test:real-data-boundaries": "corepack pnpm --filter @gielinor/desktop exec vitest run src/lib/bridge.test.ts src/App.test.tsx -t \"runtime boundaries|Preview data\" && node scripts/verify-native-real-boundary.mjs",
     "test:no-demo-native": "corepack pnpm --filter @gielinor/desktop exec vitest run src/lib/bridge.test.ts && node scripts/verify-native-real-boundary.mjs",
+    "test:launcher": "node scripts/test-launcher.mjs",
+    "test:installer": "node scripts/test-installer.mjs",
+    "test:portable": "node scripts/test-portable.mjs",
+    "test:release-assets": "node scripts/test-release-assets.mjs",
+    "test:provenance": "corepack pnpm --filter @gielinor/shared-types build && vitest run packages/shared-types/test/provenance.test.ts apps/mcp-server/test/server.integration.test.ts && corepack pnpm --filter @gielinor/desktop exec vitest run src/components/Common.test.tsx",
+    "test:live-data-ui": "corepack pnpm --filter @gielinor/desktop exec vitest run src/App.test.tsx src/components/Common.test.tsx src/views/FirstRunView.test.tsx && node scripts/verify-native-real-boundary.mjs",
     "test:safety": "node scripts/verify-safety-boundary.mjs && corepack pnpm --filter @gielinor/alt1-overlay test",
     "test:market-intelligence": "corepack pnpm build && vitest run packages/core/test/market-intelligence-service.test.ts packages/providers/test/jagex-providers.test.ts packages/providers/test/weird-gloop-market.test.ts",
     "test:portfolio": "corepack pnpm build && vitest run packages/core/test/market-intelligence-service.test.ts -t portfolio",
@@ -80,6 +86,7 @@
     "verify:release": "corepack pnpm build && node scripts/verify-release.mjs",
     "verify:safety": "node scripts/verify-safety-boundary.mjs",
     "pack:release": "corepack pnpm build && node scripts/pack-release.mjs",
+    "pack:portable": "node scripts/pack-portable.mjs",
     "smoke:clean-install": "corepack pnpm build && node scripts/clean-install-smoke.mjs",
     "capture:screenshots": "corepack pnpm --filter @gielinor/desktop capture:screenshots"
   },

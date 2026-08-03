@@ -197,7 +197,7 @@ URLs and cache refresh keys are independently coalesced.
 
 The React UI contains presentation state and strict forms, not domain
 calculations. Tauri accepts only a documented tool name and JSON arguments,
-rejects everything outside the generated 60-tool allowlist (including the
+rejects everything outside the generated 93-tool allowlist (including the
 frozen 48-tool Version 1.0 prefix), and starts the bundled MCP runtime without a
 shell. Each call performs MCP initialization and a structured tool call over
 stdio, then terminates its child process. Native errors are mapped to path-free

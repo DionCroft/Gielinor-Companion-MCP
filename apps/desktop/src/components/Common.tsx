@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { DATA_ORIGIN_LABELS, type DataOrigin } from "@gielinor/shared-types";
 
 import type { RuntimeStatus } from "../types.js";
 
@@ -35,6 +36,27 @@ export function StatusPill({
   children: ReactNode;
 }) {
   return <span className={`status-pill status-${state}`}>{children}</span>;
+}
+
+export function DataOriginBadge({
+  origin,
+  provider,
+  timestamp,
+}: {
+  origin: DataOrigin;
+  provider?: string;
+  timestamp?: string;
+}) {
+  const detail = [provider, timestamp].filter(Boolean).join(" · ");
+  return (
+    <span
+      className={`origin-badge origin-${origin}`}
+      data-origin={origin}
+      title={detail === "" ? DATA_ORIGIN_LABELS[origin] : detail}
+    >
+      {DATA_ORIGIN_LABELS[origin]}
+    </span>
+  );
 }
 
 export function EmptyState({
@@ -100,17 +122,30 @@ export function MetricCard({
   value,
   detail,
   accent = "mint",
+  origin,
+  provider,
+  timestamp,
 }: {
   label: string;
   value: ReactNode;
   detail: string;
   accent?: "mint" | "gold" | "blue" | "rose";
+  origin?: DataOrigin;
+  provider?: string;
+  timestamp?: string;
 }) {
   return (
     <article className={`metric-card metric-${accent}`}>
       <span className="metric-label">{label}</span>
       <strong>{value}</strong>
       <small>{detail}</small>
+      {origin === undefined ? null : (
+        <DataOriginBadge
+          origin={origin}
+          {...(provider === undefined ? {} : { provider })}
+          {...(timestamp === undefined ? {} : { timestamp })}
+        />
+      )}
     </article>
   );
 }

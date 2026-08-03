@@ -6,18 +6,31 @@
 [![CI](https://github.com/DionCroft/Gielinor-Companion-MCP/actions/workflows/ci.yml/badge.svg)](https://github.com/DionCroft/Gielinor-Companion-MCP/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
+## Download for Windows
+
+**[Download Gielinor Companion Setup 1.2.0 (x64)](https://github.com/DionCroft/Gielinor-Companion-MCP/releases/download/v1.2.0/Gielinor-Companion-Setup-1.2.0-x64.exe)**
+
+Install it, launch **Gielinor Companion** from the Start Menu or desktop
+shortcut, then enter your RuneScape display name. The ordinary installer
+includes the local MCP runtime: normal users do not need PowerShell, Node.js,
+Rust, pnpm, or a source checkout. The optional MSI and portable ZIP are on the
+[Version 1.2.0 release page](https://github.com/DionCroft/Gielinor-Companion-MCP/releases/tag/v1.2.0).
+See the [one-click Windows guide](docs/installation/one-click-windows.md) for
+checksums, upgrades, uninstall behaviour, and troubleshooting.
+
 Gielinor Companion MCP is a safe, model-independent foundation for deterministic
-RuneScape 3 planning. Version 1.1 preserves the frozen 48-tool Version 1.0
+RuneScape 3 planning. Version 1.2 preserves the frozen 48-tool Version 1.0
 surface while extending it with health, real-data status, private holdings,
 trade journals, deterministic market intelligence, backtesting, and paper
-trading. It combines
+trading. It adds one-click installation, explicit portable isolation, and a
+universal live/cached/manual/imported/calculated provenance model. It combines
 hosted/local MCP servers, an accessible Tauri/React no-AI desktop, optional
 Ollama/LM Studio conversations, and optional Alt1 guidance. It never controls
 the game client.
 
 ## Release status
 
-**Current version: 1.1.0 — Real Data, Player Intelligence and Grand Exchange Adviser.**
+**Current version: 1.2.0 — One-Click Launch and Live-Data Completion.**
 Ninety-three trusted tools are available over local stdio and stateless Streamable HTTP,
 with the original 48 names and schemas preserved as the frozen Version 1.0
 prefix. Public JSON contracts,
@@ -25,8 +38,8 @@ profile migration fixtures, clean npm installation, forward-only database
 upgrades, cross-platform desktop builds, checksums, SBOMs, and provenance
 attestations are release gates.
 
-Read the [1.1.0 release notes](docs/releases/v1.1.0.md) and
-[28-part completion report](docs/releases/v1.1.0-completion.md).
+Read the [1.2.0 release notes](docs/releases/v1.2.0.md) and
+[completion report](docs/releases/v1.2.0-completion.md).
 
 ## Features
 
@@ -106,7 +119,7 @@ Read the [1.1.0 release notes](docs/releases/v1.1.0.md) and
   2,000-profile, memory-bound, and hosted-load tests plus documented threat,
   dependency, and accessibility audits.
 - Stable generated MCP contract manifest, provider API v1, profile schema v1,
-  database schema v5, public npm package manifests, clean packed-install smoke
+  database schema v8, public npm package manifests, clean packed-install smoke
   test, cross-platform release workflow, SPDX SBOM, SHA-256 checksums, and
   keyless GitHub provenance attestations.
 
@@ -247,7 +260,7 @@ discovers only models whose Ollama metadata advertises tool support. See the
 
 ### Standalone desktop
 
-Version 1.1 retains the complete no-AI dashboard and optional local AI.
+Version 1.2 retains the complete no-AI dashboard and optional local AI.
 Build and run it from source:
 
 ```sh

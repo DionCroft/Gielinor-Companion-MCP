@@ -6,6 +6,7 @@ import {
 } from "@gielinor/agent-runtime";
 import {
   APPLICATION_VERSION,
+  DEFAULT_MARKET_PREFERENCES,
   SKILL_IDS,
   type PlayerProfile,
   type ProfileExport,
@@ -32,7 +33,21 @@ import type {
 const NOW = "2026-07-23T12:00:00.000Z";
 
 function envelope<T>(data: T, source = "browser preview fixture"): ToolEnvelope<T> {
-  return { data, meta: { generatedAt: NOW, source } };
+  return {
+    data,
+    meta: {
+      generatedAt: NOW,
+      source,
+      provenance: {
+        origin: "preview-fixture",
+        provider: source,
+        timestamp: NOW,
+        freshness: "not-applicable",
+        cacheState: "not-applicable",
+        warnings: ["Preview data is deterministic and is not connected to RuneScape."],
+      },
+    },
+  };
 }
 
 function demoProfile(): PlayerProfile {
@@ -749,6 +764,32 @@ export class DemoCompanionBridge implements CompanionBridge {
           historyPointCount: 180,
         } satisfies DataStatus;
         break;
+      case "get_market_data_status":
+        result = {
+          state: "ready",
+          provider: "fixture: Grand Exchange preview",
+          lastSuccessfulSyncAt: NOW,
+          itemCount: 7_310,
+          historyItemCount: 1,
+          historyPointCount: 180,
+          offline: false,
+        };
+        break;
+      case "get_market_preferences":
+        this.requireProfile(arguments_.profileId);
+        result = DEFAULT_MARKET_PREFERENCES;
+        break;
+      case "get_selected_player_snapshot": {
+        const selectedProfile = this.profiles[0];
+        if (selectedProfile === undefined) throw new Error("Selected player profile was not found");
+        result = {
+          profile: selectedProfile,
+          holdings: null,
+          marketPreferences: DEFAULT_MARKET_PREFERENCES,
+          selectedAt: NOW,
+        };
+        break;
+      }
       case "get_system_health":
         result = demoSystemHealth(this.fixture === "offline", this.fixture === "circuit-open");
         break;
@@ -801,31 +842,38 @@ export class DemoCompanionBridge implements CompanionBridge {
       case "check_for_software_updates":
         result = {
           state: "up-to-date",
-          installedVersion: "1.1.0",
+          installedVersion: APPLICATION_VERSION,
           checkedAt: NOW,
           nextCheckAt: "2026-07-24T12:00:00.000Z",
           source: "cache",
-          message: "Version 1.1.0 is up to date",
+          message: `Version ${APPLICATION_VERSION} is up to date`,
+          checksumMetadataAvailable: true,
           warnings: [],
           traceId: "00000000-0000-4000-8000-000000000021",
           release: {
-            version: "1.1.0",
-            tagName: "v1.1.0",
-            name: "Gielinor Companion 1.1.0",
-            notes: "Resilience, self-healing, automatic maintenance, and diagnostics.",
+            version: APPLICATION_VERSION,
+            tagName: `v${APPLICATION_VERSION}`,
+            name: `Gielinor Companion ${APPLICATION_VERSION}`,
+            notes: "One-click launch and live-data completion.",
             publishedAt: NOW,
-            releaseUrl: "https://github.com/DionCroft/Gielinor-Companion-MCP/releases/tag/v1.1.0",
+            releaseUrl: `https://github.com/DionCroft/Gielinor-Companion-MCP/releases/tag/v${APPLICATION_VERSION}`,
             prerelease: false,
             assets: [
               {
-                name: "gielinor-companion-windows.zip",
-                contentType: "application/zip",
+                name: `Gielinor-Companion-Setup-${APPLICATION_VERSION}-x64.exe`,
+                contentType: "application/vnd.microsoft.portable-executable",
                 size: 12_345_678,
-                downloadUrl:
-                  "https://github.com/DionCroft/Gielinor-Companion-MCP/releases/download/v1.1.0/gielinor-companion-windows.zip",
+                downloadUrl: `https://github.com/DionCroft/Gielinor-Companion-MCP/releases/download/v${APPLICATION_VERSION}/Gielinor-Companion-Setup-${APPLICATION_VERSION}-x64.exe`,
                 digest: "sha256:preview-checksum",
               },
             ],
+          },
+          recommendedAsset: {
+            name: `Gielinor-Companion-Setup-${APPLICATION_VERSION}-x64.exe`,
+            contentType: "application/vnd.microsoft.portable-executable",
+            size: 12_345_678,
+            downloadUrl: `https://github.com/DionCroft/Gielinor-Companion-MCP/releases/download/v${APPLICATION_VERSION}/Gielinor-Companion-Setup-${APPLICATION_VERSION}-x64.exe`,
+            digest: "sha256:preview-checksum",
           },
         } satisfies SoftwareUpdateCheck;
         break;
@@ -854,6 +902,17 @@ export class DemoCompanionBridge implements CompanionBridge {
         result = {
           catalogue: { total: 7_310, inserted: 0, updated: 0, unchanged: 7_310, removed: 0 },
           histories: [],
+        };
+        break;
+      case "refresh_all_real_data":
+        result = {
+          limited: false,
+          stages: [
+            { stage: "player-hiscores", status: "complete" },
+            { stage: "quests", status: "complete" },
+            { stage: "training", status: "complete" },
+            { stage: "grand-exchange", status: "complete" },
+          ],
         };
         break;
       case "set_offline_mode":
@@ -897,6 +956,14 @@ export class BrowserLiveDevelopmentBridge implements CompanionBridge {
         meta: {
           generatedAt: new Date().toISOString(),
           source: "unavailable: browser live-development has no local MCP connection",
+          provenance: {
+            origin: "unavailable",
+            provider: "browser live-development",
+            timestamp: new Date().toISOString(),
+            freshness: "unknown",
+            cacheState: "not-applicable",
+            warnings: ["Use the native desktop runtime for real companion data."],
+          },
         },
       };
     }

@@ -16,10 +16,13 @@ jobs:
       matrix:
         include:
           - platform: windows-latest
-            bundles: nsis
+            asset_platform: windows
+            bundles: nsis,msi
           - platform: macos-latest
+            asset_platform: macos
             bundles: dmg
           - platform: ubuntu-22.04
+            asset_platform: linux
             bundles: appimage,deb
     runs-on: ${{ matrix.platform }}
     timeout-minutes: 45
@@ -57,8 +60,26 @@ jobs:
       - name: Build native bundles
         run: pnpm --filter @gielinor/desktop exec tauri build --bundles ${{ matrix.bundles }}
 
+      - name: Build isolated portable Windows archive
+        if: runner.os == 'Windows'
+        run: pnpm pack:portable
+
+      - name: Smoke-test clean per-user Windows installation
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: ./scripts/smoke-windows-installer.ps1
+
+      - name: Normalize release asset names
+        shell: bash
+        run: |
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            node scripts/collect-desktop-assets.mjs --platform windows --portable auto
+          else
+            node scripts/collect-desktop-assets.mjs --platform ${{ matrix.asset_platform }}
+          fi
+
       - uses: actions/upload-artifact@v4
         with:
           name: gielinor-companion-${{ matrix.platform }}
-          path: apps/desktop/src-tauri/target/release/bundle/
+          path: release/desktop-assets/*
           if-no-files-found: error

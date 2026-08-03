@@ -20,8 +20,9 @@ threshold. The Jagex graph is also the explicit history fallback when the
 community endpoint is unavailable. A malformed or suspiciously truncated
 snapshot cannot replace the previous valid snapshot.
 
-Fresh network data is labelled live public data. Valid retained data is labelled
-cached or stale and includes its age. Offline mode prevents provider calls.
+Fresh network data is labelled `live-public` only for the current successful
+request. Valid retained data is `validated-cache` and includes its age; storing
+a response never leaves it labelled live. Offline mode prevents provider calls.
 Unavailable values remain unavailable; no volume, buy limit, current price or
 history point is fabricated.
 

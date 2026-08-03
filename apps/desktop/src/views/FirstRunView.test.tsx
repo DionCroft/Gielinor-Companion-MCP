@@ -21,7 +21,18 @@ class PartialFirstRunBridge extends DemoCompanionBridge {
     ) {
       return {
         data: { state: "never-synced" } as DataStatus as T,
-        meta: { generatedAt: new Date().toISOString(), source: "test" },
+        meta: {
+          generatedAt: new Date().toISOString(),
+          source: "test",
+          provenance: {
+            origin: "preview-fixture",
+            provider: "explicit first-run test fixture",
+            timestamp: new Date().toISOString(),
+            freshness: "not-applicable",
+            cacheState: "not-applicable",
+            warnings: ["Explicit deterministic test fixture."],
+          },
+        },
       };
     }
     if (tool === "refresh_quest_data") {
@@ -47,19 +58,21 @@ describe("desktop first-run catalogue population", () => {
     await user.type(screen.getByLabelText(/runescape display name/i), "Local Hero");
     await user.click(screen.getByRole("button", { name: /continue to companion/i }));
 
-    expect(await screen.findByText("Validating local database")).toBeVisible();
-    expect(screen.getByText("Creating player profile")).toBeVisible();
-    expect(screen.getByText("Refreshing player statistics")).toBeVisible();
-    expect(screen.getByText("Checking quest catalogue")).toBeVisible();
-    expect(screen.getByText("Synchronising quest data")).toBeVisible();
-    expect(screen.getByText("Checking training catalogue")).toBeVisible();
-    expect(screen.getByText("Synchronising training data")).toBeVisible();
-    expect(screen.getByText("Checking Grand Exchange catalogue")).toBeVisible();
-    expect(screen.getByText("Synchronising Grand Exchange data")).toBeVisible();
-    expect(screen.getByText("Validating snapshot coverage")).toBeVisible();
-    expect(screen.getByText("Opening dashboard")).toBeVisible();
+    expect(await screen.findByText("Runtime ready")).toBeVisible();
+    expect(screen.getByText("Database ready")).toBeVisible();
+    expect(screen.getByText("Player profile created")).toBeVisible();
+    expect(screen.getByText("Public Hiscores refreshed")).toBeVisible();
+    expect(screen.getByText("Quest catalogue synchronised")).toBeVisible();
+    expect(screen.getByText("Training catalogue synchronised")).toBeVisible();
+    expect(screen.getByText("GE catalogue synchronised")).toBeVisible();
+    expect(screen.getByText("Historical providers checked")).toBeVisible();
+    expect(screen.getByText("Market engine ready")).toBeVisible();
+    expect(screen.getByText("Data provenance verified")).toBeVisible();
+    expect(screen.getByText("Companion ready")).toBeVisible();
     expect(await screen.findByText(/GC-SYNC-001/)).toBeVisible();
-    expect(screen.getByText(/2 of 3 catalogues ready/i)).toBeVisible();
+    expect(screen.getByText(/ready with 1 limited capability warning/i)).toBeVisible();
+    expect(onComplete).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("button", { name: /continue with limited functionality/i }));
     expect(onComplete).toHaveBeenCalledOnce();
     expect(
       bridge.calls.filter((tool) =>

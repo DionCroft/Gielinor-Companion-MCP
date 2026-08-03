@@ -102,7 +102,7 @@ describe("hosted Streamable HTTP service", () => {
     const live = await fetch(`${running.url}/health/live`);
     expect(live.status).toBe(200);
     expect(live.headers.get("x-content-type-options")).toBe("nosniff");
-    await expect(live.json()).resolves.toMatchObject({ status: "ok", version: "1.1.0" });
+    await expect(live.json()).resolves.toMatchObject({ status: "ok", version: "1.2.0" });
 
     const ready = await fetch(`${running.url}/health/ready`);
     expect(ready.status).toBe(200);

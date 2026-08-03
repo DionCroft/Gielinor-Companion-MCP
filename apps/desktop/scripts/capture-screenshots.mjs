@@ -12,6 +12,7 @@ await mkdir(imageDirectory, { recursive: true });
 
 const server = await createServer({
   root: desktopRoot,
+  mode: "preview",
   logLevel: "error",
   server: {
     host: "127.0.0.1",

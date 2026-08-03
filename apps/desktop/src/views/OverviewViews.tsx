@@ -1,8 +1,9 @@
 import { useRef, useState, type ChangeEvent, type FormEvent } from "react";
-import type { ProfileExport } from "@gielinor/shared-types";
+import type { DataProvenance, ProfileExport } from "@gielinor/shared-types";
 
 import {
   EmptyState,
+  DataOriginBadge,
   InlineAlert,
   MetricCard,
   PageHeader,
@@ -24,8 +25,13 @@ export function DashboardView({
   onNavigate: (view: ViewId) => void;
 }) {
   const totalLevel = profile.skills.reduce((total, skill) => total + skill.level, 0);
+  const totalExperience = profile.skills.reduce((total, skill) => total + skill.experience, 0);
   const highest = [...profile.skills].sort((left, right) => right.level - left.level)[0];
   const completedQuests = profile.completedQuestIds.length;
+  const hiscoresOrigin =
+    profile.lastHiscoresRefresh === undefined
+      ? ("unavailable" as const)
+      : ("validated-cache" as const);
 
   return (
     <div className="page-stack">
@@ -34,10 +40,16 @@ export function DashboardView({
         title={`Welcome back, ${profile.displayName}`}
         description="A calm overview of your public progress and local plans."
         actions={
-          <StatusPill state="ready">
-            <span className="runtime-dot ready" />
-            Local & read-only
-          </StatusPill>
+          <div className="tag-row">
+            <DataOriginBadge
+              origin={hiscoresOrigin}
+              provider="Jagex public Hiscores"
+              {...(profile.lastHiscoresRefresh === undefined
+                ? {}
+                : { timestamp: profile.lastHiscoresRefresh })}
+            />
+            <DataOriginBadge origin="manual-local" provider="Local SQLite profile" />
+          </div>
         }
       />
       <section className="hero-panel">
@@ -73,24 +85,49 @@ export function DashboardView({
           value={formatNumber(totalLevel)}
           detail={`${profile.skills.length} public skills tracked`}
           accent="mint"
+          origin={hiscoresOrigin}
+          provider="Jagex public Hiscores"
+          {...(profile.lastHiscoresRefresh === undefined
+            ? {}
+            : { timestamp: profile.lastHiscoresRefresh })}
         />
         <MetricCard
           label="Highest skill"
           value={highest === undefined ? "Refresh needed" : `Level ${highest.level}`}
           detail={highest === undefined ? "No Hiscores snapshot" : titleCase(highest.skillId)}
           accent="gold"
+          origin={hiscoresOrigin}
+          provider="Jagex public Hiscores"
+          {...(profile.lastHiscoresRefresh === undefined
+            ? {}
+            : { timestamp: profile.lastHiscoresRefresh })}
+        />
+        <MetricCard
+          label="Total XP"
+          value={formatNumber(totalExperience)}
+          detail="Public Hiscores snapshot"
+          accent="mint"
+          origin={hiscoresOrigin}
+          provider="Jagex public Hiscores"
+          {...(profile.lastHiscoresRefresh === undefined
+            ? {}
+            : { timestamp: profile.lastHiscoresRefresh })}
         />
         <MetricCard
           label="Quest progress"
           value={formatNumber(completedQuests)}
           detail="Manually marked complete"
           accent="blue"
+          origin="manual-local"
+          provider="Local confirmed quest status"
         />
         <MetricCard
           label="Active goals"
           value={formatNumber(goalsRemaining)}
           detail="Stored on this computer"
           accent="rose"
+          origin="manual-local"
+          provider="Local goals"
         />
       </section>
       <div className="content-grid two-thirds">
@@ -133,6 +170,7 @@ export function DashboardView({
           <div className="large-avatar">{profile.displayName.slice(0, 1).toUpperCase()}</div>
           <h2>{profile.displayName}</h2>
           <StatusPill state="neutral">{titleCase(profile.gameMode)}</StatusPill>
+          <DataOriginBadge origin="manual-local" provider="Local SQLite profile" />
           <dl>
             <div>
               <dt>Last Hiscores refresh</dt>
@@ -309,6 +347,18 @@ export function ProfilesView({
             </div>
             <h2>{profile.displayName}</h2>
             <p>{titleCase(profile.gameMode)} account</p>
+            <div className="tag-row">
+              <DataOriginBadge origin="manual-local" provider="Local SQLite profile" />
+              <DataOriginBadge
+                origin={
+                  profile.lastHiscoresRefresh === undefined ? "unavailable" : "validated-cache"
+                }
+                provider="Jagex public Hiscores"
+                {...(profile.lastHiscoresRefresh === undefined
+                  ? {}
+                  : { timestamp: profile.lastHiscoresRefresh })}
+              />
+            </div>
             <dl>
               <div>
                 <dt>Skills</dt>
@@ -429,6 +479,7 @@ export function SkillsView({
     progressPercent: number;
   }>();
   const [error, setError] = useState<string>();
+  const [progressProvenance, setProgressProvenance] = useState<DataProvenance>();
 
   async function calculate(event: FormEvent) {
     event.preventDefault();
@@ -440,6 +491,7 @@ export function SkillsView({
         targetLevel,
       });
       setProgress(result.data);
+      setProgressProvenance(result.meta.provenance);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Progress could not be calculated");
     }
@@ -452,7 +504,13 @@ export function SkillsView({
         title="Skills"
         description={`Explore ${profile.displayName}'s latest public snapshot and calculate exact targets.`}
         actions={
-          <StatusPill state="fresh">Updated {formatDate(profile.lastHiscoresRefresh)}</StatusPill>
+          <DataOriginBadge
+            origin={profile.lastHiscoresRefresh === undefined ? "unavailable" : "validated-cache"}
+            provider="Jagex public Hiscores"
+            {...(profile.lastHiscoresRefresh === undefined
+              ? {}
+              : { timestamp: profile.lastHiscoresRefresh })}
+          />
         }
       />
       {error === undefined ? null : <InlineAlert tone="error">{error}</InlineAlert>}
@@ -478,7 +536,12 @@ export function SkillsView({
                 </span>
                 <span className="skill-name" role="cell">
                   <strong>{titleCase(skill.skillId)}</strong>
-                  <small>{formatNumber(skill.experience)} XP</small>
+                  <small>
+                    {formatNumber(skill.experience)} XP ·{" "}
+                    {skill.rank === undefined || skill.rank < 0
+                      ? "Unranked"
+                      : `Rank ${formatNumber(skill.rank)}`}
+                  </small>
                 </span>
                 <span className="skill-level" role="cell">
                   {skill.level}
@@ -512,6 +575,13 @@ export function SkillsView({
             <p className="muted-copy">Choose a skill and target to see exact XP remaining.</p>
           ) : (
             <div className="progress-result">
+              {progressProvenance === undefined ? null : (
+                <DataOriginBadge
+                  origin={progressProvenance.origin}
+                  provider={progressProvenance.provider}
+                  timestamp={progressProvenance.timestamp}
+                />
+              )}
               <div>
                 <span>Current</span>
                 <strong>Level {progress.currentLevel}</strong>
