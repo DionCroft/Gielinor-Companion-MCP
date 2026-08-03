@@ -74,7 +74,7 @@ jobs:
       - name: Prepare npm release archives
         run: pnpm pack:release
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: npm-packages
           path: release/npm/*.tgz
@@ -90,7 +90,7 @@ jobs:
           upload-artifact: false
           upload-release-assets: false
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: release-metadata
           path: |
@@ -179,7 +179,7 @@ jobs:
             node scripts/collect-desktop-assets.mjs --platform ${{ matrix.asset_platform }}
           fi
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: desktop-${{ matrix.label }}
           path: release/desktop-assets/*
@@ -236,7 +236,7 @@ jobs:
         shell: bash
         run: printf '%s@%s\n' "${IMAGE_NAME}" "${{ steps.image.outputs.digest }}" > container-digest.txt
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: container-digest
           path: container-digest.txt
