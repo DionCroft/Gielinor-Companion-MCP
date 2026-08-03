@@ -1,7 +1,13 @@
 import { useEffect, useState } from "react";
-import { APPLICATION_VERSION } from "@gielinor/shared-types";
+import { APPLICATION_VERSION, type DataOrigin } from "@gielinor/shared-types";
 
-import { InlineAlert, LoadingBlock, PageHeader, StatusPill } from "../components/Common.js";
+import {
+  DataOriginBadge,
+  InlineAlert,
+  LoadingBlock,
+  PageHeader,
+  StatusPill,
+} from "../components/Common.js";
 import { Icon } from "../components/Icon.js";
 import { desktopError } from "../lib/errors.js";
 import { formatDate, formatNumber, titleCase } from "../lib/format.js";
@@ -13,9 +19,36 @@ import type {
   DesktopSoftwareUpdateCheck,
   DesktopSystemHealth,
   RuntimeStatus,
+  ToolEnvelope,
 } from "../types.js";
 
 type SourceKey = "quests" | "training" | "prices";
+
+type CapabilityTruthRow = {
+  capability: string;
+  provider: string;
+  state: string;
+  origin: DataOrigin;
+  timestamp: string | undefined;
+  detail: string;
+  warning: string | undefined;
+  circuitState: string;
+  failedRequests: number | undefined;
+  lastFailureAt: string | undefined;
+  lastSuccessAt: string | undefined;
+  nextRefreshAt: string | undefined;
+  cacheAgeMs: number | undefined;
+  retainedRecords: number | undefined;
+};
+
+function formatAge(ageMs: number | undefined): string {
+  if (ageMs === undefined) return "Unavailable";
+  const minutes = Math.floor(ageMs / 60_000);
+  if (minutes < 60) return `${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 48) return `${hours} hr`;
+  return `${Math.floor(hours / 24)} days`;
+}
 
 const SOURCE_DETAILS: Record<
   SourceKey,
@@ -494,9 +527,20 @@ export function DataStatusView({
   bridge: CompanionBridge;
   offlineMode: boolean;
 }) {
-  const [statuses, setStatuses] = useState<Partial<Record<SourceKey, DataStatus>>>({});
-  const [busy, setBusy] = useState<SourceKey>();
+  const [statuses, setStatuses] = useState<Partial<Record<SourceKey, ToolEnvelope<DataStatus>>>>(
+    {},
+  );
+  const [system, setSystem] = useState<ToolEnvelope<DesktopSystemHealth>>();
+  const [selected, setSelected] = useState<
+    ToolEnvelope<{
+      profile?: { lastHiscoresRefresh?: string; skills?: unknown[] };
+      holdings?: { capturedAt?: string; source?: string } | null;
+      selectedAt?: string;
+    }>
+  >();
+  const [busy, setBusy] = useState<string>();
   const [error, setError] = useState<string>();
+  const [notice, setNotice] = useState<string>();
 
   async function load() {
     setError(undefined);
@@ -506,10 +550,20 @@ export function DataStatusView({
           Object.entries(SOURCE_DETAILS) as Array<[SourceKey, (typeof SOURCE_DETAILS)[SourceKey]]>
         ).map(
           async ([key, detail]) =>
-            [key, (await bridge.callTool<DataStatus>(detail.statusTool, {})).data] as const,
+            [key, await bridge.callTool<DataStatus>(detail.statusTool, {})] as const,
         ),
       );
       setStatuses(Object.fromEntries(entries));
+      const [systemResult, selectedResult] = await Promise.allSettled([
+        bridge.callTool<DesktopSystemHealth>("get_system_health", {}),
+        bridge.callTool<{
+          profile?: { lastHiscoresRefresh?: string; skills?: unknown[] };
+          holdings?: { capturedAt?: string; source?: string } | null;
+          selectedAt?: string;
+        }>("get_selected_player_snapshot", {}),
+      ]);
+      if (systemResult.status === "fulfilled") setSystem(systemResult.value);
+      if (selectedResult.status === "fulfilled") setSelected(selectedResult.value);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Data-source status could not be loaded");
     }
@@ -536,6 +590,235 @@ export function DataStatusView({
     }
   }
 
+  async function verifyLiveData() {
+    if (offlineMode) {
+      setError("Offline mode is enabled. Live verification cannot call public providers.");
+      return;
+    }
+    setBusy("verify");
+    setError(undefined);
+    setNotice(undefined);
+    try {
+      const response = await bridge.callTool<{
+        limited: boolean;
+        stages: Array<{ stage: string; status: string }>;
+      }>("refresh_all_real_data", {});
+      const failed = response.data.stages.filter(({ status }) => status !== "complete");
+      setNotice(
+        response.data.limited
+          ? `Verification completed in limited mode. ${failed.map(({ stage }) => stage).join(", ")} did not refresh; retained valid data remains available.`
+          : "Live providers were verified and all public snapshots refreshed successfully.",
+      );
+      await load();
+    } catch (caught) {
+      const failure = desktopError(caught, "verify-live-data", "GC-SYNC-001");
+      setError(`${failure.userMessage} (${failure.code}; trace ${failure.traceId})`);
+    } finally {
+      setBusy(undefined);
+    }
+  }
+
+  function originForPrivateSource(source: string | undefined): DataOrigin {
+    if (source === "alt1-confirmed") return "alt1-confirmed";
+    if (source === "csv-import" || source === "json-import") return "imported-local";
+    return selected === undefined ? "unavailable" : "manual-local";
+  }
+
+  function capabilityRows(): CapabilityTruthRow[] {
+    const quest = statuses.quests;
+    const training = statuses.training;
+    const prices = statuses.prices;
+    const providers = system?.data.providers ?? [];
+    const provider = (capability: string) =>
+      providers.find((candidate) => candidate.capability === capability);
+    const catalogue = (catalogueName: SourceKey) =>
+      system?.data.catalogues.find((candidate) => candidate.catalogue === catalogueName);
+    const operational = (capability?: string, catalogueName?: SourceKey) => {
+      const providerHealth = capability === undefined ? undefined : provider(capability);
+      const catalogueHealth = catalogueName === undefined ? undefined : catalogue(catalogueName);
+      return {
+        circuitState: providerHealth?.circuitState ?? "not-applicable",
+        failedRequests: providerHealth?.failedRequests,
+        lastFailureAt: providerHealth?.lastFailureAt ?? catalogueHealth?.lastFailureAt,
+        lastSuccessAt: providerHealth?.lastSuccessAt ?? catalogueHealth?.lastSuccessAt,
+        nextRefreshAt: providerHealth?.nextProbeAt ?? catalogueHealth?.nextRefreshAt,
+        cacheAgeMs: catalogueHealth?.ageMs,
+        retainedRecords: catalogueHealth?.recordCount,
+      };
+    };
+    const healthState = (capability: string) => provider(capability)?.state ?? "unknown";
+    const statusOrigin = (response: ToolEnvelope<DataStatus> | undefined): DataOrigin =>
+      response?.meta.provenance?.origin ??
+      (response?.data.state === "ready" ? "validated-cache" : "unavailable");
+    const localProfile = selected?.data.profile;
+    const holdings = selected?.data.holdings;
+    const privateOrigin = originForPrivateSource(holdings?.source);
+    const update = system?.data.updateChecker;
+    return [
+      {
+        capability: "Public Hiscores",
+        provider: provider("player-stats")?.providerId ?? "Jagex Hiscores",
+        state: localProfile?.lastHiscoresRefresh === undefined ? "unavailable" : "ready",
+        origin:
+          localProfile?.lastHiscoresRefresh === undefined
+            ? ("unavailable" as const)
+            : ("validated-cache" as const),
+        timestamp: localProfile?.lastHiscoresRefresh,
+        detail:
+          localProfile?.lastHiscoresRefresh === undefined
+            ? "No public Hiscores snapshot is retained for the selected profile."
+            : `${localProfile.skills?.length ?? 0} public skill records retained locally.`,
+        warning:
+          healthState("player-stats") === "degraded"
+            ? "The Hiscores provider is degraded; retained data may be used."
+            : undefined,
+        ...operational("player-stats"),
+      },
+      {
+        capability: "Quest catalogue",
+        provider: quest?.data.provider ?? "RuneScape Wiki",
+        state: quest?.data.state ?? "unavailable",
+        origin: statusOrigin(quest),
+        timestamp: quest?.data.lastSuccessfulSyncAt,
+        detail: `${formatNumber(quest?.data.questCount ?? 0)} revision-aware quest records.`,
+        warning: quest?.data.lastErrorMessage,
+        ...operational(undefined, "quests"),
+      },
+      {
+        capability: "Training catalogue",
+        provider: training?.data.provider ?? "RuneScape Wiki",
+        state: training?.data.state ?? "unavailable",
+        origin: statusOrigin(training),
+        timestamp: training?.data.lastSuccessfulSyncAt,
+        detail: `${formatNumber(training?.data.methodCount ?? 0)} source-backed training methods.`,
+        warning: training?.data.lastErrorMessage,
+        ...operational(undefined, "training"),
+      },
+      {
+        capability: "GE catalogue",
+        provider: prices?.data.provider ?? "Weird Gloop RS3 catalogue",
+        state: prices?.data.state ?? "unavailable",
+        origin: statusOrigin(prices),
+        timestamp: prices?.data.lastSuccessfulSyncAt,
+        detail: `${formatNumber(prices?.data.itemCount ?? 0)} RS3 guide-price catalogue records.`,
+        warning: prices?.data.lastErrorMessage,
+        ...operational(undefined, "prices"),
+      },
+      {
+        capability: "Current guide prices",
+        provider: provider("current-price")?.providerId ?? "Jagex ItemDB",
+        state: prices?.data.state === "ready" ? healthState("current-price") : "unavailable",
+        origin: statusOrigin(prices),
+        timestamp: prices?.data.lastSuccessfulSyncAt,
+        detail: "On-demand RS3 guide values; this is not a live order book.",
+        warning: undefined,
+        ...operational("current-price", "prices"),
+      },
+      {
+        capability: "Price history",
+        provider: provider("price-history")?.providerId ?? "Jagex graph and Weird Gloop history",
+        state: (prices?.data.historyPointCount ?? 0) > 0 ? "ready" : "available-on-demand",
+        origin: statusOrigin(prices),
+        timestamp: prices?.data.lastSuccessfulSyncAt,
+        detail:
+          (prices?.data.historyPointCount ?? 0) > 0
+            ? `${formatNumber(prices?.data.historyPointCount ?? 0)} validated daily history points retained.`
+            : "History is requested per item; no history has been retained yet.",
+        warning: undefined,
+        ...operational("price-history", "prices"),
+      },
+      {
+        capability: "RuneScape news context",
+        provider: "RuneScape news via Weird Gloop",
+        state: "available-on-demand",
+        origin: "unavailable" as const,
+        timestamp: undefined,
+        detail: "Fetched only during market analysis; no standalone health snapshot is fabricated.",
+        warning:
+          "A missing news response lowers context coverage and never creates a causal claim.",
+        ...operational(),
+      },
+      {
+        capability: "Software updates",
+        provider: "GitHub Releases",
+        state: update?.state ?? "unavailable",
+        origin:
+          update?.lastSuccessAt === undefined
+            ? ("unavailable" as const)
+            : ("validated-cache" as const),
+        timestamp: update?.lastSuccessAt,
+        detail: update?.message ?? "Validated release metadata has not been checked.",
+        warning: update?.errorCode,
+        ...operational(),
+      },
+      {
+        capability: "Local private records",
+        provider: "Local SQLite",
+        state: selected === undefined ? "unavailable" : "ready",
+        origin: privateOrigin,
+        timestamp: holdings?.capturedAt ?? selected?.data.selectedAt,
+        detail:
+          selected === undefined
+            ? "No selected local profile was available."
+            : holdings === null
+              ? "Selected profile is local; no holdings snapshot has been entered."
+              : "Selected profile and user-controlled holdings are stored locally.",
+        warning: undefined,
+        ...operational(),
+      },
+      {
+        capability: "Optional Alt1 capture",
+        provider: "Read-only Alt1 overlay",
+        state: holdings?.source === "alt1-confirmed" ? "confirmed" : "not-connected",
+        origin:
+          holdings?.source === "alt1-confirmed"
+            ? ("alt1-confirmed" as const)
+            : ("unavailable" as const),
+        timestamp: holdings?.source === "alt1-confirmed" ? holdings.capturedAt : undefined,
+        detail:
+          holdings?.source === "alt1-confirmed"
+            ? "The latest visible-screen capture was confirmed by the user before saving."
+            : "Optional visible-screen suggestions require explicit user confirmation before saving.",
+        warning:
+          "Alt1 does not provide a complete account, bank, inventory, or active-offer snapshot.",
+        ...operational(),
+      },
+    ];
+  }
+
+  function exportProvenance() {
+    const report = {
+      reportVersion: 1,
+      generatedAt: new Date().toISOString(),
+      applicationVersion: APPLICATION_VERSION,
+      offlineMode,
+      capabilities: capabilityRows().map(
+        ({ capability, provider, state, origin, timestamp, detail, warning }) => ({
+          capability,
+          provider,
+          state,
+          origin,
+          ...(timestamp === undefined ? {} : { timestamp }),
+          detail,
+          ...(warning === undefined ? {} : { warning }),
+        }),
+      ),
+      redactionNotice:
+        "This report excludes display names, profile identifiers, holdings, trades, credentials, payloads, and local paths.",
+    };
+    if (typeof URL.createObjectURL === "function") {
+      const url = URL.createObjectURL(
+        new Blob([JSON.stringify(report, null, 2)], { type: "application/json" }),
+      );
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `gielinor-provenance-${report.generatedAt.slice(0, 10)}.json`;
+      link.click();
+      URL.revokeObjectURL(url);
+    }
+    setNotice("A redacted provenance report was prepared without player-private records.");
+  }
+
   return (
     <div className="page-stack">
       <PageHeader
@@ -543,10 +826,21 @@ export function DataStatusView({
         title="Data sources"
         description="See exactly what is local, when it was refreshed, and whether retained data is stale."
         actions={
-          <button className="secondary-button" type="button" onClick={() => void load()}>
-            <Icon name="refresh" />
-            Recheck status
-          </button>
+          <>
+            <button className="secondary-button" type="button" onClick={exportProvenance}>
+              <Icon name="download" />
+              Export provenance
+            </button>
+            <button
+              className="secondary-button"
+              type="button"
+              disabled={busy !== undefined || offlineMode}
+              onClick={() => void verifyLiveData()}
+            >
+              <Icon name="refresh" className={busy === "verify" ? "spin" : ""} />
+              {busy === "verify" ? "Verifying…" : "Verify live data now"}
+            </button>
+          </>
         }
       />
       {offlineMode ? (
@@ -555,6 +849,7 @@ export function DataStatusView({
         </InlineAlert>
       ) : null}
       {error === undefined ? null : <InlineAlert tone="error">{error}</InlineAlert>}
+      {notice === undefined ? null : <InlineAlert tone="success">{notice}</InlineAlert>}
       {Object.keys(statuses).length === 0 && error === undefined ? (
         <LoadingBlock label="Checking local data sources" />
       ) : (
@@ -562,13 +857,10 @@ export function DataStatusView({
           {(
             Object.entries(SOURCE_DETAILS) as Array<[SourceKey, (typeof SOURCE_DETAILS)[SourceKey]]>
           ).map(([key, detail]) => {
-            const status = statuses[key];
+            const response = statuses[key];
+            const status = response?.data;
+            const provenance = response?.meta.provenance;
             const count = status?.questCount ?? status?.methodCount ?? status?.itemCount ?? 0;
-            const sourceClass = status?.provider?.toLocaleLowerCase("en-GB").includes("fixture")
-              ? "fixture"
-              : status?.state === "ready"
-                ? "retained cached data"
-                : "unavailable";
             const parseWarningCount = Object.values(
               status?.coverage?.parseWarningsByField ?? {},
             ).reduce((total, value) => total + value, 0);
@@ -596,6 +888,13 @@ export function DataStatusView({
                 </div>
                 <h2>{detail.title}</h2>
                 <p>{detail.description}</p>
+                {provenance === undefined ? null : (
+                  <DataOriginBadge
+                    origin={provenance.origin}
+                    provider={provenance.provider}
+                    timestamp={provenance.timestamp}
+                  />
+                )}
                 <dl>
                   <div>
                     <dt>Retained records</dt>
@@ -611,7 +910,7 @@ export function DataStatusView({
                   </div>
                   <div>
                     <dt>Data class</dt>
-                    <dd>{titleCase(sourceClass)}</dd>
+                    <dd>{provenance?.origin ?? "unavailable"}</dd>
                   </div>
                   <div>
                     <dt>Last attempted</dt>
@@ -653,6 +952,61 @@ export function DataStatusView({
           })}
         </section>
       )}
+      <section className="surface-card">
+        <div className="section-heading-row">
+          <div>
+            <p className="eyebrow">Source-truth contract</p>
+            <h2>All user-facing data capabilities</h2>
+          </div>
+          <button
+            className="secondary-button"
+            type="button"
+            disabled={busy !== undefined}
+            onClick={() => void load()}
+          >
+            Recheck local status
+          </button>
+        </div>
+        <div className="diagnostic-list capability-truth-list">
+          {capabilityRows().map((capability) => (
+            <article key={capability.capability}>
+              <div>
+                <strong>{capability.capability}</strong>
+                <small>{capability.provider}</small>
+                <small>{capability.detail}</small>
+                <small>
+                  Last success {formatDate(capability.lastSuccessAt ?? capability.timestamp)} · Last
+                  failure {formatDate(capability.lastFailureAt)} · Next refresh/probe{" "}
+                  {formatDate(capability.nextRefreshAt)}
+                </small>
+                <small>
+                  Circuit {titleCase(capability.circuitState)} · Failed requests{" "}
+                  {formatNumber(capability.failedRequests)} · Cache age{" "}
+                  {formatAge(capability.cacheAgeMs)} · Retained records{" "}
+                  {formatNumber(capability.retainedRecords)}
+                </small>
+                {capability.warning === undefined ? null : <small>{capability.warning}</small>}
+              </div>
+              <DataOriginBadge
+                origin={capability.origin}
+                provider={capability.provider}
+                {...(capability.timestamp === undefined ? {} : { timestamp: capability.timestamp })}
+              />
+              <StatusPill
+                state={
+                  ["ready", "healthy", "confirmed"].includes(capability.state)
+                    ? "success"
+                    : ["failed", "unavailable"].includes(capability.state)
+                      ? "failed"
+                      : "warning"
+                }
+              >
+                {titleCase(capability.state)}
+              </StatusPill>
+            </article>
+          ))}
+        </div>
+      </section>
       <InlineAlert tone="info">
         A failed refresh never replaces the previous valid catalogue. Provider errors and stale
         timestamps remain visible.
@@ -808,6 +1162,32 @@ export function UpdatesView({ bridge }: { bridge: CompanionBridge }) {
               <p className="release-notes-copy">
                 {status.release.notes || "No release notes were published."}
               </p>
+              {status.recommendedAsset === undefined ? (
+                <InlineAlert tone="warning">
+                  No recommended asset matches this operating system and architecture. Open the
+                  official release page to review supported downloads.
+                </InlineAlert>
+              ) : (
+                <div className="recommended-release-asset">
+                  <div>
+                    <p className="eyebrow">Recommended for this computer</p>
+                    <strong>{status.recommendedAsset.name}</strong>
+                    <small>
+                      {status.checksumMetadataAvailable
+                        ? "Published SHA-256 metadata is available."
+                        : "Checksum metadata is missing; do not install until the release is corrected."}
+                    </small>
+                  </div>
+                  <a
+                    className="primary-button"
+                    href={status.recommendedAsset.downloadUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    View recommended download
+                  </a>
+                </div>
+              )}
               <h3>Platform assets</h3>
               {status.release.assets.length === 0 ? (
                 <p>No platform-specific assets are attached to this release.</p>

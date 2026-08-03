@@ -1,16 +1,19 @@
 import { useMemo, useState, type FormEvent } from "react";
 import type {
+  DataProvenance,
   GeTradeRecord,
   ManualGeOrderPlan,
   MarketBacktestResult,
   MarketRecommendation,
   MarketWatchlist,
   PaperPortfolio,
+  PlayerHolding,
   PlayerHoldingsSnapshot,
   PortfolioSummary,
 } from "@gielinor/shared-types";
 
 import {
+  DataOriginBadge,
   EmptyState,
   InlineAlert,
   LoadingBlock,
@@ -54,6 +57,8 @@ export function QuestPlannerView({
   const [tab, setTab] = useState<"route" | "checklist" | "shopping">("route");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
+  const [questProvenance, setQuestProvenance] = useState<DataProvenance>();
+  const [planProvenance, setPlanProvenance] = useState<DataProvenance>();
 
   async function search(event: FormEvent) {
     event.preventDefault();
@@ -70,6 +75,7 @@ export function QuestPlannerView({
         limit: 20,
       });
       setResults(response.data);
+      setQuestProvenance(response.meta.provenance);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Quest search failed");
     } finally {
@@ -94,6 +100,7 @@ export function QuestPlannerView({
       ]);
       setRoute(routeResult.data);
       setShopping(shoppingResult.data);
+      setPlanProvenance(routeResult.meta.provenance);
       setTab("route");
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Quest route could not be built");
@@ -132,6 +139,18 @@ export function QuestPlannerView({
         eyebrow="Prerequisite intelligence"
         title="Quest planner"
         description="Choose a target, see every dependency, and keep progress as a local checklist."
+        actions={
+          <div className="tag-row">
+            {questProvenance === undefined ? null : (
+              <DataOriginBadge
+                origin={questProvenance.origin}
+                provider={questProvenance.provider}
+                timestamp={questProvenance.timestamp}
+              />
+            )}
+            <DataOriginBadge origin="manual-local" provider="Local confirmed quest status" />
+          </div>
+        }
       />
       {error === undefined ? null : <InlineAlert tone="error">{error}</InlineAlert>}
       <div className="quest-workspace">
@@ -185,6 +204,13 @@ export function QuestPlannerView({
                   <h2>{selected.name}</h2>
                 </div>
                 <StatusPill state="neutral">{selected.difficulty ?? "Quest"}</StatusPill>
+                {planProvenance === undefined ? null : (
+                  <DataOriginBadge
+                    origin={planProvenance.origin}
+                    provider={planProvenance.provider}
+                    timestamp={planProvenance.timestamp}
+                  />
+                )}
               </div>
               <div className="tab-list" role="tablist" aria-label="Quest planning views">
                 {[
@@ -292,6 +318,7 @@ export function LevellingView({
   const [plan, setPlan] = useState<TrainingPlan>();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
+  const [planProvenance, setPlanProvenance] = useState<DataProvenance>();
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -319,6 +346,7 @@ export function LevellingView({
         allowVirtualLevels: parsed.data.targetLevel > 120,
       });
       setPlan(result.data);
+      setPlanProvenance(result.meta.provenance);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Levelling plan could not be created");
     } finally {
@@ -435,6 +463,13 @@ export function LevellingView({
                 <StatusPill state={plan.feasible ? "success" : "warning"}>
                   {plan.feasible ? "Feasible" : "Constraints exceeded"}
                 </StatusPill>
+                {planProvenance === undefined ? null : (
+                  <DataOriginBadge
+                    origin={planProvenance.origin}
+                    provider={planProvenance.provider}
+                    timestamp={planProvenance.timestamp}
+                  />
+                )}
                 <div className="plan-metrics">
                   <div>
                     <span>XP remaining</span>
@@ -616,10 +651,14 @@ export function ExchangeView({
   const [selectedItemId, setSelectedItemId] = useState<number>();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
+  const [marketProvenance, setMarketProvenance] = useState<DataProvenance>();
+  const [analysisProvenance, setAnalysisProvenance] = useState<DataProvenance>();
+  const [privateProvenance, setPrivateProvenance] = useState<DataProvenance>();
   const [holdingItemId, setHoldingItemId] = useState(4151);
   const [holdingQuantity, setHoldingQuantity] = useState(1);
   const [holdingCost, setHoldingCost] = useState("");
   const [holdingCash, setHoldingCash] = useState("");
+  const [holdingNotes, setHoldingNotes] = useState("");
   const [holdingsFormat, setHoldingsFormat] = useState<"csv" | "json">("json");
   const [holdingsTransfer, setHoldingsTransfer] = useState("");
   const [tradeItemId, setTradeItemId] = useState(4151);
@@ -648,6 +687,7 @@ export function ExchangeView({
         limit: 20,
       });
       setResults(response.data);
+      setMarketProvenance(response.meta.provenance);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Item search failed");
     } finally {
@@ -664,6 +704,7 @@ export function ExchangeView({
         range: "30d",
       });
       setSummary(response.data);
+      setMarketProvenance(response.meta.provenance);
       setSelectedItemId(item.itemId);
       try {
         const analysed = await bridge.callTool<MarketRecommendation>("analyse_ge_item", {
@@ -671,6 +712,7 @@ export function ExchangeView({
           item: item.itemId,
         });
         setAnalysis(analysed.data);
+        setAnalysisProvenance(analysed.meta.provenance);
       } catch {
         setAnalysis(undefined);
       }
@@ -695,6 +737,7 @@ export function ExchangeView({
             { profileId: profile.id, items: results.map(({ itemId }) => itemId) },
           );
           setScan(response.data);
+          setAnalysisProvenance(response.meta.provenance);
           const planned = await Promise.allSettled(
             response.data.map((candidate) =>
               bridge.callTool<ManualGeOrderPlan>("create_manual_ge_order_plan", {
@@ -724,44 +767,44 @@ export function ExchangeView({
         ]);
         setPortfolio(portfolioResponse.data);
         setHoldings(holdingsResponse.data);
+        setAnalysisProvenance(portfolioResponse.meta.provenance);
+        setPrivateProvenance(holdingsResponse.meta.provenance);
       } else if (next === "Trade journal") {
-        setJournal(
-          (
-            await bridge.callTool<GeTradeRecord[]>("list_ge_trades", {
-              profileId: profile.id,
-            })
-          ).data,
-        );
+        const response = await bridge.callTool<GeTradeRecord[]>("list_ge_trades", {
+          profileId: profile.id,
+        });
+        setJournal(response.data);
+        setPrivateProvenance(response.meta.provenance);
       } else if (next === "Watchlist") {
-        setWatchlists(
-          (
-            await bridge.callTool<MarketWatchlist[]>("get_market_watchlist", {
-              profileId: profile.id,
-            })
-          ).data,
-        );
+        const response = await bridge.callTool<MarketWatchlist[]>("get_market_watchlist", {
+          profileId: profile.id,
+        });
+        setWatchlists(response.data);
+        setPrivateProvenance(response.meta.provenance);
       } else if (next === "Paper trading") {
-        setPaper(
-          (await bridge.callTool<PaperPortfolio>("get_paper_portfolio", { profileId: profile.id }))
-            .data,
-        );
+        const response = await bridge.callTool<PaperPortfolio>("get_paper_portfolio", {
+          profileId: profile.id,
+        });
+        setPaper(response.data);
+        setPrivateProvenance(response.meta.provenance);
       } else if (next === "Backtests" && selectedItemId !== undefined) {
-        setBacktest(
-          (
-            await bridge.callTool<MarketBacktestResult>("backtest_ge_strategy", {
-              itemId: selectedItemId,
-              initialGp: 10_000_000,
-              slippagePercent: 1,
-              fillDelayDays: 1,
-              maximumHoldingDays: 14,
-              trainingFraction: 0.7,
-            })
-          ).data,
-        );
+        const response = await bridge.callTool<MarketBacktestResult>("backtest_ge_strategy", {
+          itemId: selectedItemId,
+          initialGp: 10_000_000,
+          slippagePercent: 1,
+          fillDelayDays: 1,
+          maximumHoldingDays: 14,
+          trainingFraction: 0.7,
+        });
+        setBacktest(response.data);
+        setAnalysisProvenance(response.meta.provenance);
       } else if (next === "Data status") {
-        setDataStatus(
-          (await bridge.callTool<Record<string, unknown>>("get_market_data_status", {})).data,
+        const response = await bridge.callTool<Record<string, unknown>>(
+          "get_market_data_status",
+          {},
         );
+        setDataStatus(response.data);
+        setMarketProvenance(response.meta.provenance);
       }
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "The market view could not be loaded");
@@ -789,20 +832,55 @@ export function ExchangeView({
           itemId: holdingItemId,
           quantity: holdingQuantity,
           ...(holdingCost.trim() === "" ? {} : { averageAcquisitionPrice: Number(holdingCost) }),
+          ...(holdingNotes.trim() === "" ? {} : { notes: holdingNotes.trim() }),
         },
         ...(holdingCash.trim() === "" ? {} : { cashGp: Number(holdingCash) }),
         source: "manual",
       });
       setHoldings(response.data);
-      setPortfolio(
-        (
-          await bridge.callTool<PortfolioSummary>("get_portfolio_summary", {
-            profileId: profile.id,
-          })
-        ).data,
-      );
+      setPrivateProvenance(response.meta.provenance);
+      const portfolioResponse = await bridge.callTool<PortfolioSummary>("get_portfolio_summary", {
+        profileId: profile.id,
+      });
+      setPortfolio(portfolioResponse.data);
+      setAnalysisProvenance(portfolioResponse.meta.provenance);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "The holding could not be saved");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function editHolding(holding: PlayerHolding) {
+    setHoldingItemId(holding.itemId);
+    setHoldingQuantity(holding.quantity);
+    setHoldingCost(
+      holding.averageAcquisitionPrice === undefined ? "" : String(holding.averageAcquisitionPrice),
+    );
+    setHoldingNotes(holding.notes ?? "");
+  }
+
+  async function removeHolding(itemId: number) {
+    if (holdings === null || holdings === undefined) return;
+    setBusy(true);
+    setError(undefined);
+    try {
+      const response = await bridge.callTool<PlayerHoldingsSnapshot>("replace_player_holdings", {
+        profileId: profile.id,
+        items: holdings.items.filter((holding) => holding.itemId !== itemId),
+        ...(holdings.cashGp === undefined ? {} : { cashGp: holdings.cashGp }),
+        source: "manual",
+        confirmReplace: true,
+      });
+      setHoldings(response.data);
+      setPrivateProvenance(response.meta.provenance);
+      const portfolioResponse = await bridge.callTool<PortfolioSummary>("get_portfolio_summary", {
+        profileId: profile.id,
+      });
+      setPortfolio(portfolioResponse.data);
+      setAnalysisProvenance(portfolioResponse.meta.provenance);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "The holding could not be removed");
     } finally {
       setBusy(false);
     }
@@ -820,20 +898,20 @@ export function ExchangeView({
           confirmReplace: true,
         });
         setHoldings(response.data);
+        setPrivateProvenance(response.meta.provenance);
       } else {
         const response = await bridge.callTool<{ content: string }>("export_player_holdings", {
           profileId: profile.id,
           format: holdingsFormat,
         });
         setHoldingsTransfer(response.data.content);
+        setPrivateProvenance(response.meta.provenance);
       }
-      setPortfolio(
-        (
-          await bridge.callTool<PortfolioSummary>("get_portfolio_summary", {
-            profileId: profile.id,
-          })
-        ).data,
-      );
+      const portfolioResponse = await bridge.callTool<PortfolioSummary>("get_portfolio_summary", {
+        profileId: profile.id,
+      });
+      setPortfolio(portfolioResponse.data);
+      setAnalysisProvenance(portfolioResponse.meta.provenance);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Holdings transfer failed");
     } finally {
@@ -846,7 +924,7 @@ export function ExchangeView({
     setBusy(true);
     setError(undefined);
     try {
-      await bridge.callTool<GeTradeRecord>("record_ge_trade", {
+      const recorded = await bridge.callTool<GeTradeRecord>("record_ge_trade", {
         profileId: profile.id,
         itemId: tradeItemId,
         side: tradeSide,
@@ -855,13 +933,11 @@ export function ExchangeView({
         occurredAt: new Date().toISOString(),
         source: "manual",
       });
-      setJournal(
-        (
-          await bridge.callTool<GeTradeRecord[]>("list_ge_trades", {
-            profileId: profile.id,
-          })
-        ).data,
-      );
+      setPrivateProvenance(recorded.meta.provenance);
+      const journalResponse = await bridge.callTool<GeTradeRecord[]>("list_ge_trades", {
+        profileId: profile.id,
+      });
+      setJournal(journalResponse.data);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "The trade could not be recorded");
     } finally {
@@ -874,17 +950,15 @@ export function ExchangeView({
     setBusy(true);
     setError(undefined);
     try {
-      setPaper(
-        (
-          await bridge.callTool<PaperPortfolio>("record_paper_trade", {
-            profileId: profile.id,
-            itemId: paperItemId,
-            side: paperSide,
-            quantity: paperQuantity,
-            unitPrice: paperPrice,
-          })
-        ).data,
-      );
+      const response = await bridge.callTool<PaperPortfolio>("record_paper_trade", {
+        profileId: profile.id,
+        itemId: paperItemId,
+        side: paperSide,
+        quantity: paperQuantity,
+        unitPrice: paperPrice,
+      });
+      setPaper(response.data);
+      setPrivateProvenance(response.meta.provenance);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "The paper trade could not be recorded");
     } finally {
@@ -901,18 +975,16 @@ export function ExchangeView({
     setBusy(true);
     setError(undefined);
     try {
-      await bridge.callTool<MarketWatchlist>("create_market_watchlist", {
+      const created = await bridge.callTool<MarketWatchlist>("create_market_watchlist", {
         profileId: profile.id,
         name: watchlistName,
         itemIds: [...new Set(itemIds)],
       });
-      setWatchlists(
-        (
-          await bridge.callTool<MarketWatchlist[]>("get_market_watchlist", {
-            profileId: profile.id,
-          })
-        ).data,
-      );
+      setPrivateProvenance(created.meta.provenance);
+      const response = await bridge.callTool<MarketWatchlist[]>("get_market_watchlist", {
+        profileId: profile.id,
+      });
+      setWatchlists(response.data);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "The watchlist could not be saved");
     } finally {
@@ -926,7 +998,31 @@ export function ExchangeView({
         eyebrow="Guide-price intelligence"
         title="Grand Exchange"
         description="Search current guide prices and inspect descriptive history—never guaranteed trades."
-        actions={<StatusPill state="fresh">Catalogue ready</StatusPill>}
+        actions={
+          <div className="tag-row">
+            {marketProvenance === undefined ? null : (
+              <DataOriginBadge
+                origin={marketProvenance.origin}
+                provider={marketProvenance.provider}
+                timestamp={marketProvenance.timestamp}
+              />
+            )}
+            {analysisProvenance === undefined ? null : (
+              <DataOriginBadge
+                origin={analysisProvenance.origin}
+                provider={analysisProvenance.provider}
+                timestamp={analysisProvenance.timestamp}
+              />
+            )}
+            {privateProvenance === undefined ? null : (
+              <DataOriginBadge
+                origin={privateProvenance.origin}
+                provider={privateProvenance.provider}
+                timestamp={privateProvenance.timestamp}
+              />
+            )}
+          </div>
+        }
       />
       <div
         className="tab-list exchange-tabs"
@@ -1131,6 +1227,14 @@ export function ExchangeView({
                       placeholder="Optional GP"
                     />
                   </label>
+                  <label>
+                    Notes
+                    <input
+                      value={holdingNotes}
+                      onChange={(event) => setHoldingNotes(event.currentTarget.value)}
+                      placeholder="Optional local note"
+                    />
+                  </label>
                 </div>
                 <button className="primary-button" type="submit" disabled={busy}>
                   Save confirmed holding
@@ -1186,13 +1290,57 @@ export function ExchangeView({
             </section>
             <section className="surface-card">
               <h2>Latest confirmed snapshot</h2>
-              {holdings === null ? (
+              {holdings === undefined ? (
+                <LoadingBlock label="Loading confirmed holdings" />
+              ) : holdings === null ? (
                 <p>No holdings snapshot has been recorded.</p>
               ) : (
-                <p>
-                  {holdings?.items.length ?? 0} item lines; captured{" "}
-                  {formatDate(holdings?.capturedAt)}; source {holdings?.source}
-                </p>
+                <>
+                  <p>
+                    {holdings?.items.length ?? 0} item lines; captured{" "}
+                    {formatDate(holdings?.capturedAt)}; source {holdings?.source}; confirmed cash{" "}
+                    {holdings?.cashGp === undefined ? "not entered" : formatGp(holdings.cashGp)}
+                  </p>
+                  {holdings.items.length === 0 ? (
+                    <p>No item holdings have been recorded.</p>
+                  ) : (
+                    <div className="shopping-table" aria-label="Editable confirmed holdings">
+                      {holdings.items.map((holding) => (
+                        <div className="shopping-row" key={holding.itemId}>
+                          <span className="item-orb">#{holding.itemId}</span>
+                          <div>
+                            <strong>{formatNumber(holding.quantity)} held</strong>
+                            <small>
+                              Cost{" "}
+                              {holding.averageAcquisitionPrice === undefined
+                                ? "not entered"
+                                : formatGp(holding.averageAcquisitionPrice)}
+                              {holding.notes === undefined ? "" : `; ${holding.notes}`}
+                            </small>
+                          </div>
+                          <div className="button-row">
+                            <button
+                              className="secondary-button"
+                              type="button"
+                              disabled={busy}
+                              onClick={() => editHolding(holding)}
+                            >
+                              Edit
+                            </button>
+                            <button
+                              className="secondary-button"
+                              type="button"
+                              disabled={busy}
+                              onClick={() => void removeHolding(holding.itemId)}
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
               )}
             </section>
           </>

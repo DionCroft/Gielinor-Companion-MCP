@@ -36,6 +36,13 @@ unsafe rollback enters read-only safe mode instead of resetting user data.
 Provider circuits, scheduler recovery limits, and explicit confirmation on
 targeted maintenance actions prevent recovery storms and broad resets.
 
+Version 1.2 separates the native production module graph from explicit preview
+fixtures and fails release verification if demo profiles, fixture catalogues,
+or fake market values are reachable. Every MCP response carries an origin
+classification; cached, manual, imported, Alt1-confirmed, calculated, preview,
+and unavailable data cannot be presented as a current live provider response.
+The native app is single-instance to avoid competing SQLite processes.
+
 Provider plugins are untrusted outward adapters. The registry applies shared
 result schemas, explicit priority, fallback diagnostics, disagreement
 preservation, offline eligibility, and health tracking before data reaches core
@@ -80,6 +87,12 @@ Dependencies and release artifacts must be reviewed. The read-only update
 checker contacts only the official GitHub Releases API, validates official
 release and asset URLs, and never downloads or installs code. Desktop updates
 remain opt-in.
+
+The recommended Windows installer is per-user and signed-capable. Tag releases
+publish checksums, an SBOM, and provenance attestations; platform code signing
+depends on maintainer-owned certificates. Installed and explicit portable modes
+use separate database paths. Ordinary uninstall preserves local data unless the
+user deliberately selects its removal.
 
 The maintained [threat model](docs/security/threat-model.md),
 [audit checklist](docs/security/audit-checklist.md), and

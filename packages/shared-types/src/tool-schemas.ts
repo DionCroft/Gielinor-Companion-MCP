@@ -16,6 +16,7 @@ import {
   PlayerPrivateDataSourceSchema,
 } from "./player-private-data.js";
 import { MarketBacktestInputSchema } from "./market-intelligence.js";
+import { DataProvenanceSchema } from "./provenance.js";
 
 export const EmptyInputSchema = z.object({}).strict();
 
@@ -37,6 +38,7 @@ export const ToolEnvelopeSchema = z
         source: z.string().min(1),
         traceId: z.string().uuid().optional(),
         recoveryStatus: RecoveryStatusSchema.optional(),
+        provenance: DataProvenanceSchema.optional(),
       })
       .strict(),
   })

@@ -112,7 +112,14 @@ describe("MCP server protocol integration", () => {
         targetExperience: 13_034_431,
         experienceRemaining: 12_034_431,
       },
-      meta: { source: "deterministic RuneScape XP table" },
+      meta: {
+        source: "deterministic RuneScape XP table",
+        provenance: {
+          origin: "derived",
+          provider: "deterministic RuneScape XP table",
+          cacheState: "not-applicable",
+        },
+      },
     });
 
     const status = await client.callTool({
@@ -122,7 +129,10 @@ describe("MCP server protocol integration", () => {
     expect(status.isError).not.toBe(true);
     expect(status.structuredContent).toMatchObject({
       data: { state: "ready", questCount: 2 },
-      meta: { source: "local SQLite quest sync status" },
+      meta: {
+        source: "local SQLite quest sync status",
+        provenance: { origin: "validated-cache" },
+      },
     });
 
     const trainingStatus = await client.callTool({
@@ -132,7 +142,10 @@ describe("MCP server protocol integration", () => {
     expect(trainingStatus.isError).not.toBe(true);
     expect(trainingStatus.structuredContent).toMatchObject({
       data: { state: "ready", methodCount: 42, coveredSkills: ["mining"] },
-      meta: { source: "local SQLite training sync status" },
+      meta: {
+        source: "local SQLite training sync status",
+        provenance: { origin: "validated-cache" },
+      },
     });
 
     const priceStatus = await client.callTool({
@@ -142,7 +155,10 @@ describe("MCP server protocol integration", () => {
     expect(priceStatus.isError).not.toBe(true);
     expect(priceStatus.structuredContent).toMatchObject({
       data: { state: "ready", itemCount: 7_000, historyPointCount: 180 },
-      meta: { source: "local SQLite Grand Exchange sync status" },
+      meta: {
+        source: "local SQLite Grand Exchange sync status",
+        provenance: { origin: "validated-cache" },
+      },
     });
   });
 });

@@ -2,6 +2,8 @@
 
 Choose one surface:
 
+- [One-click Windows installer](one-click-windows.md) for normal Windows users.
+- [Portable Windows mode](portable-windows.md) for an explicitly isolated archive.
 - [Local stdio MCP](local-mcp.md) for standards-compliant desktop/CLI clients.
 - [Claude Desktop](claude-desktop.md).
 - [Claude Code](claude-code.md).

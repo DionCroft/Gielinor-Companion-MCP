@@ -8,10 +8,10 @@ const live = process.env.RUN_LIVE_API_TESTS === "1";
 describe.runIf(live)("live GitHub Releases update metadata", () => {
   it("loads and validates the official release list without downloading assets", async () => {
     const result = await new SoftwareUpdateService({
-      installedVersion: "1.1.0",
+      installedVersion: "1.2.0",
       cacheStore: new MemoryCacheStore(),
       userAgent:
-        "Gielinor-Companion-MCP-live-test/1.1.0 (https://github.com/DionCroft/Gielinor-Companion-MCP)",
+        "Gielinor-Companion-MCP-live-test/1.2.0 (https://github.com/DionCroft/Gielinor-Companion-MCP)",
       maximumAttempts: 2,
     }).check({ forceRefresh: true });
 

@@ -18,7 +18,7 @@ import {
 import { PROVIDER_PLUGIN_API_VERSION } from "../packages/providers/dist/index.js";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const expectedVersion = "1.1.0";
+const expectedVersion = "1.2.0";
 const manifests = [
   "package.json",
   "apps/alt1-overlay/package.json",
@@ -142,6 +142,7 @@ const requiredFiles = [
   "docs/architecture/real-data-flow.md",
   "docs/architecture/player-private-data.md",
   "docs/architecture/market-intelligence.md",
+  "docs/architecture/data-provenance.md",
   "docs/architecture/provider-plugins.md",
   "docs/architecture/resilience.md",
   "docs/architecture/scheduler.md",
@@ -154,6 +155,8 @@ const requiredFiles = [
   "docs/installation/claude-code.md",
   "docs/installation/claude-desktop.md",
   "docs/installation/desktop.md",
+  "docs/installation/one-click-windows.md",
+  "docs/installation/portable-windows.md",
   "docs/installation/hosted.md",
   "docs/installation/lm-studio.md",
   "docs/installation/local-mcp.md",
@@ -164,17 +167,26 @@ const requiredFiles = [
   "docs/guides/ge-recommendations.md",
   "docs/releases/v1.1.0-completion.md",
   "docs/releases/v1.1.0.md",
+  "docs/releases/v1.2.0-completion.md",
+  "docs/releases/v1.2.0-plan.md",
+  "docs/releases/v1.2.0.md",
   "docs/security/release-integrity.md",
   "docs/testing/release-validation.md",
   "docs/testing/fault-injection.md",
   "docs/testing/live-provider-monitoring.md",
+  "docs/testing/installer-acceptance.md",
+  "docs/testing/live-data-audit.md",
   "docs/testing/market-backtesting.md",
   "docs/testing/node-compatibility.md",
 ];
 await Promise.all(requiredFiles.map((path) => access(resolve(root, path))));
 
 const readme = await readFile(resolve(root, "README.md"), "utf8");
-invariant(readme.includes("Current version: 1.1.0"), "README does not identify Version 1.1.0");
+invariant(readme.includes("Current version: 1.2.0"), "README does not identify Version 1.2.0");
+invariant(
+  readme.includes("Download for Windows"),
+  "README does not lead with Windows download guidance",
+);
 invariant(
   readme.includes("unofficial community project"),
   "README lacks the affiliation disclaimer",
@@ -189,6 +201,8 @@ for (const expected of [
   "anchore/sbom-action@v0",
   "actions/attest@v4",
   "tauri-apps/tauri-action@v1",
+  "smoke-windows-installer.ps1",
+  "collect-desktop-assets.mjs",
 ]) {
   invariant(workflow.includes(expected), `Release workflow lacks ${expected}`);
 }

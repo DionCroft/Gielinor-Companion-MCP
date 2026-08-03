@@ -30,7 +30,8 @@ const NAVIGATION: Array<{
   {
     label: "System",
     items: [
-      { id: "data-status", label: "Diagnostics", icon: "status" },
+      { id: "data-status", label: "Data sources", icon: "status" },
+      { id: "diagnostics", label: "Diagnostics", icon: "settings" },
       { id: "updates", label: "Updates", icon: "updates" },
       { id: "settings", label: "Settings", icon: "settings" },
       { id: "ai-providers", label: "AI providers", icon: "spark" },

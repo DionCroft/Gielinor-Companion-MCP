@@ -56,6 +56,18 @@ jobs:
       - name: Build all current workspaces
         run: pnpm build
 
+      - name: Version 1.2 launch and provenance boundaries
+        if: matrix.node-version == 24
+        run: |
+          pnpm test:launcher
+          pnpm test:installer
+          pnpm test:portable
+          pnpm test:release-assets
+          pnpm test:provenance
+          pnpm test:live-data-ui
+          pnpm test:real-data-boundaries
+          pnpm test:no-demo-native
+
   desktop-e2e:
     runs-on: ubuntu-latest
     timeout-minutes: 15

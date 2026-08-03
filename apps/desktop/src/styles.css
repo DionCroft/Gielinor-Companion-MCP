@@ -856,6 +856,41 @@ dd {
   white-space: nowrap;
 }
 
+.origin-badge {
+  display: inline-flex;
+  width: fit-content;
+  min-height: 24px;
+  align-items: center;
+  padding: 0.25rem 0.55rem;
+  border: 1px solid var(--line);
+  border-radius: 99px;
+  color: var(--muted);
+  background: var(--surface-soft);
+  font-size: 0.67rem;
+  font-weight: 800;
+}
+
+.origin-live-public {
+  color: var(--mint);
+  border-color: color-mix(in srgb, var(--mint) 35%, var(--line));
+}
+
+.origin-validated-cache,
+.origin-derived {
+  color: var(--blue);
+}
+
+.origin-manual-local,
+.origin-imported-local,
+.origin-alt1-confirmed {
+  color: var(--gold);
+}
+
+.origin-preview-fixture,
+.origin-unavailable {
+  color: var(--warning);
+}
+
 .status-ready,
 .status-success,
 .status-fresh {
@@ -2235,6 +2270,27 @@ legend {
   background: var(--surface-raised);
   border: 1px solid var(--line);
   border-radius: 8px;
+}
+
+.recommended-release-asset {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin: 1rem 0;
+  padding: 1rem;
+  background: var(--mint-soft);
+  border: 1px solid color-mix(in srgb, var(--mint) 40%, var(--line));
+  border-radius: 10px;
+}
+
+.recommended-release-asset > div {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.recommended-release-asset small {
+  color: var(--muted);
 }
 
 .release-assets {

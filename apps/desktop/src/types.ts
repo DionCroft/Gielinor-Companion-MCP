@@ -1,6 +1,7 @@
 import type { JsonTransport } from "@gielinor/agent-runtime";
 import type {
   GameMode,
+  DataProvenance,
   PlayerProfile,
   PlayerSkill,
   RedactedDiagnostics,
@@ -16,6 +17,7 @@ export type ToolEnvelope<T> = {
     source: string;
     traceId?: string;
     recoveryStatus?: "not-required" | "not-attempted" | "succeeded" | "failed" | "partial";
+    provenance?: DataProvenance;
   };
 };
 
@@ -27,7 +29,7 @@ export type RuntimeStatus = {
     | "browser-preview"
     | "automated-test"
     | "unavailable";
-  transport?: "bundled" | "development" | "configured" | "unavailable";
+  transport?: "bundled" | "development" | "configured" | "portable" | "unavailable";
   message: string;
 };
 

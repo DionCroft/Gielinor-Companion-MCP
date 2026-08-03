@@ -55,6 +55,12 @@ jobs:
           pnpm test:scheduler
           pnpm test:update-checker
           pnpm test:fault-injection
+          pnpm test:launcher
+          pnpm test:installer
+          pnpm test:portable
+          pnpm test:release-assets
+          pnpm test:provenance
+          pnpm test:live-data-ui
 
       - name: Verify stable release contracts and documentation
         run: |
@@ -103,20 +109,16 @@ jobs:
         include:
           - platform: windows-latest
             label: windows-x64
+            asset_platform: windows
             bundles: nsis,msi
-            artifacts: |
-              apps/desktop/src-tauri/target/release/bundle/nsis/*.exe
-              apps/desktop/src-tauri/target/release/bundle/msi/*.msi
           - platform: macos-latest
             label: macos
+            asset_platform: macos
             bundles: dmg
-            artifacts: apps/desktop/src-tauri/target/release/bundle/dmg/*.dmg
           - platform: ubuntu-22.04
             label: linux-x64
+            asset_platform: linux
             bundles: appimage,deb
-            artifacts: |
-              apps/desktop/src-tauri/target/release/bundle/appimage/*.AppImage
-              apps/desktop/src-tauri/target/release/bundle/deb/*.deb
 
     runs-on: ${{ matrix.platform }}
 
@@ -159,10 +161,28 @@ jobs:
           projectPath: apps/desktop
           args: --bundles ${{ matrix.bundles }}
 
+      - name: Build isolated portable Windows archive
+        if: runner.os == 'Windows'
+        run: pnpm pack:portable
+
+      - name: Smoke-test clean per-user Windows installation
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: ./scripts/smoke-windows-installer.ps1
+
+      - name: Normalize release asset names
+        shell: bash
+        run: |
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            node scripts/collect-desktop-assets.mjs --platform windows --portable auto
+          else
+            node scripts/collect-desktop-assets.mjs --platform ${{ matrix.asset_platform }}
+          fi
+
       - uses: actions/upload-artifact@v4
         with:
           name: desktop-${{ matrix.label }}
-          path: ${{ matrix.artifacts }}
+          path: release/desktop-assets/*
           if-no-files-found: error
 
   container:
@@ -255,7 +275,7 @@ jobs:
       - name: Publish GitHub release
         uses: softprops/action-gh-release@v3
         with:
-          body_path: docs/releases/v1.1.0.md
+          body_path: docs/releases/v1.2.0.md
           files: release/assets/**
           fail_on_unmatched_files: true
           generate_release_notes: true

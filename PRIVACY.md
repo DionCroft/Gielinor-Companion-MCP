@@ -21,6 +21,11 @@ The default SQLite path is
 `-shm`/`-wal` files while the application is closed to remove local MCP data.
 The desktop does not silently upload that database.
 
+Explicit Windows portable mode instead stores data below `portable-data` beside
+the extracted application. It never silently mixes that database with the
+installed per-user database. Ordinary installer upgrades and uninstall preserve
+the per-user database by default.
+
 ## Data never requested
 
 Do not enter a Jagex email, password, authenticator code, launcher/session token,
@@ -34,6 +39,12 @@ Wiki. A player-stat refresh sends the public display name to the selected
 Hiscores endpoint. Requests include the configured application User-Agent.
 Provider responses are validated, source-stamped, cached, and never treated as
 game credentials.
+
+User-facing data is classified as live public, validated cache, manual local,
+imported local, Alt1-confirmed, deterministic derived, preview fixture, or
+unavailable. A value is labelled Live only when a real provider succeeds during
+that request. The redacted provenance report excludes display names, profile
+identifiers, holdings, trades, credentials, provider payloads, and local paths.
 
 Automatic maintenance sends the same minimal public requests as a manual
 refresh and respects offline mode. The update checker may request public release

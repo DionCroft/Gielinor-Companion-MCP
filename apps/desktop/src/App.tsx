@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useReducer } from "react";
+import { isTauri } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 
 import { InlineAlert, LoadingBlock } from "./components/Common.js";
 import { Layout } from "./components/Layout.js";
-import { createDefaultBridge } from "./lib/bridge.js";
+import { createDefaultBridge } from "./lib/native-bridge.js";
 import { desktopError } from "./lib/errors.js";
 import {
   appReducer,
@@ -22,7 +24,13 @@ import {
   QuestPlannerView,
   ShoppingListsView,
 } from "./views/PlanningViews.js";
-import { AboutView, DiagnosticsView, SettingsView, UpdatesView } from "./views/SystemViews.js";
+import {
+  AboutView,
+  DataStatusView,
+  DiagnosticsView,
+  SettingsView,
+  UpdatesView,
+} from "./views/SystemViews.js";
 
 function activeContent(
   state: AppState,
@@ -71,7 +79,8 @@ function activeContent(
         onRemove={(goalId) => dispatch({ type: "remove-goal", goalId })}
       />
     ),
-    "data-status": (
+    "data-status": <DataStatusView bridge={bridge} offlineMode={state.offlineMode} />,
+    diagnostics: (
       <DiagnosticsView bridge={bridge} offlineMode={state.offlineMode} onOffline={setOfflineMode} />
     ),
     updates: <UpdatesView bridge={bridge} />,
@@ -154,6 +163,25 @@ export function App({ bridge: providedBridge }: { bridge?: CompanionBridge }) {
       active = false;
     };
   }, [bridge]);
+
+  useEffect(() => {
+    if (!isTauri()) {
+      return;
+    }
+    let dispose: (() => void) | undefined;
+    void listen("gielinor://second-instance", () => {
+      dispatch({
+        type: "notice",
+        notice: {
+          tone: "info",
+          message: "Gielinor Companion was already running, so this window was brought forward.",
+        },
+      });
+    }).then((unlisten) => {
+      dispose = unlisten;
+    });
+    return () => dispose?.();
+  }, []);
 
   useEffect(() => {
     persistAppState(state);

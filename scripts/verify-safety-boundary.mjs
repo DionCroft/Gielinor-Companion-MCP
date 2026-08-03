@@ -36,6 +36,10 @@ const forbidden = [
     category: "RuneScape credential handling",
     pattern: /\b(?:runescapePassword|jagexPassword|jagexSessionToken|runescapeCookie)\b/i,
   },
+  {
+    category: "CAPTCHA handling",
+    pattern: /\b(?:solveCaptcha|handleCaptcha|captchaSolver|hcaptcha|recaptcha)\b/i,
+  },
 ];
 
 async function files(directory) {
@@ -77,5 +81,5 @@ if (violations.length > 0) {
 }
 
 process.stdout.write(
-  "Safety boundary verified: no game input, GE execution, credential, client-memory or packet-interception APIs detected.\n",
+  "Safety boundary verified: no game input, GE execution, credential, CAPTCHA-handling, client-memory or packet-interception APIs detected.\n",
 );

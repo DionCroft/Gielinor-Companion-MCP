@@ -21,6 +21,8 @@ import {
   toGielinorError,
   type CatalogueHealth,
   type ComponentHealth,
+  type DataOrigin,
+  type DataProvenance,
   type GameMode,
   type GielinorError,
   type MaintenanceJobName,
@@ -49,17 +51,166 @@ export type ToolEnvelope<T> = {
     source: string;
     traceId?: string;
     recoveryStatus?: RecoveryStatus;
+    provenance: DataProvenance;
   };
 };
 
 export type ToolError = GielinorError;
 
-function envelope<T>(data: T, source: string): ToolEnvelope<T> {
+type ProvenanceRecord = Record<string, unknown>;
+
+function object(value: unknown): ProvenanceRecord | undefined {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+    ? (value as ProvenanceRecord)
+    : undefined;
+}
+
+function stringField(record: ProvenanceRecord | undefined, key: string): string | undefined {
+  const value = record?.[key];
+  return typeof value === "string" ? value : undefined;
+}
+
+function cacheState(data: unknown): "miss" | "fresh" | "stale" | "not-applicable" {
+  const record = object(data);
+  const source = object(record?.["source"]);
+  const value = stringField(source, "cacheStatus") ?? stringField(record, "cacheStatus");
+  return value === "miss" || value === "fresh" || value === "stale" ? value : "not-applicable";
+}
+
+function privateDataOrigin(data: unknown): DataOrigin | undefined {
+  const source = stringField(object(data), "source");
+  if (source === "alt1-confirmed") return "alt1-confirmed";
+  if (source === "csv-import" || source === "json-import") return "imported-local";
+  if (source === "manual") return "manual-local";
+  return undefined;
+}
+
+function inferOrigin(data: unknown, source: string): DataOrigin {
+  const normalized = source.toLowerCase();
+  const cached = cacheState(data);
+  const privateOrigin = privateDataOrigin(data);
+  if (privateOrigin !== undefined) return privateOrigin;
+  if (normalized.includes("fixture") || normalized.includes("preview")) return "preview-fixture";
+  if (normalized.includes("unavailable")) return "unavailable";
+  if (cached === "miss") return "live-public";
+  if (cached === "fresh" || cached === "stale") return "validated-cache";
+  if (normalized.includes("import")) return "imported-local";
+  if (normalized.includes("alt1")) return "alt1-confirmed";
+  if (
+    normalized.includes("deterministic") ||
+    normalized.includes("calculated") ||
+    normalized.includes("scoring") ||
+    normalized.includes("backtest") ||
+    normalized.includes("valuation") ||
+    normalized.includes("manual order plan")
+  ) {
+    return "derived";
+  }
+  if (
+    normalized.includes("user-entered") ||
+    normalized.includes("user-confirmed") ||
+    normalized.includes("private local") ||
+    normalized.includes("local sqlite profile") ||
+    normalized.includes("selected-profile state") ||
+    normalized.includes("market preferences") ||
+    normalized.includes("market watchlist") ||
+    normalized.includes("paper portfolio") ||
+    normalized.includes("paper trade")
+  ) {
+    return "manual-local";
+  }
+  if (
+    normalized.includes("validated local") ||
+    normalized.includes("retained sqlite") ||
+    normalized.includes("sync status") ||
+    normalized.includes("local rs3") ||
+    normalized.includes("local catalogue") ||
+    normalized.includes("local profile and validated")
+  ) {
+    return "validated-cache";
+  }
+  if (
+    normalized.includes("runescape wiki") ||
+    normalized.includes("jagex") ||
+    normalized.includes("weird gloop") ||
+    normalized.includes("grand exchange") ||
+    normalized.includes("hiscores")
+  ) {
+    // Direct refresh operations explicitly request live-public above. Ordinary lookups from
+    // public providers are served from the validated local repository and must not be labelled
+    // as an upstream request made for this response.
+    return "validated-cache";
+  }
+  return "derived";
+}
+
+function provenance(
+  data: unknown,
+  source: string,
+  generatedAt: string,
+  traceId: string,
+  requestedOrigin?: DataOrigin,
+): DataProvenance {
+  const record = object(data);
+  const nestedSource = object(record?.["source"]);
+  const cached = cacheState(data);
+  const origin = requestedOrigin ?? inferOrigin(data, source);
+  const resolvedCache =
+    cached !== "not-applicable"
+      ? cached
+      : origin === "live-public"
+        ? "miss"
+        : origin === "validated-cache"
+          ? stringField(record, "state") === "failed"
+            ? "stale"
+            : "fresh"
+          : "not-applicable";
+  const timestamp =
+    stringField(nestedSource, "retrievedAt") ??
+    stringField(record, "retrievedAt") ??
+    stringField(record, "timestamp") ??
+    stringField(record, "capturedAt") ??
+    stringField(record, "occurredAt") ??
+    stringField(record, "lastSuccessfulSyncAt") ??
+    generatedAt;
+  const warnings = Array.isArray(record?.["warnings"])
+    ? record["warnings"].filter((warning): warning is string => typeof warning === "string")
+    : [];
+  if (resolvedCache === "stale" && !warnings.some((warning) => /stale/i.test(warning))) {
+    warnings.push(
+      "This result uses retained stale data; confidence and decisions should be reduced.",
+    );
+  }
+  const confidence = record?.["confidence"];
+  return {
+    origin,
+    provider: source,
+    timestamp,
+    freshness:
+      resolvedCache === "stale"
+        ? "stale"
+        : resolvedCache === "miss" || resolvedCache === "fresh"
+          ? "fresh"
+          : "unknown",
+    cacheState: resolvedCache,
+    ...(typeof confidence === "number" && Number.isFinite(confidence)
+      ? { confidence: Math.max(0, Math.min(100, confidence)) }
+      : {}),
+    warnings,
+    traceId,
+  };
+}
+
+function envelope<T>(data: T, source: string, origin?: DataOrigin): ToolEnvelope<T> {
+  const generatedAt = new Date().toISOString();
+  const traceId = createTraceId();
   return ToolEnvelopeSchema.parse({
     data,
     meta: {
-      generatedAt: new Date().toISOString(),
+      generatedAt,
       source,
+      traceId,
+      provenance: provenance(data, source, generatedAt, traceId, origin),
     },
   }) as ToolEnvelope<T>;
 }
@@ -70,13 +221,15 @@ function diagnosticEnvelope<T>(
   recoveryStatus: RecoveryStatus,
   traceId = createTraceId(),
 ): ToolEnvelope<T> {
+  const generatedAt = new Date().toISOString();
   return ToolEnvelopeSchema.parse({
     data,
     meta: {
-      generatedAt: new Date().toISOString(),
+      generatedAt,
       source,
       traceId,
       recoveryStatus,
+      provenance: provenance(data, source, generatedAt, traceId, "derived"),
     },
   }) as ToolEnvelope<T>;
 }
@@ -369,7 +522,7 @@ export class CompanionToolService {
     preferredPlayStyle?: "fastest" | "cheapest" | "balanced" | "afk" | undefined;
     availableHoursPerDay?: number | undefined;
   }): Promise<ToolEnvelope<Awaited<ReturnType<ProfileService["create"]>>>> {
-    return envelope(await this.profiles.create(input), "local SQLite profile");
+    return envelope(await this.profiles.create(input), "local SQLite profile", "manual-local");
   }
 
   public async getPlayerProfile(
@@ -403,6 +556,7 @@ export class CompanionToolService {
     return envelope(
       await this.profiles.refreshStats(profileId),
       "Jagex public Hiscores and local SQLite profile",
+      "live-public",
     );
   }
 
@@ -427,7 +581,7 @@ export class CompanionToolService {
   public async importPlayerProfile(
     profile: unknown,
   ): Promise<ToolEnvelope<Awaited<ReturnType<ProfileService["import"]>>>> {
-    return envelope(await this.profiles.import(profile), "local SQLite profile");
+    return envelope(await this.profiles.import(profile), "local SQLite profile", "imported-local");
   }
 
   public async getSelectedPlayerSnapshot() {
@@ -786,6 +940,7 @@ export class CompanionToolService {
     return envelope(
       { stages, limited: stages.some(({ status }) => status !== "complete") },
       "validated public RuneScape providers with transactional local retention",
+      "live-public",
     );
   }
 
@@ -804,6 +959,7 @@ export class CompanionToolService {
     return envelope(
       await this.exchangeService().refreshData(itemIds),
       "validated RS3 Grand Exchange public providers",
+      "live-public",
     );
   }
 
@@ -989,6 +1145,7 @@ export class CompanionToolService {
     return envelope(
       await this.exchangeService().refreshData(itemIds),
       "RS3 Grand Exchange public sources and local SQLite",
+      "live-public",
     );
   }
 
@@ -1209,7 +1366,11 @@ export class CompanionToolService {
   }
 
   public async refreshQuestData() {
-    return envelope(await this.questService().refreshData(), "RuneScape Wiki and local SQLite");
+    return envelope(
+      await this.questService().refreshData(),
+      "RuneScape Wiki and local SQLite",
+      "live-public",
+    );
   }
 
   public async getQuestDataStatus() {
@@ -1300,7 +1461,11 @@ export class CompanionToolService {
   }
 
   public async refreshTrainingData() {
-    return envelope(await this.plannerService().refreshData(), "RuneScape Wiki and local SQLite");
+    return envelope(
+      await this.plannerService().refreshData(),
+      "RuneScape Wiki and local SQLite",
+      "live-public",
+    );
   }
 
   public async getTrainingDataStatus() {

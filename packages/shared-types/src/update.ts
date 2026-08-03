@@ -60,6 +60,8 @@ export const SoftwareUpdateCheckSchema = z
     source: z.enum(["live", "cache", "none"]),
     message: z.string().min(1).max(500),
     release: SoftwareReleaseSchema.optional(),
+    recommendedAsset: SoftwareReleaseAssetSchema.optional(),
+    checksumMetadataAvailable: z.boolean(),
     errorCode: GielinorErrorCodeSchema.optional(),
     warnings: z.array(GielinorErrorCodeSchema).max(10),
     traceId: z.string().uuid(),

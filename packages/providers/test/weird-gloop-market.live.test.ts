@@ -10,7 +10,7 @@ const live = process.env.RUN_LIVE_API_TESTS === "1";
 describe.runIf(live)("live Weird Gloop RS3 market and news contracts", () => {
   const httpClient = new ResilientHttpClient({
     userAgent:
-      "Gielinor-Companion-MCP-live-test/1.1.0 (https://github.com/DionCroft/Gielinor-Companion-MCP)",
+      "Gielinor-Companion-MCP-live-test/1.2.0 (https://github.com/DionCroft/Gielinor-Companion-MCP)",
     timeoutMs: 30_000,
     retries: 1,
   });

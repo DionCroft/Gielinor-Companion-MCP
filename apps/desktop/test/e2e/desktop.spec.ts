@@ -67,6 +67,7 @@ test("provider failures are explicit and retained profile setup still succeeds",
   await page.goto("/?mode=automated-test&fixture=provider-error");
   await page.getByLabel(/runescape display name/i).fill("Offline Hero");
   await page.getByRole("button", { name: /continue to companion/i }).click();
+  await page.getByRole("button", { name: /continue with limited functionality/i }).click();
   await expect(page.getByRole("heading", { name: /welcome back, offline hero/i })).toBeVisible();
   await page.getByRole("button", { name: "Diagnostics" }).click();
   await page.getByRole("button", { name: /refresh quest catalogue/i }).click();

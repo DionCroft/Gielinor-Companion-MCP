@@ -1,6 +1,6 @@
 {
   "name": "@gielinor/agent-runtime",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Bounded, model-independent local AI runtime for Gielinor Companion.",
   "type": "module",
   "main": "./dist/index.js",

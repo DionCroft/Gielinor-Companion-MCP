@@ -5,6 +5,7 @@ export * from "./maintenance.js";
 export * from "./market-data.js";
 export * from "./market-intelligence.js";
 export * from "./player-private-data.js";
+export * from "./provenance.js";
 export * from "./retry.js";
 export * from "./runtime-compatibility.js";
 export * from "./schemas.js";

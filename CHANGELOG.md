@@ -3,6 +3,41 @@
 All notable changes follow [Keep a Changelog](https://keepachangelog.com/) and
 semantic versioning.
 
+## [1.2.0] - 2026-08-03
+
+### Added
+
+- Recommended per-user Windows NSIS installer, managed MSI, isolated portable
+  ZIP, clean-runner install/uninstall smoke test, and stable cross-platform
+  release asset names.
+- Start Menu/default desktop shortcuts, final-page launch, single-instance
+  focusing, explicit `--portable` mode, and a production-only source launcher.
+- Universal eight-origin data provenance envelopes and consistent desktop
+  badges, plus a redacted provenance report and dedicated Data Sources centre.
+- Eleven-stage first-run synchronisation with retry and safe limited mode.
+- Platform-aware read-only update asset recommendations and checksum-metadata
+  visibility.
+- Installer, launcher, portable, release-asset, provenance, live-data UI, and
+  native fixture-reachability gates.
+
+### Changed
+
+- Application and workspace package versions are now `1.2.0`; the 93-tool
+  Version 1.1 contract and frozen 48-tool Version 1.0 prefix are unchanged.
+- Native production has a separate entry graph from explicit browser preview
+  fixtures. Browser live-development never silently selects preview mode.
+- README and installation documentation now lead normal Windows users to the
+  installer before source-development instructions.
+
+### Security
+
+- Native production bundle verification rejects reachable demo profiles,
+  preview catalogues, and deterministic fake market data.
+- Installed and portable databases are isolated; ordinary install, upgrade,
+  and uninstall preserve existing user data.
+- Live, cached, manual, imported, confirmed, calculated, preview, and
+  unavailable values cannot be silently relabelled across trust boundaries.
+
 ## [1.1.0] - 2026-07-24
 
 ### Added

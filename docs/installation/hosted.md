@@ -65,14 +65,14 @@ For a direct container deployment, mount durable storage at `/data` and keep the
 application port private:
 
 ```sh
-docker build -t gielinor-companion-mcp:1.1.0 .
+docker build -t gielinor-companion-mcp:1.2.0 .
 docker run --rm \
   --read-only \
   --user 10001:10001 \
   --mount type=volume,src=gielinor-data,dst=/data \
   --publish 127.0.0.1:3333:3333 \
   --env-file .env.hosted \
-  gielinor-companion-mcp:1.1.0
+  gielinor-companion-mcp:1.2.0
 ```
 
 ## Health

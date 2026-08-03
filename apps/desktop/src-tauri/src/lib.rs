@@ -6,7 +6,7 @@ use std::io::{BufRead, BufReader, Write};
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
-use tauri::{AppHandle, Manager};
+use tauri::{AppHandle, Emitter, Manager};
 
 const ALLOWED_TOOLS: &[&str] = &[
     "create_player_profile",
@@ -145,6 +145,18 @@ struct RuntimeCommand {
     mode: &'static str,
 }
 
+fn portable_mode() -> bool {
+    env::args_os().any(|argument| argument == "--portable")
+}
+
+fn portable_root() -> Option<PathBuf> {
+    portable_mode().then(|| env::current_exe().ok()?.parent().map(PathBuf::from))?
+}
+
+fn portable_database_path() -> Option<PathBuf> {
+    portable_root().map(|root| root.join("portable-data").join("gielinor.db"))
+}
+
 fn is_allowed_tool(tool: &str) -> bool {
     ALLOWED_TOOLS.contains(&tool)
 }
@@ -191,6 +203,22 @@ fn resolve_runtime(app: &AppHandle) -> Result<RuntimeCommand, BridgeError> {
                 executable: PathBuf::from(if cfg!(windows) { "node.exe" } else { "node" }),
                 entry,
                 mode: "development",
+            });
+        }
+    }
+
+    if let Some(root) = portable_root() {
+        let executable = root.join(if cfg!(windows) {
+            "gielinor-runtime.exe"
+        } else {
+            "gielinor-runtime"
+        });
+        let entry = root.join("runtime/dist/index.js");
+        if executable.is_file() && entry.is_file() {
+            return Ok(RuntimeCommand {
+                executable,
+                entry,
+                mode: "portable",
             });
         }
     }
@@ -245,12 +273,17 @@ fn invoke_tool(
     tool: &str,
     arguments: Value,
 ) -> Result<Value, BridgeError> {
-    let mut child = Command::new(&runtime.executable)
+    let mut command = Command::new(&runtime.executable);
+    command
         .arg(&runtime.entry)
         .env("GIELINOR_RUNTIME_MODE", "desktop-ephemeral")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
-        .stderr(Stdio::null())
+        .stderr(Stdio::null());
+    if let Some(database_path) = portable_database_path() {
+        command.env("GIELINOR_DB_PATH", database_path);
+    }
+    let mut child = command
         .spawn()
         .map_err(|_| BridgeError::StartupFailed)?;
     let mut stdin = child.stdin.take().ok_or(BridgeError::StartupFailed)?;
@@ -269,7 +302,7 @@ fn invoke_tool(
                     "capabilities": {},
                     "clientInfo": {
                         "name": "gielinor-companion-desktop",
-                        "version": "1.1.0"
+                        "version": "1.2.0"
                     }
                 }
             }),
@@ -384,6 +417,14 @@ async fn call_companion_tool(
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_single_instance::init(|app, _arguments, _working_directory| {
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.unminimize();
+                let _ = window.show();
+                let _ = window.set_focus();
+            }
+            let _ = app.emit("gielinor://second-instance", ());
+        }))
         .plugin(tauri_plugin_http::init())
         .invoke_handler(tauri::generate_handler![
             desktop_runtime_status,
@@ -404,6 +445,15 @@ mod tests {
         assert!(!is_allowed_tool("run_shell_command"));
         assert!(!is_allowed_tool("../mcp-server"));
         assert_eq!(ALLOWED_TOOLS.len(), 93);
+    }
+
+    #[test]
+    fn portable_paths_are_explicit_and_application_local() {
+        let root = PathBuf::from("C:/portable/Gielinor Companion");
+        let database = root.join("portable-data").join("gielinor.db");
+
+        assert!(database.starts_with(&root));
+        assert_ne!(database, PathBuf::from(".gielinor-companion/gielinor.db"));
     }
 
     #[test]

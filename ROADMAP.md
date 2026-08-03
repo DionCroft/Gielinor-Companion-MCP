@@ -67,7 +67,15 @@ automatic catalogue scheduling, central diagnostics, twelve additive MCP tools,
 read-only GitHub release checks, scheduled live contract monitoring, and tested
 Node.js 22/24 support.
 
-## Version 1.2 candidates
+## 1.2 — One-click launch and live-data completion (complete)
+
+Normal-user NSIS installation, managed MSI and isolated portable packaging;
+single-instance native launch; production-only developer launcher; universal
+live/cache/manual/import/confirmed/calculated/preview/unavailable provenance;
+hard native fixture isolation; complete Data Sources centre; staged first run;
+and platform-aware read-only update guidance.
+
+## Version 1.3 candidates
 
 - OAuth/OIDC for private hosted profiles.
 - Persisted cross-process provider-circuit state and an operator dashboard for
@@ -80,3 +88,6 @@ Node.js 22/24 support.
 - Distributed rate limits and operational telemetry for multi-replica hosting.
 - Broader manual assistive-technology testing and independently exercised
   installer matrices.
+- Evaluate a supported future Jagex plugin/API contract for confirmed quest
+  state and visible-interface imports without credentials, memory access, or
+  automation. Do not adopt the undocumented RuneMetrics endpoint as live truth.

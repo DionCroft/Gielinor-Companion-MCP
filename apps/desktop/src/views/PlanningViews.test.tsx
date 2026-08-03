@@ -60,6 +60,16 @@ class MarketUiBridge extends DemoCompanionBridge {
         items: [{ itemId: 4151, quantity: 1 }],
       }) as ToolEnvelope<T>;
     }
+    if (tool === "replace_player_holdings") {
+      return response({
+        schemaVersion: 1,
+        snapshotId: "22222222-2222-4222-8222-222222222222",
+        profileId: PROFILE_ID,
+        capturedAt: NOW,
+        source: "manual",
+        items: arguments_.items,
+      }) as ToolEnvelope<T>;
+    }
     if (tool === "list_ge_trades") {
       return response([]) as ToolEnvelope<T>;
     }
@@ -115,6 +125,8 @@ describe("Grand Exchange private-data desktop workflows", () => {
 
     await user.click(screen.getByRole("tab", { name: "Portfolio" }));
     await user.click(await screen.findByRole("button", { name: "Save confirmed holding" }));
+    await user.click(await screen.findByRole("button", { name: "Edit" }));
+    await user.click(screen.getByRole("button", { name: "Remove" }));
 
     await user.click(screen.getByRole("tab", { name: "Trade journal" }));
     await user.click(await screen.findByRole("button", { name: "Record manual trade" }));
@@ -128,6 +140,7 @@ describe("Grand Exchange private-data desktop workflows", () => {
     expect(bridge.calls.map(({ tool }) => tool)).toEqual(
       expect.arrayContaining([
         "upsert_player_holding",
+        "replace_player_holdings",
         "record_ge_trade",
         "record_paper_trade",
         "create_market_watchlist",
@@ -139,6 +152,14 @@ describe("Grand Exchange private-data desktop workflows", () => {
       profileId: PROFILE_ID,
       holding: { itemId: 4151, quantity: 1 },
       source: "manual",
+    });
+    expect(
+      bridge.calls.find(({ tool }) => tool === "replace_player_holdings")?.arguments,
+    ).toMatchObject({
+      profileId: PROFILE_ID,
+      items: [],
+      source: "manual",
+      confirmReplace: true,
     });
   });
 });
