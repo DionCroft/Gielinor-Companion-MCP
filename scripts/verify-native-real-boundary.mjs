@@ -6,6 +6,10 @@ const root = resolve(import.meta.dirname, "..");
 const bridge = readFileSync(resolve(root, "apps/desktop/src/lib/native-bridge.ts"), "utf8");
 const app = readFileSync(resolve(root, "apps/desktop/src/App.tsx"), "utf8");
 const entry = readFileSync(resolve(root, "apps/desktop/src/main.tsx"), "utf8");
+const playwrightSetup = readFileSync(
+  resolve(root, "apps/desktop/test/e2e/global-setup.ts"),
+  "utf8",
+);
 const native = readFileSync(resolve(root, "apps/desktop/src-tauri/src/lib.rs"), "utf8");
 
 const failures = [];
@@ -29,6 +33,12 @@ if (!entry.includes('runtimeMode !== "browser-preview"')) {
 }
 if (!entry.includes('runtimeMode !== "automated-test"')) {
   failures.push("automated fixtures must require an explicit runtime query mode");
+}
+if (!playwrightSetup.includes('process.env.VITE_GIELINOR_ENABLE_PREVIEW = "true"')) {
+  failures.push("the Playwright server must explicitly enable automated-test fixtures");
+}
+if (!playwrightSetup.includes('mode: "automated-test"')) {
+  failures.push("the Playwright server must use the explicit automated-test environment mode");
 }
 if (!native.includes('mode: "native-real"')) {
   failures.push("the native runtime must report native-real mode");
