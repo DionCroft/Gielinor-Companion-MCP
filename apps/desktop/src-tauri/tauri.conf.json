@@ -48,7 +48,8 @@
     "windows": {
       "nsis": {
         "installMode": "currentUser",
-        "startMenuFolder": "Gielinor Companion"
+        "startMenuFolder": "Gielinor Companion",
+        "installerHooks": "windows/installer-hooks.nsh"
       },
       "wix": {
         "language": "en-US"

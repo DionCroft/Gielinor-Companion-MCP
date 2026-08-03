@@ -7,6 +7,7 @@ import type {
   MarketRecommendation,
   MarketWatchlist,
   PaperPortfolio,
+  PlayerHolding,
   PlayerHoldingsSnapshot,
   PortfolioSummary,
 } from "@gielinor/shared-types";
@@ -657,6 +658,7 @@ export function ExchangeView({
   const [holdingQuantity, setHoldingQuantity] = useState(1);
   const [holdingCost, setHoldingCost] = useState("");
   const [holdingCash, setHoldingCash] = useState("");
+  const [holdingNotes, setHoldingNotes] = useState("");
   const [holdingsFormat, setHoldingsFormat] = useState<"csv" | "json">("json");
   const [holdingsTransfer, setHoldingsTransfer] = useState("");
   const [tradeItemId, setTradeItemId] = useState(4151);
@@ -830,6 +832,7 @@ export function ExchangeView({
           itemId: holdingItemId,
           quantity: holdingQuantity,
           ...(holdingCost.trim() === "" ? {} : { averageAcquisitionPrice: Number(holdingCost) }),
+          ...(holdingNotes.trim() === "" ? {} : { notes: holdingNotes.trim() }),
         },
         ...(holdingCash.trim() === "" ? {} : { cashGp: Number(holdingCash) }),
         source: "manual",
@@ -843,6 +846,41 @@ export function ExchangeView({
       setAnalysisProvenance(portfolioResponse.meta.provenance);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "The holding could not be saved");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function editHolding(holding: PlayerHolding) {
+    setHoldingItemId(holding.itemId);
+    setHoldingQuantity(holding.quantity);
+    setHoldingCost(
+      holding.averageAcquisitionPrice === undefined ? "" : String(holding.averageAcquisitionPrice),
+    );
+    setHoldingNotes(holding.notes ?? "");
+  }
+
+  async function removeHolding(itemId: number) {
+    if (holdings === null || holdings === undefined) return;
+    setBusy(true);
+    setError(undefined);
+    try {
+      const response = await bridge.callTool<PlayerHoldingsSnapshot>("replace_player_holdings", {
+        profileId: profile.id,
+        items: holdings.items.filter((holding) => holding.itemId !== itemId),
+        ...(holdings.cashGp === undefined ? {} : { cashGp: holdings.cashGp }),
+        source: "manual",
+        confirmReplace: true,
+      });
+      setHoldings(response.data);
+      setPrivateProvenance(response.meta.provenance);
+      const portfolioResponse = await bridge.callTool<PortfolioSummary>("get_portfolio_summary", {
+        profileId: profile.id,
+      });
+      setPortfolio(portfolioResponse.data);
+      setAnalysisProvenance(portfolioResponse.meta.provenance);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "The holding could not be removed");
     } finally {
       setBusy(false);
     }
@@ -1189,6 +1227,14 @@ export function ExchangeView({
                       placeholder="Optional GP"
                     />
                   </label>
+                  <label>
+                    Notes
+                    <input
+                      value={holdingNotes}
+                      onChange={(event) => setHoldingNotes(event.currentTarget.value)}
+                      placeholder="Optional local note"
+                    />
+                  </label>
                 </div>
                 <button className="primary-button" type="submit" disabled={busy}>
                   Save confirmed holding
@@ -1244,13 +1290,57 @@ export function ExchangeView({
             </section>
             <section className="surface-card">
               <h2>Latest confirmed snapshot</h2>
-              {holdings === null ? (
+              {holdings === undefined ? (
+                <LoadingBlock label="Loading confirmed holdings" />
+              ) : holdings === null ? (
                 <p>No holdings snapshot has been recorded.</p>
               ) : (
-                <p>
-                  {holdings?.items.length ?? 0} item lines; captured{" "}
-                  {formatDate(holdings?.capturedAt)}; source {holdings?.source}
-                </p>
+                <>
+                  <p>
+                    {holdings?.items.length ?? 0} item lines; captured{" "}
+                    {formatDate(holdings?.capturedAt)}; source {holdings?.source}; confirmed cash{" "}
+                    {holdings?.cashGp === undefined ? "not entered" : formatGp(holdings.cashGp)}
+                  </p>
+                  {holdings.items.length === 0 ? (
+                    <p>No item holdings have been recorded.</p>
+                  ) : (
+                    <div className="shopping-table" aria-label="Editable confirmed holdings">
+                      {holdings.items.map((holding) => (
+                        <div className="shopping-row" key={holding.itemId}>
+                          <span className="item-orb">#{holding.itemId}</span>
+                          <div>
+                            <strong>{formatNumber(holding.quantity)} held</strong>
+                            <small>
+                              Cost{" "}
+                              {holding.averageAcquisitionPrice === undefined
+                                ? "not entered"
+                                : formatGp(holding.averageAcquisitionPrice)}
+                              {holding.notes === undefined ? "" : `; ${holding.notes}`}
+                            </small>
+                          </div>
+                          <div className="button-row">
+                            <button
+                              className="secondary-button"
+                              type="button"
+                              disabled={busy}
+                              onClick={() => editHolding(holding)}
+                            >
+                              Edit
+                            </button>
+                            <button
+                              className="secondary-button"
+                              type="button"
+                              disabled={busy}
+                              onClick={() => void removeHolding(holding.itemId)}
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
               )}
             </section>
           </>

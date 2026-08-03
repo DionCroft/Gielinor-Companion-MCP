@@ -8,6 +8,11 @@ const config = JSON.parse(
 );
 const native = readFileSync(resolve(root, "apps/desktop/src-tauri/src/lib.rs"), "utf8");
 const cargo = readFileSync(resolve(root, "apps/desktop/src-tauri/Cargo.toml"), "utf8");
+const desktopPackage = JSON.parse(readFileSync(resolve(root, "apps/desktop/package.json"), "utf8"));
+const hooks = readFileSync(
+  resolve(root, "apps/desktop/src-tauri/windows/installer-hooks.nsh"),
+  "utf8",
+);
 const smoke = readFileSync(resolve(root, "scripts/smoke-windows-installer.ps1"), "utf8");
 const releaseWorkflow = readFileSync(resolve(root, ".github/workflows/release.yml"), "utf8");
 const nsis = config.bundle?.windows?.nsis;
@@ -18,6 +23,22 @@ if (config.bundle?.targets !== "all") throw new Error("NSIS and MSI outputs must
 if (nsis?.installMode !== "currentUser") throw new Error("NSIS must default to per-user install");
 if (nsis?.startMenuFolder !== "Gielinor Companion") {
   throw new Error("NSIS must create a Gielinor Companion Start Menu folder");
+}
+if (nsis?.installerHooks !== "windows/installer-hooks.nsh") {
+  throw new Error("NSIS must use the supported data-lifecycle hooks");
+}
+if (desktopPackage.devDependencies?.["@tauri-apps/cli"] !== "2.11.4") {
+  throw new Error("the audited Tauri NSIS template version must remain pinned");
+}
+for (const required of [
+  "NSIS_HOOK_POSTUNINSTALL",
+  "$DeleteAppDataCheckboxState = 1",
+  "$UpdateMode <> 1",
+  "$PROFILE\\.gielinor-companion",
+]) {
+  if (!hooks.includes(required)) {
+    throw new Error(`the explicit app-data deletion hook is missing ${required}`);
+  }
 }
 if (!config.bundle.externalBin?.includes("binaries/gielinor-runtime")) {
   throw new Error("the installer must include the exact bundled MCP executable");
