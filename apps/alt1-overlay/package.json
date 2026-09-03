@@ -16,7 +16,7 @@
   "dependencies": {
     "@gielinor/shared-types": "workspace:*",
     "alt1": "0.1.3",
-    "zod": "^3.25.76"
+    "zod": "^4.5.4"
   },
   "devDependencies": {
     "jsdom": "29.1.1",

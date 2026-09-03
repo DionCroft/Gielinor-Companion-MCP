@@ -23,7 +23,7 @@
   },
   "dependencies": {
     "@gielinor/shared-types": "workspace:*",
-    "zod": "^3.25.76"
+    "zod": "^4.5.4"
   },
   "repository": {
     "type": "git",
